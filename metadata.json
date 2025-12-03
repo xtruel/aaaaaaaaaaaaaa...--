@@ -1,0 +1,8 @@
+{
+  "name": "BananaStream Studio",
+  "description": "A powerful video composition tool that lets you record system audio, replace your background with AI-generated visuals using Gemini, and overlay your segmented webcam feed.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
