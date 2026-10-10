@@ -1,15 +1,16 @@
-// Purifier (2×2): a tall white tank (rounded square, as in the reference sheet) with glowing cyan bands, tall
-// windows and a blue cap carrying a big fan; a round short tank topped by the droplet logo; pipes between them and
-// a vented filter unit in front. While working the fan spins, a pulse of light climbs the bands and the droplet glows.
+// Purifier (2×2): a slender white tank tower (rounded, about 2.5 times as tall as it is wide, as in the reference
+// sheet) on a wide pedestal, with glowing cyan bands, a sight-glass on each visible face and a blue cap carrying a
+// fan; a round short tank topped by the droplet logo; pipes between them and a vented filter unit in front. While
+// working the fan spins, a pulse of light climbs the bands, the water rises in the sight-glasses and the drop glows.
 import { M } from '../palette';
 import type { Vox } from '../voxel';
 import { footprint, plate } from './common';
 import type { BuildingArt } from './common';
 
-// A rounded tank: a squircle prism (|dx|^p + |dy|^p <= r^p) centred on (cx, cy). p = 6 gives flat walls that
-// read clean and white in the iso light, with rounded corners; p = 2 is a plain cylinder. 'inner' > 0 keeps only
-// the shell outside that radius.
-function tank(v: Vox, cx: number, cy: number, r: number, z0: number, z1: number, m: number, inner = -1, p = 6): void {
+// A rounded tank: a squircle prism (|dx|^p + |dy|^p <= r^p) centred on (cx, cy). p = 4 keeps the faces flat (they
+// read clean and white in the iso light, no staircase ribbing) and rounds the corners over ~3 voxels; p = 2 is a
+// plain cylinder. 'inner' > 0 keeps only the shell outside that radius.
+function tank(v: Vox, cx: number, cy: number, r: number, z0: number, z1: number, m: number, inner = -1, p = 4): void {
   for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
     for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
       const d = Math.abs(x + 0.5 - cx) ** p + Math.abs(y + 0.5 - cy) ** p;
@@ -22,38 +23,42 @@ export const purifier: BuildingArt = {
   fps: 6,
   model(frame, working) {
     const f = working ? frame % 4 : 0;
-    const v = footprint(2, 2, 46);
+    const v = footprint(2, 2, 50);
     plate(v);
-    // the tall tank: a wide base with a white shoulder, then the narrower column
+    // the tall tank: a wide pedestal with a white shoulder, then the slender column
     const tx = 20;
     const ty = 12;
-    const tr = 7.5;
+    const tr = 6.5;
     tank(v, tx, ty, tr + 1.5, 3, 15, M.white);
     tank(v, tx, ty, tr + 2.1, 3, 5, M.cyanD);
     tank(v, tx, ty, tr + 2, 15, 16, M.steelL);
-    tank(v, tx, ty, tr, 16, 37, M.white);
+    tank(v, tx, ty, tr, 16, 41, M.white);
     // glowing bands: a pulse of light climbs them while working
     const bands: [number, number][] = [
       [8, tr + 1.5],
       [19, tr],
-      [31, tr],
+      [34, tr],
     ];
     bands.forEach(([z, r], k) => {
       const m = working ? (f === k || f === 3 ? M.cyanLit : M.screen) : M.cyanD;
       tank(v, tx, ty, r + 0.6, z, z + 2, m, r - 1);
     });
-    // tall glass windows on both visible faces of the column
-    for (const d of [-3, 2]) {
-      v.box(tx + d, ty + 7, 22, tx + d + 2, ty + 8, 29, M.ink);
-      v.box(tx + 7, ty + d, 22, tx + 8, ty + d + 2, 29, M.ink);
-      v.box(tx + d, ty + 7, 23, tx + d + 2, ty + 8, 28, M.glass);
-      v.box(tx + 7, ty + d, 23, tx + 8, ty + d + 2, 28, M.glass);
-    }
+    // a sight-glass gauge on each visible face of the column: the water climbs 2 voxels per frame while working
+    const level = working ? 24 + f * 2 : 25;
+    const water = working ? M.cyanLit : M.cyanD;
+    v.box(tx - 2, ty + 6, 21, tx + 2, ty + 7, 33, M.ink);
+    v.box(tx + 6, ty - 2, 21, tx + 7, ty + 2, 33, M.ink);
+    v.box(tx - 1, ty + 6, 22, tx + 1, ty + 7, 32, M.window);
+    v.box(tx + 6, ty - 1, 22, tx + 7, ty + 1, 32, M.window);
+    v.box(tx - 1, ty + 6, 31, tx, ty + 7, 32, M.glass); // a glint at the top of the empty tube
+    v.box(tx + 6, ty - 1, 31, tx + 7, ty, 32, M.glass);
+    v.box(tx - 1, ty + 6, 22, tx + 1, ty + 7, level, water);
+    v.box(tx + 6, ty - 1, 22, tx + 7, ty + 1, level, water);
     // blue cap with the fan housing
-    tank(v, tx, ty, tr + 0.6, 37, 39, M.blueD);
-    tank(v, tx, ty, tr, 39, 41, M.blue);
-    v.cylZ(tx, ty, 6.6, 41, 43, M.steelD, 5.4);
-    v.cylZ(tx, ty, 5.6, 40, 41, M.ink);
+    tank(v, tx, ty, tr + 0.6, 41, 43, M.blueD);
+    tank(v, tx, ty, tr, 43, 45, M.blue);
+    v.cylZ(tx, ty, 6.1, 45, 47, M.steelD, 4.9);
+    v.cylZ(tx, ty, 5.1, 44, 45, M.ink);
     // four fan blades, a quarter of a turn every four frames
     for (let k = 0; k < 4; k++) {
       const a = (k * Math.PI) / 2 + (f * Math.PI) / 8;
@@ -65,25 +70,25 @@ export const purifier: BuildingArt = {
           const dy = y + 0.5 - ty;
           const t = dx * ca + dy * sa;
           const n = -dx * sa + dy * ca;
-          if (t > 0.8 && t < 5.4 && n > -0.6 && n < 1.4) v.set(x, y, 41, M.steelL);
+          if (t > 0.8 && t < 4.9 && n > -0.6 && n < 1.4) v.set(x, y, 45, M.steelL);
         }
     }
-    v.box(tx - 1, ty - 1, 41, tx + 1, ty + 1, 42, M.white);
+    v.box(tx - 1, ty - 1, 45, tx + 1, ty + 1, 46, M.white);
     // beacon on the housing rim
-    v.box(tx + 4, ty - 5, 43, tx + 5, ty - 4, 45, M.redLit);
-    v.point('light', tx + 4.5, ty - 4.5, 45);
+    v.box(tx + 3, ty - 5, 47, tx + 4, ty - 4, 49, working ? M.redLit : M.red);
+    v.point('light', tx + 3.5, ty - 4.5, 49);
     // the round short tank with a cyan dome
     const sx = 9.5;
     const sy = 22.5;
-    tank(v, sx, sy, 5.6, 3, 21, M.white, -1, 2);
-    tank(v, sx, sy, 6.2, 3, 5, M.cyanD, -1, 2);
-    tank(v, sx, sy, 6.2, 12, 14, working ? M.cyanLit : M.cyanD, 4.5, 2);
-    tank(v, sx, sy, 6.2, 21, 22, M.steelL, -1, 2);
+    tank(v, sx, sy, 5.6, 3, 21, M.white, -1, 4);
+    tank(v, sx, sy, 6.2, 3, 5, M.cyanD, -1, 4);
+    tank(v, sx, sy, 6.2, 12, 14, working ? M.cyanLit : M.cyanD, 4.5, 4);
+    tank(v, sx, sy, 6.2, 21, 22, M.steelL, -1, 4);
     v.sphere(sx, sy, 21.5, 4.8, M.cyanD, 0.4);
-    // the droplet logo standing on top: a ball tapering to a point, glowing while working
-    const drop = working ? M.cyanLit : M.sky;
+    // the droplet logo standing on top: a ball with a concave taper to a sharp tip, glowing while working
+    const drop = working ? M.cyanLit : M.cyanD;
     v.sphere(sx, sy, 26.5, 3.6, drop);
-    v.cone(sx, sy, 28, 34, 3.1, 0.5, drop);
+    [3.2, 2.7, 2.2, 1.8, 1.4, 1.1, 0.8, 0.6].forEach((r, k) => v.cylZ(sx, sy, r, 28 + k, 29 + k, drop));
     v.paint(8, 24, 27, 10, 26, 30, M.white);
     // pipes from the short tank to the tall one
     v.cylX(22.5, 16.5, 1.2, 14, 22, M.steelL);

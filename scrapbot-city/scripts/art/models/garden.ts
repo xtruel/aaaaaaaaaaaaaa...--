@@ -1,43 +1,47 @@
 // Pixel Garden (1×1): a grass bed in a sand planter with a big round tree, a small tree, a bed of pink and
-// yellow flowers, a wooden bench and a street lamp that glows at night. Two frames: the canopies sway by a voxel
-// and a butterfly flutters over the flowers.
+// yellow flower clumps, a wooden bench and a street lamp that glows while the garden is open. Four frames: the
+// canopies lean right, back, left, back (whole crowns shift, shading intact) and a butterfly flaps over the flowers.
 import { M } from '../palette';
+import { hex, mat } from '../voxel';
 import type { Vox } from '../voxel';
 import { footprint, plate } from './common';
 import type { BuildingArt } from './common';
 
-// A chunky round canopy: a few overlapping balls, lighter on top, darker underneath. 'sway' leans the crown
-// towards the screen's right by a voxel.
+const WOOD = mat('garden-wood', { rgb: hex('#a8794a') });
+const WOOD_D = mat('garden-woodD', { rgb: hex('#5f3d25') });
+
+// A chunky round canopy: a few overlapping balls, lighter on top, darker underneath. It is built in its own model
+// so the shading only touches this crown, then stamped with 'sway' (+1 leans 2 px to the screen's right).
 function canopy(v: Vox, cx: number, cy: number, cz: number, r: number, sway: number): void {
-  const z0 = Math.max(0, Math.floor(cz - r - 1));
-  const z1 = Math.min(v.h, Math.ceil(cz + r + 2));
-  const s = sway * 0.5;
-  v.sphere(cx + s * 0.5, cy - s * 0.5, cz, r, M.green);
-  v.sphere(cx - r * 0.35, cy + r * 0.35, cz - r * 0.3, r * 0.68, M.green);
-  v.sphere(cx + r * 0.35 + s, cy - r * 0.35 - s, cz - r * 0.2, r * 0.68, M.green);
-  v.sphere(cx + s * 1.5, cy - s * 1.5, cz + r * 0.55, r * 0.62, M.green);
+  const c = footprint(1, 1, v.h);
+  c.sphere(cx, cy, cz, r, M.green);
+  c.sphere(cx - r * 0.35, cy + r * 0.35, cz - r * 0.3, r * 0.68, M.green);
+  c.sphere(cx + r * 0.35, cy - r * 0.35, cz - r * 0.2, r * 0.68, M.green);
+  c.sphere(cx, cy, cz + r * 0.55, r * 0.62, M.green);
   // shade: light top layer, dark bottom layer
-  for (let y = 0; y < v.d; y++)
-    for (let x = 0; x < v.w; x++) {
+  for (let y = 0; y < c.d; y++)
+    for (let x = 0; x < c.w; x++) {
       let top = -1;
       let bottom = -1;
-      for (let z = z0; z < z1; z++)
-        if (v.get(x, y, z) === M.green) {
+      for (let z = 0; z < c.h; z++)
+        if (c.get(x, y, z)) {
           if (bottom < 0) bottom = z;
           top = z;
         }
       if (top < 0) continue;
-      v.set(x, y, top, M.greenL);
-      if (bottom < top - 1) v.set(x, y, bottom, M.greenD);
+      c.set(x, y, top, M.greenL);
+      if (bottom < top - 1) c.set(x, y, bottom, M.greenD);
     }
+  v.stamp(c, sway, -sway, 0);
 }
 
 export const garden: BuildingArt = {
-  frames: 2,
-  fps: 2,
+  frames: 4,
+  fps: 4,
   model(frame, working) {
     const v = footprint(1, 1, 19);
-    const sway = working ? frame % 2 : 0;
+    const f = working ? frame % 4 : 0;
+    const sway = working ? [0, 1, 0, -1][f] : 0;
     plate(v);
     // grass bed inside the sand rim
     v.box(2, 2, 2, 14, 14, 3, M.green);
@@ -48,36 +52,34 @@ export const garden: BuildingArt = {
     // a small tree on the right corner
     v.box(12, 3, 3, 13, 4, 6, M.rustD);
     canopy(v, 12.5, 3.5, 7.5, 2.6, sway);
-    // flower bed on the front corner: pink and yellow heads scattered over leafy green
+    // flower bed on the front corner: four 2×2 clumps of pink and yellow heads over dark leaves
     v.box(9, 9, 3, 14, 14, 4, M.greenD);
-    const FLOWERS = ['..P..', '.Y..P', 'P..Y.', '..P..', '.Y..P'];
-    FLOWERS.forEach((row, j) =>
-      [...row].forEach((ch, i) => {
-        if (ch === '.') return;
-        v.set(9 + i, 9 + j, 3, M.green);
-        v.set(9 + i, 9 + j, 4, ch === 'P' ? M.pink : M.yellow);
-      }),
-    );
-    // wooden bench along the front-left edge, facing the viewer
-    for (const x of [3, 8]) {
-      v.box(x, 13, 3, x + 1, 14, 5, M.steelD);
-      v.box(x, 11, 3, x + 1, 12, 8, M.steelD);
+    const CLUMPS: [number, number, number][] = [
+      [9, 12, M.pink],
+      [12, 9, M.pink],
+      [12, 12, M.yellow],
+      [9, 9, M.yellow],
+    ];
+    for (const [x, y, m] of CLUMPS) v.box(x, y, 4, x + 2, y + 2, 5, m);
+    // wooden bench along the front-left edge, facing the viewer: seat, a gap, then the backrest
+    for (const x of [2, 9]) {
+      v.box(x, 13, 3, x + 1, 14, 5, WOOD_D);
+      v.box(x, 11, 3, x + 1, 12, 7, WOOD_D);
     }
-    v.box(2, 12, 5, 10, 14, 6, M.rust);
-    v.box(2, 11, 6, 10, 12, 8, M.rustD);
-    // street lamp on the left corner
+    v.box(2, 12, 5, 10, 14, 6, WOOD);
+    v.box(2, 11, 7, 10, 12, 9, WOOD_D);
+    // street lamp on the left corner: a 2×2 head that glows while the garden is open
     v.box(2, 14, 3, 3, 15, 12, M.steelD);
-    v.box(2, 14, 12, 3, 15, 14, M.yellowLit);
-    v.box(1, 13, 14, 4, 16, 15, M.steelD);
-    // a butterfly over the flowers (wings open, then folded higher up)
+    v.box(2, 13, 12, 4, 15, 14, working ? M.yellowLit : M.yellow);
+    v.box(1, 12, 14, 5, 16, 15, M.steelD);
+    // a butterfly over the flowers: wings open, then folded 2 voxels higher, drifting up a voxel every other beat
     if (working) {
-      if (frame % 2 === 0) {
-        v.set(11, 11, 8, M.pink);
-        v.set(12, 10, 8, M.pink);
-      } else {
-        v.set(12, 9, 9, M.pink);
-        v.set(12, 9, 10, M.pinkD);
-      }
+      const z = 9 + (f >> 1);
+      if (f % 2 === 0) {
+        v.box(11, 10, z, 12, 12, z + 2, M.pink);
+        v.box(13, 10, z, 14, 12, z + 2, M.pink);
+        v.box(12, 10, z, 13, 12, z + 1, M.pinkD);
+      } else v.box(12, 10, z + 2, 13, 12, z + 4, M.pink);
     }
     return v;
   },

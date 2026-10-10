@@ -4,7 +4,7 @@
 // Working = belt, crates, arm and roof fan move; sign, skylights, windows and boiler gauge lit; smoke.
 // Off = everything still and unlit (only the chimney beacon stays on).
 import { M } from '../palette';
-import { FONT, hex, mat } from '../voxel';
+import { hex, mat } from '../voxel';
 import type { Vox } from '../voxel';
 import { footprint, hazardBand, plate } from './common';
 import type { BuildingArt } from './common';
@@ -14,17 +14,12 @@ const SKY = mat('factory-skylight', { rgb: hex('#86c8ff'), emit: 0.6, glow: hex(
 // neon tube letters: white by day, glowing pink-white at night
 const NEON = mat('factory-neon', { rgb: hex('#fff2f8'), emit: 0.6, glow: hex('#ffd6ea'), jitter: 0 });
 
-// Letters at twice the size of the 3×5 font on the +y face (outer layer y), reading along +x.
-function bigTextY(v: Vox, str: string, x: number, y: number, zTop: number, m: number, gap = 2): void {
-  let cursor = 0;
-  for (const ch of str) {
-    const g = FONT[ch];
-    if (g)
-      for (let row = 0; row < 5; row++)
-        for (let col = 0; col < 3; col++) if (g[row][col] === '#') v.box(x + cursor + col * 2, y, zTop - row * 2 - 1, x + cursor + col * 2 + 2, y + 1, zTop - row * 2 + 1, m);
-    cursor += 6 + gap;
-  }
-}
+// The flagship "2PM" in native 10-row neon letters (the doubled 3×5 font read as "ZFM").
+const SIGN = [
+  ['.####.', '##..##', '....##', '....##', '...##.', '..##..', '.##...', '##....', '######', '######'],
+  ['#####.', '######', '##..##', '##..##', '######', '#####.', '##....', '##....', '##....', '##....'],
+  ['##...##', '###.###', '#######', '##.#.##', '##...##', '##...##', '##...##', '##...##', '##...##', '##...##'],
+];
 
 type P3 = [number, number, number];
 
@@ -40,11 +35,13 @@ function beam(v: Vox, a: P3, b: P3, r: number, m: number): void {
   }
 }
 
-// A cardboard crate with a tape band.
-function crate(v: Vox, x: number, y: number, z: number): void {
-  v.box(x, y, z, x + 4, y + 4, z + 4, M.sand);
-  v.paint(x, y, z + 3, x + 4, y + 4, z + 4, M.white);
-  v.paint(x + 1, y, z, x + 3, y + 4, z + 4, M.sandD);
+// A rust-brown crate with a pink 2PM tape band (it must pop against the sand plate and the yellow arm).
+// `turned` runs the band along y instead of x, so the crates of a stack alternate and each one reads.
+function crate(v: Vox, x: number, y: number, z: number, turned = false): void {
+  v.box(x, y, z, x + 4, y + 4, z + 4, M.rust);
+  v.paint(x, y, z, x + 4, y + 4, z + 1, M.rustD);
+  if (turned) v.paint(x, y + 1, z, x + 4, y + 3, z + 4, M.pink);
+  else v.paint(x + 1, y, z, x + 3, y + 4, z + 4, M.pink);
 }
 
 // Two-link arm in a vertical plane: shoulder at (0, sz), gripper target (u, z); returns the elbow (elbow up).
@@ -62,12 +59,12 @@ function elbow(sz: number, u: number, z: number): [number, number] {
 }
 
 // Gripper targets (offset along x from the arm base, height): over the end of the belt, lifting the crate,
-// swung over the pallet, setting it down on the stack.
+// swung high over the pallet, setting it down on top of the stack.
 const GRIP: [number, number][] = [
   [-7, 12],
   [-6, 16],
-  [5, 17],
-  [6, 14],
+  [3, 20],
+  [6, 17],
 ];
 
 export const factory: BuildingArt = {
@@ -88,7 +85,13 @@ export const factory: BuildingArt = {
     // (lit only while the factory runs: off means stopped or without power)
     v.box(4, 22, 7, 28, 24, 20, working ? M.pinkLit : M.pink);
     v.box(5, 23, 8, 27, 24, 19, M.pinkD);
-    bigTextY(v, '2PM', 6, 23, 18, working ? NEON : M.white, 1); // flush with the panel: crisp letter shapes
+    let sx = 6; // letters flush with the panel: crisp shapes
+    for (const g of SIGN) {
+      g.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) if (row[c] === '#') v.set(sx + c, 23, 18 - r, working ? NEON : M.white);
+      });
+      sx += g[0].length + 1;
+    }
 
     // loading door the belt comes out of
     v.box(28, 22, 3, 36, 24, 14, M.steelD);
@@ -106,23 +109,30 @@ export const factory: BuildingArt = {
     }
 
     // ---------- grey machinery on the roof ----------
-    v.box(27, 4, 23, 35, 12, 30, M.concreteL); // big unit with a fan on top
-    v.box(28, 12, 24, 34, 13, 28, M.steel);
-    for (let z = 25; z < 28; z += 2) v.box(29, 12, z, 33, 13, z + 1, M.ink); // vents
-    v.cylZ(31, 8, 3.2, 30, 31, M.ink);
-    const o = working ? frame % 2 : 0;
-    if (o === 0) {
-      v.box(28, 7, 30, 34, 9, 31, M.steelL);
-      v.box(30, 5, 30, 32, 11, 31, M.steelL);
-    } else
-      for (let k = -3; k < 3; k++) {
-        v.box(31 + k, 8 + k, 30, 31 + k + 1, 8 + k + 1, 31, M.steelL);
-        v.box(31 + k, 7 - k, 30, 31 + k + 1, 7 - k + 1, 31, M.steelL);
+    v.box(26, 3, 23, 36, 13, 30, M.concreteL); // big unit with a fan on top
+    v.box(28, 13, 24, 34, 14, 28, M.steel);
+    for (let z = 25; z < 28; z += 2) v.box(29, 13, z, 33, 14, z + 1, M.ink); // vents
+    v.cylZ(31, 8, 4.8, 30, 31, M.steel); // fan shroud
+    // 4-blade fan on a dark disc, turned a quarter of its 90° symmetry per frame (4 orientations)
+    const th = (f * Math.PI) / 8;
+    for (let y = 3; y < 13; y++)
+      for (let x = 26; x < 36; x++) {
+        const dx = x + 0.5 - 31;
+        const dy = y + 0.5 - 8;
+        if (Math.hypot(dx, dy) > 3.9) continue;
+        let blade = false;
+        for (let k = 0; k < 4; k++) {
+          const p = th + (k * Math.PI) / 2;
+          const along = dx * Math.cos(p) + dy * Math.sin(p);
+          const across = -dx * Math.sin(p) + dy * Math.cos(p);
+          if (along > 0 && Math.abs(across) < 0.75) blade = true;
+        }
+        v.set(x, y, 30, blade ? M.steelL : M.ink);
       }
-    v.box(30, 7, 30, 32, 9, 31, M.steelD);
+    v.box(30, 7, 30, 32, 9, 31, M.steelD); // hub
     v.box(28, 15, 23, 34, 21, 27, M.steel); // smaller box with a red pipe up to the big unit
     v.box(29, 16, 27, 33, 20, 28, M.steelD);
-    v.cylY(33.5, 28.5, 1.2, 10, 18, M.red);
+    v.cylY(33.5, 26.5, 1.2, 10, 18, M.red);
 
     // ---------- red boiler and pipes beside the right wall ----------
     v.box(37, 10, 3, 47, 23, 5, M.steelD); // machine bed
@@ -136,9 +146,9 @@ export const factory: BuildingArt = {
     v.cylX(12.5, 9.5, 1.3, 35, 40, M.red);
     v.cylZ(36.5, 8.5, 1.3, 3, 27, M.red); // riser to the roof machinery
     v.cylX(8.5, 26.5, 1.3, 33, 37, M.red);
-    // gauge panel on the boiler bed
-    v.box(45, 18, 5, 47, 23, 11, M.steel);
-    v.box(46, 19, 6, 47, 22, 10, working ? M.cyanLit : M.window);
+    // pressure gauge on the boiler's right side
+    v.box(46, 13, 7, 47, 19, 13, M.steel);
+    v.box(46, 14, 8, 47, 18, 12, working ? M.cyanLit : M.window);
 
     // ---------- striped chimney (back right) ----------
     const cx = 42;
@@ -188,12 +198,11 @@ export const factory: BuildingArt = {
     v.box(gr[0] - 2, by - 2, gz - 3, gr[0] - 1, by + 2, gz - 1, M.steelD);
     v.box(gr[0] + 1, by - 2, gz - 3, gr[0] + 2, by + 2, gz - 1, M.steelD);
     if (working && frame > 0) crate(v, gr[0] - 2, by - 2, gz - 5); // the crate in its grip
-    // pallet with a stack of crates
-    v.box(40, 23, 3, 47, 31, 4, M.rustD);
-    crate(v, 40, 23, 4);
-    crate(v, 43, 23, 4);
-    crate(v, 40, 27, 4);
-    crate(v, 43, 27, 4);
+    // pallet with a stack of crates (clear of the arm's base plate)
+    v.box(41, 23, 3, 47, 31, 4, M.rustD);
+    crate(v, 42, 23, 4);
+    crate(v, 42, 27, 4, true);
+    crate(v, 42, 23, 8, true);
     crate(v, 42, 27, 8);
     // front yard: a painted walkway line and a few pink 2PM barrels by the corner
     v.paint(3, 26, 2, 27, 27, 3, M.hazardY);
@@ -205,7 +214,7 @@ export const factory: BuildingArt = {
       v.cylZ(x, y, 1.7, 3, 8, m);
       v.cylZ(x, y, 1.7, 5, 6, M.ink);
     }
-    v.point('spark', 31, 29, 12);
+    v.point('spark', 38, 29, 13); // the arm's shoulder joint
     return v;
   },
 };

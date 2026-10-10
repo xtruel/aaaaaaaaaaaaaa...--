@@ -1,10 +1,10 @@
 // Fix-It Lab (2×2): an L-shaped white workshop on a dark base wrapped around an open repair bay on the front
 // corner. In the bay an orange robotic arm welds a bot (white head, pink ears, lime eyes) on a lift pad in front of
 // the garage door. The shop front has a pink and white striped awning under a big cyan diagnostic screen, the
-// right wall a neon wrench sign, and the roof a big monitor with the bot face.
+// right wall a neon wrench sign, and the roof a big monitor with a heartbeat trace that runs while the lab works.
 import { M } from '../palette';
 import type { Vox } from '../voxel';
-import { botFaceY, footprint, hazardBand, plate } from './common';
+import { footprint, hazardBand, plate } from './common';
 import type { BuildingArt } from './common';
 
 type P = [number, number, number];
@@ -34,8 +34,8 @@ function patient(v: Vox, x0: number, y0: number, z0: number, eyes: number): void
   v.box(x0 + 6, y0 + 3, z0 + 7, x0 + 8, y0 + 5, z0 + 10, M.pink);
 }
 
-// The wrench sign glyph (5 wide, 11 tall), top row first: open jaw on top, ring at the bottom.
-const WRENCH = ['#...#', '#...#', '##.##', '.###.', '..#..', '..#..', '..#..', '..#..', '.###.', '.#.#.', '.###.'];
+// The wrench sign glyph (6 wide, 11 tall, 2-voxel strokes), top row first: open jaw on top, ring at the bottom.
+const WRENCH = ['##..##', '##..##', '######', '.####.', '..##..', '..##..', '..##..', '..##..', '.####.', '.#..#.', '.####.'];
 
 export const fixlab: BuildingArt = {
   frames: 4,
@@ -71,10 +71,10 @@ export const fixlab: BuildingArt = {
     v.box(18, 10, 7, 21, 11, 11, working ? M.cyanLit : M.window); // a screen inside
     // diagnostic screens on the left wing's bay wall: bars that flicker while working
     for (let i = 0; i < 3; i++) {
-      const y0 = 16 + i * 4;
-      v.box(13, y0, 9, 14, y0 + 3, 17, M.ink);
+      const y0 = 15 + i * 4;
+      v.box(13, y0, 9, 14, y0 + 4, 17, M.ink);
       const lit = working && (i + f) % 3 !== 0;
-      v.box(13, y0 + 1, 10, 14, y0 + 2, 16, lit ? M.cyanLit : working ? M.screen : M.window);
+      v.box(13, y0 + 1, 10, 14, y0 + 3, 16, lit ? M.cyanLit : working ? M.screen : M.window);
     }
     // shop front (left wing, front-left wall): door and window under a striped awning, big screen above
     v.box(5, 28, 3, 9, 29, 11, M.ink);
@@ -86,14 +86,14 @@ export const fixlab: BuildingArt = {
     v.box(5, 28, 14, 12, 29, 19, working ? M.screen : M.window);
     if (working)
       for (let r = 0; r < 3; r++) {
-        const len = 2 + ((r * 5 + f * 3) % 5);
+        const len = 2 + ((r * 2 + f * 3) % 5);
         v.box(6, 28, 17 - r * 2, 6 + len, 29, 18 - r * 2, M.cyanLit);
       }
     // right wall: neon wrench sign and a window
     v.box(28, 3, 8, 29, 11, 21, M.ink);
     v.box(28, 4, 9, 29, 10, 20, M.navy);
     WRENCH.forEach((row, r) => {
-      for (let c = 0; c < 5; c++) if (row[c] === '#') v.set(28, 9 - c, 19 - r, working ? M.yellowLit : M.yellow);
+      for (let c = 0; c < 6; c++) if (row[c] === '#') v.set(28, 9 - c, 19 - r, working ? M.yellowLit : M.yellow);
     });
     // lift pad (its ring glows while working) and the bot
     v.cylZ(22, 22, 5.2, 3, 5, M.steel);
@@ -106,7 +106,7 @@ export const fixlab: BuildingArt = {
       [21, 20, 15],
       [23, 22, 15],
       [21, 24, 15],
-      [19, 22, 15],
+      [20, 22, 15],
     ];
     const tip = tips[f];
     v.box(24, 14, 3, 29, 19, 5, M.steelD);
@@ -121,15 +121,18 @@ export const fixlab: BuildingArt = {
     v.box(tip[0], tip[1], tip[2] + 1, tip[0] + 1, tip[1] + 1, wrist[2] - 1, M.steelL); // nozzle
     if (working) v.set(tip[0], tip[1], tip[2], f % 2 ? M.fire : M.yellowLit);
     v.point('spark', 21.5, 22.5, 15);
-    // roof: monitor with the bot face, and a skylight on the left wing
+    // roof: a diagnostic monitor whose heartbeat runs 4 voxels per frame, and a skylight on the left wing
     v.box(12, 6, H + 1, 14, 8, H + 3, M.steelD);
     v.box(22, 6, H + 1, 24, 8, H + 3, M.steelD);
     v.box(9, 5, H + 3, 27, 8, H + 14, M.steelD);
-    v.box(9, 5, H + 14, 27, 8, H + 15, M.pink);
-    if (working) botFaceY(v, 8, 9, 27, H + 3, H + 14, f === 2);
-    else {
-      v.box(9, 8, H + 3, 27, 9, H + 14, M.ink);
-      v.box(10, 8, H + 4, 26, 9, H + 13, M.window);
+    v.box(9, 5, H + 14, 27, 9, H + 15, M.yellow);
+    v.box(9, 8, H + 3, 27, 9, H + 14, M.ink);
+    v.box(10, 8, H + 4, 26, 9, H + 13, working ? M.screen : M.window);
+    if (working) {
+      v.box(10, 8, H + 7, 26, 9, H + 8, M.cyanLit);
+      const sx = 11 + f * 4;
+      v.box(sx, 8, H + 8, sx + 2, 9, H + 12, M.limeLit);
+      v.box(sx + 2, 8, H + 5, sx + 3, 9, H + 7, M.limeLit);
     }
     v.box(5, 16, H + 1, 12, 25, H + 2, M.steelL);
     v.box(6, 17, H + 1, 11, 24, H + 2, M.glass);

@@ -1,12 +1,16 @@
-// Scrap Spire (3×3): the monument that ends a city. A tall dark tower of stacked, slightly crooked scrap tiers
-// (steel, rust and purple plates, pink trims) with glowing magenta windows, tapering up to a golden crown.
-// Welded scrap panels and bolted-on blocks break up the walls; two annex towers with gold lamps guard its sides.
-// The crown: a gold ring on a pink cap rising into points with glowing tips, jewels, an orb and a cross (the
-// 'light' beacon sits on the cross). Frames (4): a band of lamps climbs the tower's three outer edges.
-// Off: windows, lamps, jewels and crown glow all dark.
+// Scrap Spire (3×3): the monument that ends a city. A tall dark tower of stacked, crooked scrap tiers (each one
+// shoved 1-2 voxels off the axis of the one below) with steel skirt plates, glowing magenta windows and pink
+// ledges, tapering up to a golden crown. Scrap sticks out of it: a hazard-striped drum bolted to the second tier,
+// a crate on the third, a steel crane jib winching a crate up the right side, a radio mast on the left with a red
+// beacon, and a vertical neon blade sign. Two annex towers with gold lamps guard its sides; at its foot lie the
+// city's offerings: a broken bot head, a tyre and a pink crate. The crown: a gold ring on a pink cap rising into
+// points with glowing tips, a cyan jewel in its front notch and a pink gem orb on a stem, a cross on top.
+// Frames (4): a band of lamps climbs the tower's three outer edges with an orange tail, the neon sign's stripe
+// scrolls up, and the crane winches its crate up 2 voxels a frame. Off: windows, lamps, sign, jewels, gem and
+// beacon dark; the crate hangs at the bottom.
 import { M } from '../palette';
 import type { Vox } from '../voxel';
-import { footprint, hash, plate } from './common';
+import { footprint, hash, hazardBand, plate } from './common';
 import type { BuildingArt } from './common';
 
 interface Tier {
@@ -16,8 +20,8 @@ interface Tier {
   dx: number; // crooked offset of this tier
   dy: number;
   trim: number; // ledge material at the top
-  // a scrap block bolted onto one visible wall: face, position along the wall from the tier's start, size, material
-  junk?: { face: '+x' | '+y'; at: number; w: number; h: number; z: number; m: number; stripe?: number };
+  skipX?: number; // a window left out on the +x wall (scrap is bolted there)
+  skipY?: number; // the same on the +y wall
 }
 
 const CX = 24;
@@ -25,15 +29,17 @@ const CY = 24;
 
 const TIERS: Tier[] = [
   { z0: 6, z1: 30, half: 12, dx: 0, dy: 0, trim: M.pink },
-  { z0: 30, z1: 50, half: 10, dx: 1, dy: 0, trim: M.rust, junk: { face: '+x', at: 13, w: 5, h: 9, z: 34, m: M.rustD, stripe: M.rust } },
-  { z0: 50, z1: 68, half: 9, dx: 0, dy: 1, trim: M.pink, junk: { face: '+y', at: 1, w: 4, h: 7, z: 53, m: M.purpleD, stripe: M.purple } },
-  { z0: 68, z1: 84, half: 8, dx: 1, dy: 1, trim: M.purple, junk: { face: '+x', at: 2, w: 4, h: 6, z: 72, m: M.steelD, stripe: M.steel } },
-  { z0: 84, z1: 98, half: 7, dx: 0, dy: 0, trim: M.pink },
+  { z0: 30, z1: 50, half: 10, dx: 2, dy: 0, trim: M.rust, skipX: 1 },
+  { z0: 50, z1: 68, half: 9, dx: 0, dy: 2, trim: M.pink, skipY: 0 },
+  { z0: 68, z1: 84, half: 8, dx: -1, dy: 1, trim: M.purple },
+  { z0: 84, z1: 98, half: 7, dx: 1, dy: 0, trim: M.pink },
   { z0: 98, z1: 106, half: 5, dx: 0, dy: 0, trim: M.pinkD },
 ];
 
-const PLATES = [M.rust, M.purpleD, M.steelD, M.rustD, M.steel];
-const PATCH = [M.purpleD, M.navy, M.rustD, M.darkL];
+// the darker underside of each ledge trim
+function under(trim: number): number {
+  return trim === M.pink ? M.pinkD : trim === M.rust ? M.rustD : trim === M.purple ? M.purpleD : M.dark;
+}
 
 // A tall magenta window on the +y wall (outer layer y): pink frame, orange glow inside.
 function windowY(v: Vox, y: number, x: number, z: number, w: number, h: number, on: boolean): void {
@@ -53,12 +59,14 @@ export const spire: BuildingArt = {
     const v = footprint(3, 3, 124);
     plate(v);
     const on = working;
+    const f = on ? frame % 4 : 0;
     // ---- plinth: a dark stepped base with a pink edge
     v.box(5, 5, 3, 43, 43, 6, M.darkL);
     v.box(5, 42, 5, 43, 43, 6, M.pinkD);
     v.box(42, 5, 5, 43, 43, 6, M.pinkD);
 
     // ---- the tiers
+    let lamp = 0; // running lamp counter from the foot of the tower to the top, so the chase never jumps
     TIERS.forEach((t, ti) => {
       const x0 = CX - t.half + t.dx;
       const x1 = CX + t.half + t.dx;
@@ -72,47 +80,21 @@ export const spire: BuildingArt = {
         [x1 - 2, y0],
       ])
         v.box(cx, cy, t.z0, cx + 2, cy + 2, t.z1, M.darkL);
-      // a skirt of scrap plates bolted round the foot of the tier (the "layers" of the spire)
+      // a skirt of steel plates bolted round the foot of the tier: one even 2-tall band, 6-voxel plates
+      // alternating steel and dark steel with a dark seam between them
       if (t.z1 - t.z0 >= 12) {
-        let k = 0;
-        for (let x = x0 + 2; x < x1 - 2; k++) {
-          const pw = Math.min(x1 - 2 - x, 3 + Math.floor(hash(ti, k, 5) * 4));
-          const ph = 2 + Math.floor(hash(ti, k, 13) * 2);
-          v.box(x, y1, t.z0, x + pw, y1 + 1, t.z0 + ph, PLATES[Math.floor(hash(ti, k, 9) * PLATES.length)]);
-          x += pw;
-        }
-        for (let y = y0 + 2; y < y1 - 2; k++) {
-          const pw = Math.min(y1 - 2 - y, 3 + Math.floor(hash(ti, k, 5) * 4));
-          const ph = 2 + Math.floor(hash(ti, k, 13) * 2);
-          v.box(x1, y, t.z0, x1 + 1, y + pw, t.z0 + ph, PLATES[Math.floor(hash(ti, k, 9) * PLATES.length)]);
-          y += pw;
-        }
+        const plates = (n: number, put: (a: number, b: number, m: number) => void) => {
+          for (let a = 2, k = 0; a < n - 2; a += 7, k++) {
+            put(a, Math.min(n - 2, a + 6), k % 2 ? M.steelD : M.steel);
+            if (a + 6 < n - 2) put(a + 6, a + 7, M.dark);
+          }
+        };
+        plates(x1 - x0, (a, b, m) => v.box(x0 + a, y1, t.z0, x0 + b, y1 + 1, t.z0 + 2, m));
+        plates(y1 - y0, (a, b, m) => v.box(x1, y0 + a, t.z0, x1 + 1, y0 + b, t.z0 + 2, m));
       }
-      // patchwork: scrap panels welded onto the visible walls (drawn before the windows, which cut through them)
-      if (t.z1 - t.z0 >= 12)
-        for (let k = 0; k < 2; k++) {
-          const pw = 4 + Math.floor(hash(ti, k, 41) * 3);
-          const ph = 4 + Math.floor(hash(ti, k, 43) * 3);
-          const pz = t.z0 + 4 + Math.floor(hash(ti, k, 47) * Math.max(1, t.z1 - t.z0 - ph - 7));
-          const along = 2 + Math.floor(hash(ti, k, 53) * Math.max(1, x1 - x0 - pw - 4));
-          const pm = PATCH[Math.floor(hash(ti, k, 59) * PATCH.length)];
-          if (k === 0) v.paint(x0 + along, y1 - 1, pz, x0 + along + pw, y1, pz + ph, pm);
-          else v.paint(x1 - 1, y0 + along, pz, x1, y0 + along + pw, pz + ph, pm);
-        }
-      if (t.junk) {
-        const j = t.junk;
-        // the block sticks out two voxels, with a light band across its top
-        if (j.face === '+x') {
-          v.box(x1, y0 + j.at, j.z, x1 + 2, y0 + j.at + j.w, j.z + j.h, j.m);
-          if (j.stripe) v.box(x1, y0 + j.at, j.z + j.h - 2, x1 + 2, y0 + j.at + j.w, j.z + j.h - 1, j.stripe);
-        } else {
-          v.box(x0 + j.at, y1, j.z, x0 + j.at + j.w, y1 + 2, j.z + j.h, j.m);
-          if (j.stripe) v.box(x0 + j.at, y1, j.z + j.h - 2, x0 + j.at + j.w, y1 + 2, j.z + j.h - 1, j.stripe);
-        }
-      }
-      // ledge at the top of the tier, one voxel proud
+      // ledge at the top of the tier, one voxel proud, its lower row in the trim's darker shade
       v.box(x0 - 1, y0 - 1, t.z1 - 2, x1 + 1, y1 + 1, t.z1, t.trim);
-      v.paint(x0 - 1, y0 - 1, t.z1 - 2, x1 + 1, y1 + 1, t.z1 - 1, t.trim === M.pink ? M.pinkD : M.rustD);
+      v.paint(x0 - 1, y0 - 1, t.z1 - 2, x1 + 1, y1 + 1, t.z1 - 1, under(t.trim));
       // windows: one or two tall glowing windows per visible wall
       const span = x1 - x0;
       const ww = t.half >= 9 ? 4 : t.half >= 7 ? 3 : 2;
@@ -121,18 +103,68 @@ export const spire: BuildingArt = {
       const gap = Math.floor((span - count * ww) / (count + 1));
       const wz = t.z0 + Math.floor((t.z1 - t.z0 - 2 - wh) / 2);
       for (let i = 0; i < count; i++) {
-        windowY(v, y1 - 1, x0 + gap + i * (ww + gap), wz, ww, wh, on && hash(ti, i, 3) > 0.15);
-        windowX(v, x1 - 1, y0 + gap + i * (ww + gap), wz, ww, wh, on && hash(ti, i, 4) > 0.15);
+        if (t.skipY !== i) windowY(v, y1 - 1, x0 + gap + i * (ww + gap), wz, ww, wh, on && hash(ti, i, 3) > 0.15);
+        if (t.skipX !== i) windowX(v, x1 - 1, y0 + gap + i * (ww + gap), wz, ww, wh, on && hash(ti, i, 4) > 0.15);
       }
-      // chase lights on the three outer edges: every 4 voxels a lamp; one band in four is lit and climbs
-      for (let z = t.z0 + 1; z + 2 <= t.z1 - 2; z += 4) {
-        const band = Math.floor(z / 4) % 4;
-        const m = on && band === frame % 4 ? M.yellowLit : M.darkL;
+      // chase lights on the three outer edges: a lamp every 4 voxels; one band in four is lit yellow with an
+      // orange tail below it, and the band climbs one lamp per frame
+      for (let z = t.z0 + 1; z + 2 <= t.z1 - 2; z += 4, lamp++) {
+        const band = lamp % 4;
+        const m = !on ? M.darkL : band === f ? M.yellowLit : band === (f + 3) % 4 ? M.orangeLit : M.darkL;
         v.box(x1 - 1, y1 - 1, z, x1 + 1, y1 + 1, z + 2, m);
         v.box(x0 - 1, y1 - 1, z, x0 + 1, y1 + 1, z + 2, m);
         v.box(x1 - 1, y0 - 1, z, x1 + 1, y0 + 1, z + 2, m);
       }
     });
+
+    // ---- scrap bolted onto the tower
+    // tier 1, right wall: a rusty drum lying along the wall with a hazard-striped band, on two steel brackets
+    v.box(35, 25, 34, 38, 27, 36, M.steelD);
+    v.box(35, 30, 34, 38, 32, 36, M.steelD);
+    v.cylY(36, 38.5, 2.6, 24, 33, M.rust);
+    v.cylY(36, 38.5, 1.4, 32, 33, M.rustD); // the dark lid on its front end
+    hazardBand(v, 36, 24, 38, 39, 33, 40);
+    // tier 2, front-left wall: a flat purple crate with a lighter lid band, on a steel bracket
+    v.box(17, 35, 55, 25, 37, 59, M.purpleD);
+    v.box(17, 35, 58, 25, 37, 59, M.purple);
+    v.box(19, 35, 53, 23, 36, 55, M.steelD);
+
+    // ---- neon blade sign standing on tier 1's roof against tier 2's right wall: a pink frame with a cyan stripe
+    // whose dark notches scroll upwards
+    {
+      const sx0 = 33;
+      const sx1 = 37;
+      const sz0 = 50;
+      const sz1 = 64;
+      v.box(sx0, 31, sz0, sx1, 33, sz1, on ? M.pinkLit : M.pinkD);
+      v.box(sx0, 32, sz0, sx1, 33, sz0 + 1, M.pinkD);
+      v.box(sx0, 32, sz1 - 1, sx1, 33, sz1, M.pinkD);
+      for (let z = sz0 + 1; z < sz1 - 1; z++) {
+        const lit = on && (((z - f) % 4) + 4) % 4 < 2;
+        v.box(sx0 + 1, 32, z, sx1 - 1, 33, z + 1, lit ? M.cyanLit : on ? M.cyanD : M.window);
+      }
+    }
+
+    // ---- crane jib out of tier 3 toward +x, winching a hazard-striped crate up past the right side (2 voxels a
+    // frame); it hangs clear of the tower against the sky
+    v.box(31, 20, 76, 46, 22, 78, M.steelL);
+    v.box(31, 20, 75, 46, 22, 76, M.steelD);
+    v.box(31, 20, 78, 34, 22, 80, M.steelD); // counter-weight block at the root
+    v.box(43, 20, 73, 46, 22, 75, M.steelD); // pulley block
+    {
+      const cz = 60 + 2 * f; // crate bottom
+      v.box(44, 20, cz + 4, 45, 21, 73, M.steelD); // the cable
+      v.box(42, 19, cz, 46, 23, cz + 4, M.yellow);
+      hazardBand(v, 42, 19, cz, 46, 23, cz + 3);
+      v.box(42, 19, cz + 3, 46, 23, cz + 4, M.steelL);
+    }
+
+    // ---- radio mast on tier 3's left corner, a red beacon on top (lit while the city stands)
+    v.box(14, 32, 84, 16, 34, 112, M.steelL);
+    for (let z = 87; z < 110; z += 5) v.box(14, 32, z, 16, 34, z + 1, M.steelD);
+    v.box(12, 32, 104, 18, 34, 106, M.steelL); // cross bar
+    v.box(14, 32, 112, 16, 34, 114, on ? M.redLit : M.red);
+    v.point('light', 15, 33, 114);
 
     // ---- grand entrance on the front-left wall, steps down to the plaza
     v.box(19, 36, 6, 30, 39, 20, M.purpleD);
@@ -165,19 +197,22 @@ export const spire: BuildingArt = {
       v.box(ax + 5, ay + 5, 31, ax + 6, ay + 6, 33, M.yellow);
     }
 
-    // ---- a heap of scrap offerings on the front corner of the plinth
-    const HEAP = [M.rust, M.steelL, M.rustD, M.purple, M.steel, M.pinkD];
-    v.sphere(39, 39, 6, 4, M.rustD, 0.7);
-    for (let k = 0; k < 9; k++) {
-      const hx = 35 + Math.floor(hash(k, 1, 31) * 6);
-      const hy = 35 + Math.floor(hash(k, 2, 31) * 6);
-      const hz = 6 + Math.floor(hash(k, 3, 31) * 2);
-      v.box(hx, hy, hz, hx + 2, hy + 2, hz + 2, HEAP[k % HEAP.length]);
-    }
-    v.box(38, 38, 8, 40, 40, 11, M.steelL);
+    // ---- offerings on the front corner of the plinth: a broken bot head (tipped over, its screen dead or
+    // flickering), a tyre lying flat and a small pink crate
+    v.box(37, 38, 6, 41, 42, 9, M.white);
+    v.box(38, 38, 9, 42, 42, 10, M.white); // the top layer slipped sideways: the head lies askew
+    v.box(37, 41, 7, 41, 42, 9, on ? M.screen : M.window);
+    v.box(37, 41, 7, 38, 42, 9, M.ink);
+    v.box(38, 41, 7, 39, 42, 8, M.limeD);
+    v.box(40, 41, 7, 41, 42, 8, M.limeD);
+    v.box(38, 38, 10, 39, 40, 11, M.pink); // ears
+    v.box(41, 38, 10, 42, 40, 11, M.pink);
+    v.cylZ(40.5, 34.5, 2.5, 6, 8, M.dark, 1.2);
+    v.box(33, 38, 6, 36, 41, 9, M.pink);
+    v.box(33, 38, 8, 36, 41, 9, M.pinkD);
 
     // ---- the golden crown on a pink cap: a gold ring whose walls rise into points with glowing tips (five points
-    // in the silhouette), pink and cyan jewels on the band, a glowing orb on a stem at the heart
+    // in the silhouette), pink jewels on the band, a cyan jewel in the front notch, a pink gem orb at the heart
     const top = TIERS[TIERS.length - 1];
     const cz = top.z1;
     v.box(CX - 8, CY - 8, cz, CX + 8, CY + 8, cz + 2, M.pink); // cap
@@ -207,16 +242,17 @@ export const spire: BuildingArt = {
     }
     v.paint(CX - R, CY + R - 2, cz + 2, CX + R, CY + R, cz + 3, M.orange); // darker rim at the foot of the band
     v.paint(CX + R - 2, CY - R, cz + 2, CX + R, CY + R, cz + 3, M.orange);
-    // jewels on the two visible faces: pink either side, cyan in the middle
+    // pink jewels on the two visible faces
     for (const g of [-5, 3]) {
       v.box(CX + g, CY + R - 1, cz + 3, CX + g + 2, CY + R, cz + 5, on ? M.pinkLit : M.pinkD);
       v.box(CX + R - 1, CY + g, cz + 3, CX + R, CY + g + 2, cz + 5, on ? M.pinkLit : M.pinkD);
     }
-    v.box(CX - 1, CY + R - 1, cz + 3, CX + 1, CY + R, cz + 5, on ? M.cyanLit : M.cyanD);
-    v.box(CX + R - 1, CY - 1, cz + 3, CX + R, CY + 1, cz + 5, on ? M.cyanLit : M.cyanD);
-    // the orb on a stem rising above the front points, a little cross on top
-    v.box(CX - 1, CY - 1, cz + 4, CX + 1, CY + 1, cz + 10, M.orange);
-    v.sphere(CX, CY, cz + 12, 3.2, on ? M.yellowLit : M.orange);
+    // a cyan jewel filling the low front notch
+    v.box(CX + R - 3, CY + R - 3, cz + 3, CX + R, CY + R, cz + 6, on ? M.cyanLit : M.cyanD);
+    // the pink gem orb on a gold stem rising above the front points, a white glint on it, a cross on top
+    v.box(CX - 1, CY - 1, cz + 4, CX + 1, CY + 1, cz + 10, M.yellow);
+    v.sphere(CX, CY, cz + 12, 3.2, on ? M.pinkLit : M.pinkD);
+    v.box(CX + 1, CY + 1, cz + 13, CX + 3, CY + 3, cz + 14, M.white);
     v.box(CX - 1, CY - 1, cz + 15, CX + 1, CY + 1, cz + 18, M.yellow);
     v.box(CX - 2, CY - 1, cz + 16, CX + 2, CY + 1, cz + 17, M.yellow);
     v.box(CX - 1, CY - 2, cz + 16, CX + 1, CY + 2, cz + 17, M.yellow);
