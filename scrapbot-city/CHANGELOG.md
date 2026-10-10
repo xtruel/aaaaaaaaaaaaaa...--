@@ -19,6 +19,26 @@
 - **Controller**: il D-pad si muove di una casella lungo gli assi della griglia (su = nord-est, destra = sud-est); lo stick
   muove il cursore libero come prima.
 
+### I 12 edifici: sagome riconoscibili e animazioni legate alla produzione
+Ogni edificio ha fotogrammi "al lavoro" che cambiano davvero da uno all'altro, un fotogramma "spento" (senza corrente,
+in pausa o senza materiale) e 4 stadi di cantiere; un test controlla che ogni passo dell'animazione cambi almeno lo
+0,4% dei pixel e che "spento" sia diverso da "al lavoro".
+- **HQ**: schermi e faccia del bot, finestre accese, faro; senza corrente tutto si spegne.
+- **Riciclatore**: nastro con i rottami che scorre e rulli che girano, solo mentre lavora.
+- **Bot Dock**: luci che girano attorno alla pista sul tetto, torre di controllo con la faccia del bot.
+- **Fonderia**: fiamme nella bocca del forno, linea di colata con gli stampi che si riempiono e diventano lingotti.
+- **Inceneritore**: lingue di fuoco sopra la griglia, anello caldo che gira sul camino, fiamme in cima, contatore di energia.
+- **Fabbrica 2PM**: insegna "2PM" leggibile, braccio robotico che impila casse, ventola sul tetto.
+- **Pannelli solari**: pannelli inclinati con un riflesso che li attraversa, batterie che si caricano.
+- **Giardino**: alberi che ondeggiano, farfalla, lampione acceso solo quando lavora.
+- **Fix-It Lab**: monitor col battito, schermo con il testo che scorre, braccio saldatore.
+- **Depuratore**: torre-serbatoio con l'acqua che sale nel tubo di vetro, ventola, faro.
+- **Bot Pods**: ascensore che sale e scende in 12 fotogrammi, appartamenti che accendono le luci, un bot che saluta dal tetto.
+- **Guglia dei Rottami**: gru che solleva una cassa, antenna, insegna al neon, corona con gemma, luci che salgono la torre.
+- 6 cittadini diversi, Miso il gatto, il dirigibile 2PM e 25 elementi di scenografia attorno alla mappa (alberi,
+  container, gru, pala eolica, cartellone, insegne, auto distrutte, tubi, pali della luce...).
+- Le icone della barra usano gli stessi sprite isometrici, sempre a ingrandimento intero (nitide).
+
 ### Mondo vivo (tutto collegato allo stato della simulazione)
 - Nastri del Riciclatore con rottami che scorrono e rulli che girano solo quando lavora; luci della pista del Bot Dock.
 - Bot in 4 direzioni: volano sopra i tetti, scendono sui mucchi a raccogliere (con scintille), portano un cubo di rottami,
