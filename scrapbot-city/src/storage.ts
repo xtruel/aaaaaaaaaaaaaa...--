@@ -4,7 +4,7 @@ import type { GameState, OutcomeKind } from './game/state';
 
 const PREFIX = 'scrapbot:';
 
-function read(key: string): string | null {
+export function readKey(key: string): string | null {
   try {
     return window.localStorage.getItem(PREFIX + key);
   } catch {
@@ -12,7 +12,7 @@ function read(key: string): string | null {
   }
 }
 
-function write(key: string, value: string): boolean {
+export function writeKey(key: string, value: string): boolean {
   try {
     window.localStorage.setItem(PREFIX + key, value);
     return true;
@@ -27,6 +27,7 @@ export interface Settings {
   crt: boolean;
   edgeScroll: boolean;
   reducedMotion: boolean;
+  fullscreen: boolean;
 }
 
 export function loadSettings(): Settings {
@@ -36,8 +37,9 @@ export function loadSettings(): Settings {
     crt: true,
     edgeScroll: false,
     reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+    fullscreen: false,
   };
-  const raw = read('settings');
+  const raw = readKey('settings');
   if (!raw) return defaults;
   try {
     return { ...defaults, ...(JSON.parse(raw) as Partial<Settings>) };
@@ -47,11 +49,36 @@ export function loadSettings(): Settings {
 }
 
 export function saveSettings(s: Settings): void {
-  write('settings', JSON.stringify(s));
+  writeKey('settings', JSON.stringify(s));
 }
 
-export type SlotId = 'auto' | '1' | '2' | '3';
+// Free play uses the autosave and three manual slots; each campaign city has its own slot.
+export type SlotId = 'auto' | '1' | '2' | '3' | `city-${string}`;
 export const SLOTS: SlotId[] = ['auto', '1', '2', '3'];
+
+export function citySlot(cityId: string): SlotId {
+  return `city-${cityId}`;
+}
+
+// What "Continue" resumes.
+export function setLastPlayed(slot: SlotId): void {
+  writeKey('last', slot);
+}
+
+export function lastPlayed(): SlotId | null {
+  const slot = readKey('last') as SlotId | null;
+  if (slot && slotMeta(slot)) return slot;
+  // saves from before "last played" existed: fall back to the free play autosave
+  return slotMeta('auto') ? 'auto' : null;
+}
+
+export function isTutorialDone(): boolean {
+  return readKey('tutorial-done') === '1';
+}
+
+export function setTutorialDone(): void {
+  writeKey('tutorial-done', '1');
+}
 
 export interface SlotMeta {
   city: string;
@@ -69,7 +96,7 @@ export function saveGame(slot: SlotId, s: GameState): boolean {
     pop: Math.floor(s.pop),
     savedAt: Date.now(),
   };
-  return write(`save:${slot}`, serialize(s)) && write(`meta:${slot}`, JSON.stringify(meta));
+  return writeKey(`save:${slot}`, serialize(s)) && writeKey(`meta:${slot}`, JSON.stringify(meta));
 }
 
 export function clearSlot(slot: SlotId): void {
@@ -82,8 +109,8 @@ export function clearSlot(slot: SlotId): void {
 }
 
 export function slotMeta(slot: SlotId): SlotMeta | null {
-  const raw = read(`meta:${slot}`);
-  if (!raw || !read(`save:${slot}`)) return null;
+  const raw = readKey(`meta:${slot}`);
+  if (!raw || !readKey(`save:${slot}`)) return null;
   try {
     return JSON.parse(raw) as SlotMeta;
   } catch {
@@ -92,7 +119,7 @@ export function slotMeta(slot: SlotId): SlotMeta | null {
 }
 
 export function loadGame(slot: SlotId): GameState | null {
-  const raw = read(`save:${slot}`);
+  const raw = readKey(`save:${slot}`);
   if (!raw) return null;
   try {
     return deserialize(raw);
@@ -103,7 +130,7 @@ export function loadGame(slot: SlotId): GameState | null {
 }
 
 export function unlockedEndings(): OutcomeKind[] {
-  const raw = read('endings');
+  const raw = readKey('endings');
   if (!raw) return [];
   try {
     return JSON.parse(raw) as OutcomeKind[];
@@ -114,5 +141,5 @@ export function unlockedEndings(): OutcomeKind[] {
 
 export function unlockEnding(kind: OutcomeKind): void {
   const list = unlockedEndings();
-  if (!list.includes(kind)) write('endings', JSON.stringify([...list, kind]));
+  if (!list.includes(kind)) writeKey('endings', JSON.stringify([...list, kind]));
 }

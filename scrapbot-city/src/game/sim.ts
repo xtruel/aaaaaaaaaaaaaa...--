@@ -13,7 +13,8 @@ import {
   TILE,
 } from './defs';
 import { addWaste, canAfford, gain, pay, setTile, spawnJunk } from './actions';
-import { buildingCenter, day, findBuilding, idx, inBounds, pushMessage } from './state';
+import { updateStars, cityById } from './cities';
+import { FREE_HINTS, buildingCenter, day, findBuilding, idx, inBounds, pushMessage } from './state';
 import type { Bot, Building, GameState } from './state';
 import { ENDINGS, OBJECTIVES, endingFor, pickEvent } from './story';
 
@@ -63,14 +64,14 @@ export function step(s: GameState, dt: number): void {
   decayGrass(s, dt);
 
   if (s.time >= s.nextStormAt) {
-    s.nextStormAt = s.time + 160 + Math.random() * 90;
+    s.nextStormAt = s.time + (160 + Math.random() * 90) * s.mods.stormEvery;
     const n = spawnJunk(s, 10 + Math.floor(Math.random() * 5), 15, 35);
     pushMessage(s, `Junk storm! ${n} new piles landed around the city.`, 'event');
     s.fx.push({ kind: 'storm', x: 0, y: 0 });
   }
 
   if (s.time >= s.nextEventAt) {
-    s.nextEventAt = s.time + 80 + Math.random() * 50;
+    s.nextEventAt = s.time + (80 + Math.random() * 50) * s.mods.eventEvery;
     const ev = pickEvent(s);
     if (ev) {
       s.pendingEvent = ev.id;
@@ -79,6 +80,9 @@ export function step(s: GameState, dt: number): void {
   }
 
   checkObjectives(s);
+  s.stats.maxPollution = Math.max(s.stats.maxPollution, s.pollution);
+  checkStars(s);
+  rechargeHints(s);
 
   if (s.pollution >= SMOG_DANGER) {
     s.smog += dt;
@@ -123,7 +127,7 @@ export function computeDerived(s: GameState): void {
   }
   d.efficiency = d.energyUse === 0 ? 1 : Math.min(1, d.energyProd / d.energyUse);
   const shortage = d.efficiency < 1 ? 10 : 0;
-  d.happiness = clamp(55 - s.pollution * 0.5 + Math.min(25, happy) + s.happyMod - shortage, 0, 100);
+  d.happiness = clamp(55 - s.pollution * 0.5 + Math.min(25, happy) + s.happyMod + s.mods.happiness - shortage, 0, 100);
 }
 
 function updateConstruction(s: GameState, b: Building, dt: number): void {
@@ -134,11 +138,14 @@ function updateConstruction(s: GameState, b: Building, dt: number): void {
   b.built = Math.min(1, b.built + (dt * rate) / Math.max(0.1, def.buildTime));
   if (b.built >= 1) {
     b.status = 'ok';
+    s.stats.built++;
     const c = buildingCenter(b);
     s.fx.push({ kind: 'built', x: c.x, y: c.y, text: def.name });
     if (b.type === 'spire') {
-      s.outcome = { kind: endingFor(s), day: day(s) };
-      pushMessage(s, `The Scrap Spire is complete: ${ENDINGS[s.outcome.kind].title}.`, 'good');
+      s.spireDone = true;
+      s.endingKind = endingFor(s);
+      s.outcome = { kind: s.endingKind, day: day(s) };
+      pushMessage(s, `The Scrap Spire is complete: ${ENDINGS[s.endingKind].title}.`, 'good');
     } else {
       pushMessage(s, `${def.name} is online.`, 'good');
     }
@@ -191,7 +198,7 @@ function updatePollution(s: GameState, dt: number, overtime: number): void {
   let sludge = 0;
   for (let i = 0; i < s.tiles.length; i++) if (s.tiles[i] === T.SLUDGE) sludge++;
   rate += sludge * SLUDGE_EMISSION;
-  if (s.pollution > 0) rate -= DECAY_BASE + s.pollution * DECAY_PER_POINT;
+  if (s.pollution > 0) rate -= (DECAY_BASE + s.pollution * DECAY_PER_POINT) * s.mods.decay;
   s.derived.pollutionRate = rate;
   s.pollution = clamp(s.pollution + rate * dt, 0, 100);
 }
@@ -257,6 +264,24 @@ function decayGrass(s: GameState, dt: number): void {
   if (s.pollution < 70 || Math.random() > dt * 4) return;
   const i = Math.floor(Math.random() * MAP_W * MAP_H);
   if (s.tiles[i] === T.GRASS) setTile(s, i, T.GROUND);
+}
+
+function checkStars(s: GameState): void {
+  const city = cityById(s.cityId);
+  for (const i of updateStars(s)) {
+    pushMessage(s, `Star earned: ${city?.goals[i].text ?? 'city goal'}!`, 'good');
+    s.fx.push({ kind: 'star', x: 0, y: 0, text: String(i) });
+  }
+}
+
+// A free hint comes back every few days, up to the starting amount.
+function rechargeHints(s: GameState): void {
+  if (day(s) < s.hints.nextFreeDay) return;
+  s.hints.nextFreeDay = day(s) + 5;
+  if (s.hints.free < FREE_HINTS) {
+    s.hints.free++;
+    pushMessage(s, 'USA-9 has a fresh free hint for you.', 'info');
+  }
 }
 
 function checkObjectives(s: GameState): void {
@@ -436,7 +461,10 @@ function updateBots(s: GameState, dt: number, overtime: number): void {
           s.stats.scrapCollected += dep;
           bot.state = 'idle';
           bot.timer = bot.carry > 0 ? 2 : 0.3;
-          if (bot.carry > 0 && Math.random() < 0.1) pushMessage(s, 'Scrap storage is full! Build a Recycler, a Smelter or a Bot Dock.', 'bad');
+          if (bot.carry > 0 && s.time - s.warnedFullAt > 45) {
+            s.warnedFullAt = s.time;
+            pushMessage(s, 'Scrap storage is full! Build a Recycler, a Smelter or a Bot Dock.', 'bad');
+          }
         }
         break;
       }

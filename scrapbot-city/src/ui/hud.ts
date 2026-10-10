@@ -1,6 +1,8 @@
 // In-game DOM interface: resource bar, meters, goal, toolbar, inspector and message feed.
 import { audio } from '../audio';
-import { costText, refundFor } from '../game/actions';
+import { buildCost, canAfford, costText, refundFor } from '../game/actions';
+import { cityById } from '../game/cities';
+import { freeHintsLeft, hintPrice } from '../game/hints';
 import { BUILDINGS, BUILD_ORDER, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, PATH_LABEL, SMOG_DANGER, SMOG_LIMIT_SECONDS } from '../game/defs';
 import type { BuildingType, Cost } from '../game/defs';
 import { dayPhase } from '../game/sim';
@@ -9,6 +11,7 @@ import type { Building, BuildingStatus, GameState, Message } from '../game/state
 import { OBJECTIVES } from '../game/story';
 import { buildingThumb, iconUrl, pathColor, portraitUrl } from '../render/icons';
 import type { IconName } from '../render/icons';
+import { esc } from './escape';
 
 export interface HudHandlers {
   onBuild(type: BuildingType | null): void;
@@ -19,6 +22,8 @@ export interface HudHandlers {
   onDemolish(id: number): void;
   onTogglePause(id: number): void;
   onCloseInspector(): void;
+  onHint(): void;
+  onRegion(): void;
 }
 
 export interface HudView {
@@ -26,6 +31,14 @@ export interface HudView {
   build: BuildingType | null;
   bulldoze: boolean;
   selectedId: number;
+}
+
+function statusText(b: Building): string {
+  const def = BUILDINGS[b.type];
+  if (b.status === 'noInput' && def.process) {
+    return `Waiting for ${Object.keys(def.process.input).join(' and ')}`;
+  }
+  return STATUS_TEXT[b.status];
 }
 
 const STATUS_TEXT: Record<BuildingStatus, string> = {
@@ -37,14 +50,17 @@ const STATUS_TEXT: Record<BuildingStatus, string> = {
   noFuel: 'No fuel: needs scrap',
 };
 
-const HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-'];
+// Physical keys (KeyboardEvent.code), so the top number row works on AZERTY and other layouts too.
+const HOTKEY_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'KeyM'];
+const HOTKEY_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'M'];
 
 export function hotkeyFor(type: BuildingType): string {
-  return HOTKEYS[BUILD_ORDER.indexOf(type)] ?? '';
+  return HOTKEY_LABELS[BUILD_ORDER.indexOf(type)] ?? '';
 }
 
-export function typeForHotkey(key: string): BuildingType | null {
-  const i = HOTKEYS.indexOf(key);
+export function typeForHotkey(code: string): BuildingType | null {
+  const numpad = code.startsWith('Numpad') ? `Digit${code.slice(6)}` : code;
+  const i = HOTKEY_CODES.indexOf(numpad);
   return i >= 0 && i < BUILD_ORDER.length ? BUILD_ORDER[i] : null;
 }
 
@@ -61,9 +77,6 @@ function costChips(cost: Cost): string {
   return chips.join('') || '<span class="cost">free</span>';
 }
 
-function esc(text: string): string {
-  return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-}
 
 export class Hud {
   private root: HTMLElement;
@@ -72,10 +85,13 @@ export class Hud {
   private toolButtons = new Map<BuildingType, HTMLButtonElement>();
   private inspectorKey = '';
   private confirmDemolish = false;
+  private starsKey = '';
+  private s: GameState;
 
-  constructor(root: HTMLElement, handlers: HudHandlers) {
+  constructor(root: HTMLElement, handlers: HudHandlers, s: GameState) {
     this.root = root;
     this.handlers = handlers;
+    this.s = s;
     this.build();
   }
 
@@ -118,6 +134,10 @@ export class Hud {
             <button type="button" data-speed="2" aria-label="Fast">▶▶</button>
             <button type="button" data-speed="3" aria-label="Fastest">▶▶▶</button>
           </div>
+          <button type="button" class="hint-btn" data-hint aria-label="Ask USA-9 for a hint">
+            <img src="${iconUrl('bulb', 2)}" alt="" /><span class="hint-badge" data-hint-badge></span>
+          </button>
+          ${this.s.cityId ? `<button type="button" class="region-btn" data-region aria-label="Cargo blimp and region bank"><img src="${iconUrl('blimp', 2)}" alt="" /></button>` : ''}
           <button type="button" class="menu-btn" data-menu aria-label="Pause menu">Menu</button>
         </div>
       </div>
@@ -127,6 +147,7 @@ export class Hud {
           <small data-obj-step></small>
           <p data-obj-text></p>
           <em data-obj-hint></em>
+          <ul class="obj-stars" data-stars hidden></ul>
         </div>
       </div>
       <div class="feed" data-feed aria-live="polite"></div>
@@ -139,7 +160,7 @@ export class Hud {
       const key = node.closest<HTMLElement>('[data-res]')!.dataset.res!;
       this.el[`${key}:${node.hasAttribute('data-v') ? 'v' : 'cap'}`] = node;
     }
-    for (const name of ['smog-bar', 'smog', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'feed', 'smog-alert', 'inspector', 'tooltip', 'toolbar']) {
+    for (const name of ['smog-bar', 'smog', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'tooltip', 'toolbar']) {
       this.el[name] = this.root.querySelector(`[data-${name}]`)!;
     }
 
@@ -150,6 +171,14 @@ export class Hud {
       }),
     );
     this.root.querySelector('[data-import]')!.addEventListener('click', () => this.handlers.onImport());
+    this.root.querySelector('[data-hint]')!.addEventListener('click', () => {
+      audio.play('click');
+      this.handlers.onHint();
+    });
+    this.root.querySelector('[data-region]')?.addEventListener('click', () => {
+      audio.play('click');
+      this.handlers.onRegion();
+    });
     this.root.querySelector('[data-menu]')!.addEventListener('click', () => {
       audio.play('click');
       this.handlers.onMenu();
@@ -174,12 +203,13 @@ export class Hud {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'tool';
+      b.dataset.tool = type;
       b.style.setProperty('--path', pathColor(type));
       b.innerHTML = `
         <kbd>${hotkeyFor(type)}</kbd>
         <span class="tool-plate"><img src="${buildingThumb(type)}" alt="" /></span>
         <span class="tool-name">${def.name}</span>
-        <span class="tool-cost">${costChips(def.cost)}</span>`;
+        <span class="tool-cost">${costChips(buildCost(this.s, type))}</span>`;
       b.addEventListener('click', () => {
         audio.play('click');
         this.handlers.onBuild(type);
@@ -227,7 +257,7 @@ export class Hud {
       <p class="tip-title">${def.name} <span class="tag" style="--path:${pathColor(type)}">${PATH_LABEL[def.path]}</span></p>
       <p class="tip-desc">${esc(def.desc)}</p>
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
-      <p class="tip-cost">${costChips(def.cost)}</p>`;
+      <p class="tip-cost">${costChips(buildCost(this.s, type))}</p>`;
     tip.hidden = false;
     const r = anchor.getBoundingClientRect();
     const tw = tip.offsetWidth;
@@ -239,20 +269,51 @@ export class Hud {
     this.el.tooltip.hidden = true;
   }
 
+  private msgTimers = new WeakMap<HTMLElement, number[]>();
+
   pushMessages(list: Message[]): void {
     const feed = this.el.feed;
     for (const m of list) {
-      const p = document.createElement('p');
-      p.className = `msg msg-${m.tone}`;
-      p.textContent = m.text;
-      feed.append(p);
-      window.setTimeout(() => p.classList.add('msg-out'), 6500);
-      window.setTimeout(() => p.remove(), 7200);
+      // the same line twice in a row becomes "text ×2" instead of pushing older news away
+      const lastMsg = feed.lastElementChild as HTMLElement | null;
+      let p: HTMLElement;
+      if (lastMsg && lastMsg.dataset.text === m.text) {
+        p = lastMsg;
+        const count = Number(p.dataset.count ?? '1') + 1;
+        p.dataset.count = String(count);
+        p.textContent = `${m.text} ×${count}`;
+        p.classList.remove('msg-out');
+        for (const t of this.msgTimers.get(p) ?? []) window.clearTimeout(t);
+      } else {
+        p = document.createElement('p');
+        p.className = `msg msg-${m.tone}`;
+        p.dataset.text = m.text;
+        p.textContent = m.text;
+        feed.append(p);
+      }
+      const el = p;
+      this.msgTimers.set(el, [window.setTimeout(() => el.classList.add('msg-out'), 6500), window.setTimeout(() => el.remove(), 7200)]);
     }
     while (feed.children.length > 5) feed.firstElementChild!.remove();
   }
 
   private last: Record<string, number> = {};
+  private samples: { t: number; credits: number; parts: number }[] = [];
+
+  // Income per minute over the last ~20 seconds of game time (spending does not count).
+  private rates(s: GameState): { credits: number; parts: number } {
+    const now = { t: s.time, credits: s.stats.creditsEarned, parts: s.stats.partsMade };
+    const lastSample = this.samples[this.samples.length - 1];
+    if (!lastSample || now.t - lastSample.t >= 1 || now.t < lastSample.t) {
+      if (lastSample && now.t < lastSample.t) this.samples = [];
+      this.samples.push(now);
+      while (this.samples.length > 20) this.samples.shift();
+    }
+    const first = this.samples[0];
+    const span = now.t - first.t;
+    if (span < 3) return { credits: 0, parts: 0 };
+    return { credits: ((now.credits - first.credits) / span) * 60, parts: ((now.parts - first.parts) / span) * 60 };
+  }
 
   // A little hop when a number goes up, so income feels like income.
   private bump(key: string, value: number): void {
@@ -278,10 +339,11 @@ export class Hud {
     };
     set('scrap:v', fmt(s.res.scrap));
     set('scrap:cap', `/${fmt(d.storage)}`);
+    const rate = this.rates(s);
     set('parts:v', fmt(s.res.parts));
-    set('parts:cap', '');
+    set('parts:cap', rate.parts >= 1 ? `+${fmt(rate.parts)}/m` : '');
     set('credits:v', fmt(s.res.credits));
-    set('credits:cap', '');
+    set('credits:cap', rate.credits >= 1 ? `+${fmt(rate.credits)}/m` : '');
     set('energy:v', `${d.energyProd}`);
     set('energy:cap', `/${d.energyUse}`);
     set('pop:v', fmt(s.pop));
@@ -305,12 +367,30 @@ export class Hud {
     this.root.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === view.speed));
 
     const obj = OBJECTIVES[s.objective];
-    this.el.objective.hidden = !obj;
+    const city = cityById(s.cityId);
+    this.el.objective.hidden = !obj && !city;
     if (obj) {
       set('obj-step', `Goal ${s.objective + 1}/${OBJECTIVES.length}`);
       set('obj-text', obj.text);
       set('obj-hint', obj.hint);
+    } else if (city) {
+      set('obj-step', `${city.name}`);
+      set('obj-text', 'Star goals');
+      set('obj-hint', 'Earn stars to unlock more of the coast.');
     }
+    if (city) {
+      const key = s.stars.join();
+      if (key !== this.starsKey) {
+        this.starsKey = key;
+        this.el.stars.hidden = false;
+        this.el.stars.innerHTML = city.goals
+          .map((g, i) => `<li class="${s.stars[i] ? 'got' : ''}"><span class="star" aria-label="${s.stars[i] ? 'earned' : 'not yet'}">★</span>${esc(g.text)}</li>`)
+          .join('');
+      }
+    }
+    const free = freeHintsLeft(s);
+    set('hint-badge', free > 0 ? String(free) : `${hintPrice(s)}`);
+    this.el['hint-badge'].classList.toggle('paid', free === 0);
 
     const alert = this.el['smog-alert'];
     alert.hidden = s.smog <= 0;
@@ -318,7 +398,7 @@ export class Hud {
 
     for (const [type, btn] of this.toolButtons) {
       const def = BUILDINGS[type];
-      const affordable = (Object.keys(def.cost) as (keyof typeof def.cost)[]).every((r) => s.res[r] >= (def.cost[r] ?? 0));
+      const affordable = canAfford(s, buildCost(s, type));
       const locked = !!def.minPop && s.pop < def.minPop;
       btn.classList.toggle('cant', !affordable || locked);
       btn.classList.toggle('active', view.build === type);
@@ -338,13 +418,20 @@ export class Hud {
       return;
     }
     if (!this.inspectorKey.startsWith(`${b.id}:`)) this.confirmDemolish = false;
-    const key = `${b.id}:${b.status}:${this.confirmDemolish}`;
+    // Rebuild only when the buttons change; status text updates in place so clicks are never lost.
+    const key = `${b.id}:${b.built >= 1}:${b.paused}:${this.confirmDemolish}`;
     if (key !== this.inspectorKey) {
       this.inspectorKey = key;
-      this.renderInspector(b);
+      this.renderInspector(s, b);
     }
     panel.hidden = false;
     const def = BUILDINGS[b.type];
+    const status = panel.querySelector<HTMLElement>('[data-status]');
+    if (status) {
+      const text = statusText(b);
+      if (status.textContent !== text) status.textContent = text;
+      status.className = `insp-status status-${b.status}`;
+    }
     const bar = panel.querySelector<HTMLElement>('[data-progress]');
     if (bar) {
       const p = b.built < 1 ? b.built : def.process ? b.timer / def.process.time : def.fuel ? Math.min(1, b.fuel / def.fuel.seconds) : 1;
@@ -352,7 +439,7 @@ export class Hud {
     }
   }
 
-  private renderInspector(b: Building): void {
+  private renderInspector(s: GameState, b: Building): void {
     const def = BUILDINGS[b.type];
     const rows: [string, string][] = [];
     if (def.energy) rows.push(['Energy', `${def.energy > 0 ? '+' : ''}${def.energy}`]);
@@ -364,7 +451,7 @@ export class Hud {
     if (def.bots) rows.push(['Bots', `+${def.bots}`]);
     if (def.happiness) rows.push(['Happiness', `+${def.happiness}`]);
     if (def.cleanRadius) rows.push(['Cleans sludge', `${def.cleanRadius} tiles`]);
-    const refund = costText(refundFor(b));
+    const refund = costText(refundFor(s, b));
     const pausable = b.built >= 1 && (def.process || def.fuel || def.cleanRadius);
     const panel = this.el.inspector;
     panel.style.setProperty('--path', pathColor(b.type));
@@ -377,7 +464,7 @@ export class Hud {
         </div>
         <button type="button" class="modal-x" data-close aria-label="Close">×</button>
       </div>
-      <p class="insp-status status-${b.status}">${STATUS_TEXT[b.status]}</p>
+      <p class="insp-status status-${b.status}" data-status>${statusText(b)}</p>
       <div class="progress"><span data-progress></span></div>
       <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
       <p class="insp-desc">${esc(def.desc)}</p>

@@ -4,7 +4,7 @@ import { iconUrl } from '../render/icons';
 import type { IconName } from '../render/icons';
 import { MenuBackground, paintCardScene } from '../render/menuBg';
 import type { CardScene } from '../render/menuBg';
-import { slotMeta } from '../storage';
+import { lastPlayed, slotMeta } from '../storage';
 import { openCredits, openExtras, openPathInfo } from './dialogs';
 import { isModalOpen } from './modal';
 
@@ -55,9 +55,9 @@ export class MainMenu {
       <div class="menu-shade" aria-hidden="true"></div>
       <header class="corner corner-tl">
         <div class="studio">${GLOBE}<span>Qwerty3D<br />Games</span></div>
-        <p>Build_0.3<br />Oct 10 2026</p>
+        <p>Build_0.4<br />Oct 10 2026</p>
       </header>
-      <p class="corner corner-tr">Version 0.3<br />Pixel Planet Initiative<br />© 2026 Qwerty3D<br />All rights reserved</p>
+      <p class="corner corner-tr">Version 0.4<br />Pixel Planet Initiative<br />© 2026 Qwerty3D<br />All rights reserved</p>
       <div class="menu-left">
         <h1 class="logo" aria-label="Scrapbot City">
           <span class="logo-star" aria-hidden="true">✦</span>
@@ -142,10 +142,10 @@ export class MainMenu {
   }
 
   refresh(): void {
-    const hasAuto = slotMeta('auto') !== null;
+    const slot = lastPlayed();
+    const meta = slot ? slotMeta(slot) : null;
     const cont = this.items.find((b) => b.dataset.act === 'continue')!;
-    cont.disabled = !hasAuto;
-    const meta = slotMeta('auto');
+    cont.disabled = !meta;
     cont.title = meta ? `${meta.city}, day ${meta.day}` : 'No saved city yet';
   }
 

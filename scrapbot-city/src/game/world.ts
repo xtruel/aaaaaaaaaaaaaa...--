@@ -1,4 +1,5 @@
-import { MAP_H, MAP_W, T } from './defs';
+import { DEFAULT_MODS, MAP_H, MAP_W, T } from './defs';
+import type { CityMods } from './defs';
 
 export type Rng = () => number;
 
@@ -26,7 +27,7 @@ export interface GeneratedMap {
   hq: { x: number; y: number };
 }
 
-export function generateMap(seed: number): GeneratedMap {
+export function generateMap(seed: number, mods: CityMods = DEFAULT_MODS): GeneratedMap {
   const rng = mulberry32(seed);
   const tiles = new Uint8Array(MAP_W * MAP_H);
   const amount = new Uint16Array(MAP_W * MAP_H);
@@ -41,8 +42,10 @@ export function generateMap(seed: number): GeneratedMap {
   };
 
   // Grass survives in a few corners of the map.
-  for (let i = 0; i < 5; i++) {
-    const cx = rng() < 0.5 ? Math.floor(rng() * 10) : MAP_W - 1 - Math.floor(rng() * 10);
+  for (let i = 0; i < mods.grass; i++) {
+    // the first patches hug the map edges, extra ones (green cities) can be anywhere
+    const edge = rng() < 0.5 ? Math.floor(rng() * 10) : MAP_W - 1 - Math.floor(rng() * 10);
+    const cx = i < 5 ? edge : Math.floor(rng() * MAP_W);
     const cy = Math.floor(rng() * MAP_H);
     const r = 2 + rng() * 3;
     for (let y = Math.floor(cy - r); y <= cy + r; y++) {
@@ -53,7 +56,7 @@ export function generateMap(seed: number): GeneratedMap {
   }
 
   // Landfills: blobs of junk, richer towards their centre.
-  for (let i = 0; i < 13; i++) {
+  for (let i = 0; i < Math.round(13 * mods.junk); i++) {
     const cx = Math.floor(rng() * MAP_W);
     const cy = Math.floor(rng() * MAP_H);
     if (distHq(cx, cy) < 8) continue;
@@ -67,14 +70,14 @@ export function generateMap(seed: number): GeneratedMap {
   }
 
   // Loose junk everywhere.
-  for (let i = 0; i < 45; i++) {
+  for (let i = 0; i < Math.round(45 * mods.junk); i++) {
     const x = Math.floor(rng() * MAP_W);
     const y = Math.floor(rng() * MAP_H);
     if (distHq(x, y) > 5) set(x, y, T.JUNK, 8 + Math.floor(rng() * 14));
   }
 
   // Rubble: concrete chunks that must be bulldozed.
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < mods.rubble; i++) {
     const cx = Math.floor(rng() * MAP_W);
     const cy = Math.floor(rng() * MAP_H);
     if (distHq(cx, cy) < 7) continue;
@@ -83,7 +86,7 @@ export function generateMap(seed: number): GeneratedMap {
   }
 
   // Toxic sludge pools, far from the HQ.
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < mods.sludge; i++) {
     let x = 0;
     let y = 0;
     for (let tries = 0; tries < 30; tries++) {

@@ -30,6 +30,14 @@ class SoundSystem {
     this.startMusic();
   }
 
+  suspend(): void {
+    if (this.ctx?.state === 'running') void this.ctx.suspend();
+  }
+
+  resume(): void {
+    if (this.ctx?.state === 'suspended') void this.ctx.resume();
+  }
+
   setVolumes(sfx: number, music: number): void {
     this.sfxVolume = sfx;
     this.musicVolume = music;

@@ -37,6 +37,9 @@ const ICONS = {
   disk: ['KKKKKKK.', 'KBBWWBKK', 'KBBWWBBK', 'KBBBBBBK', 'KBWWWWBK', 'KBWKKWBK', 'KBWWWWBK', 'KKKKKKKK'],
   door: ['.KKKKKK.', '.KVVVVK.', '.KVVVVK.', '.KVVYVK.', '.KVVVVK.', '.KVVVVK.', '.KVVVVK.', 'KKKKKKKK'],
   star: ['...KK...', '..KYYK..', 'KKKYYKKK', 'KYYYYYYK', '.KYYYYK.', '.KYKKYK.', 'KYK..KYK', 'KK....KK'],
+  bulb: ['..KKKK..', '.KYYYYK.', 'KYYWYYYK', 'KYWYYYYK', '.KYYYYK.', '..KYYK..', '..KSSK..', '..KKKK..'],
+  blimp: ['........', '.KKKKKK.', 'KPWWWWPK', 'KPWPPWPK', 'KPWWWWPK', '.KKKKKK.', '...KSK..', '...KKK..'],
+  lock: ['..KKKK..', '.KK..KK.', '.K....K.', 'KKKKKKKK', 'KYYYYYYK', 'KYYKKYYK', 'KYYYYYYK', 'KKKKKKKK'],
   gear: ['..KKKK..', 'KKOOOOKK', 'KOOKKOOK', 'KOKSSKOK', 'KOKSSKOK', 'KOOKKOOK', 'KKOOOOKK', '..KKKK..'],
 } satisfies Record<string, string[]>;
 

@@ -99,6 +99,8 @@ export function openModal(opts: ModalOptions): HTMLElement {
   else body.append(opts.body);
   dialog.append(body);
 
+  // Keys held when the dialog pops up (Space to pause, Enter) must not pick a story choice by accident.
+  const openedAt = performance.now();
   if (opts.actions?.length) {
     const actions = document.createElement('div');
     actions.className = 'modal-actions';
@@ -108,7 +110,8 @@ export function openModal(opts: ModalOptions): HTMLElement {
       b.className = `btn ${a.primary ? 'btn-primary' : ''} ${a.tone ? `tone-${a.tone}` : ''}`;
       b.disabled = !!a.disabled;
       b.innerHTML = `<span>${a.label}</span>${a.hint ? `<small>${a.hint}</small>` : ''}`;
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
+        if (e.detail === 0 && performance.now() - openedAt < 400) return;
         audio.play('click');
         a.onClick();
       });
@@ -125,7 +128,9 @@ export function openModal(opts: ModalOptions): HTMLElement {
   }
   root.append(el);
   current = { el, opts };
-  const focusable = dialog.querySelector<HTMLElement>('.modal-actions .btn:not([disabled]), input, .modal-x');
-  focusable?.focus();
+  // Focus the dialog itself (Tab reaches the buttons) or its first text field; never pre-select a choice.
+  const field = dialog.querySelector<HTMLElement>('input[type="text"], input[type="number"]');
+  dialog.tabIndex = -1;
+  (field ?? dialog).focus();
   return dialog;
 }

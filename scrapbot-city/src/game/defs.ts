@@ -27,6 +27,37 @@ export type BuildingType =
   | 'purifier'
   | 'spire';
 
+// Rules that make each city of the campaign play differently. Free play uses DEFAULT_MODS.
+export interface CityMods {
+  junk: number; // landfill amount on the map
+  sludge: number; // toxic pools on the map
+  grass: number; // surviving grass patches
+  rubble: number; // rubble clusters
+  stormEvery: number; // junk storm interval (lower = more storms)
+  eventEvery: number; // story event interval
+  decay: number; // how fast the air clears by itself
+  industrialCost: number;
+  greenCost: number;
+  happiness: number; // flat bonus
+  startRes: Record<Resource, number>;
+  startPollution: number;
+}
+
+export const DEFAULT_MODS: CityMods = {
+  junk: 1,
+  sludge: 3,
+  grass: 5,
+  rubble: 22,
+  stormEvery: 1,
+  eventEvery: 1,
+  decay: 1,
+  industrialCost: 1,
+  greenCost: 1,
+  happiness: 0,
+  startRes: { scrap: 0, parts: 40, credits: 150 },
+  startPollution: 15,
+};
+
 export interface Process {
   input: Cost;
   output: Cost;
@@ -110,8 +141,8 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     energy: -2,
     pollution: 0.035,
     buildTime: 4,
-    desc: 'Melts 3 scrap into ingots worth 7 credits. Cheap and fast, but it smokes.',
-    process: { input: { scrap: 3 }, output: { credits: 7 }, time: 1.6 },
+    desc: 'Melts 3 scrap into ingots worth 9 credits. Cheap and fast, but it smokes.',
+    process: { input: { scrap: 3 }, output: { credits: 9 }, time: 1.6 },
     buildable: true,
   },
   solar: {

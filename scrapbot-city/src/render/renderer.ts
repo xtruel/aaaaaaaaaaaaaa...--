@@ -56,15 +56,24 @@ export class Renderer {
     [this.terrain, this.tctx] = makeCanvas(MAP_W * TILE, MAP_H * TILE);
   }
 
+  // Each art pixel covers a whole number of *device* pixels, so the art stays crisp
+  // at 125% / 150% display scaling too. pxZoom is the size of one art pixel in CSS pixels.
+  private dpr = 1;
+  private scale = 3;
+
+  get pxZoom(): number {
+    return this.scale / this.dpr;
+  }
+
   resize(): void {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    this.viewW = Math.ceil(w / this.zoom);
-    this.viewH = Math.ceil(h / this.zoom);
+    this.dpr = Math.max(1, window.devicePixelRatio || 1);
+    this.scale = Math.max(1, Math.round(this.zoom * this.dpr));
+    this.viewW = Math.ceil((window.innerWidth * this.dpr) / this.scale);
+    this.viewH = Math.ceil((window.innerHeight * this.dpr) / this.scale);
     this.canvas.width = this.viewW;
     this.canvas.height = this.viewH;
-    this.canvas.style.width = `${this.viewW * this.zoom}px`;
-    this.canvas.style.height = `${this.viewH * this.zoom}px`;
+    this.canvas.style.width = `${(this.viewW * this.scale) / this.dpr}px`;
+    this.canvas.style.height = `${(this.viewH * this.scale) / this.dpr}px`;
     this.ctx.imageSmoothingEnabled = false;
     this.clampCam();
   }
@@ -72,12 +81,12 @@ export class Renderer {
   setZoom(z: number, screenX = window.innerWidth / 2, screenY = window.innerHeight / 2): void {
     const nz = Math.max(2, Math.min(5, z));
     if (nz === this.zoom) return;
-    const wx = this.cam.x + screenX / this.zoom;
-    const wy = this.cam.y + screenY / this.zoom;
+    const wx = this.cam.x + screenX / this.pxZoom;
+    const wy = this.cam.y + screenY / this.pxZoom;
     this.zoom = nz;
     this.resize();
-    this.cam.x = wx - screenX / this.zoom;
-    this.cam.y = wy - screenY / this.zoom;
+    this.cam.x = wx - screenX / this.pxZoom;
+    this.cam.y = wy - screenY / this.pxZoom;
     this.clampCam();
   }
 
@@ -98,7 +107,7 @@ export class Renderer {
   }
 
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
-    return { x: this.cam.x + sx / this.zoom, y: this.cam.y + sy / this.zoom };
+    return { x: this.cam.x + sx / this.pxZoom, y: this.cam.y + sy / this.pxZoom };
   }
 
   screenToTile(sx: number, sy: number): { x: number; y: number } {

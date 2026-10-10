@@ -103,10 +103,10 @@ export const EVENTS: StoryEvent[] = [
         path: 'green',
         available: (s) => s.res.credits >= 40,
         apply: (s) => {
-          pay(s, { credits: 40 });
-          placeFreeGarden(s);
           shiftAlignment(s, 8);
           s.happyMod += 8;
+          if (!placeFreeGarden(s)) return 'There is no free spot near the pods, so the council keeps the money. They are happy you said yes.';
+          pay(s, { credits: 40 });
           return 'A Pixel Garden sprouts next to the pods.';
         },
       },
@@ -378,7 +378,7 @@ export const OBJECTIVES: Objective[] = [
   {
     text: 'Finish the Scrap Spire',
     hint: 'What the city becomes depends on your choices so far.',
-    done: () => false,
+    done: (s) => s.spireDone,
   },
 ];
 
@@ -402,14 +402,18 @@ export const ENDINGS: Record<OutcomeKind, Ending> = {
   balanced: {
     title: 'Different Futures, Same City',
     subtitle: 'Balanced ending',
-    text: 'Half garden, half foundry. The Spire hums with recycled power and 2PM money in equal parts. Scrapbot City did not pick a side. It picked itself.',
+    text: 'Half garden, half foundry. The Spire hums with recycled power and 2PM money in equal parts. {city} did not pick a side. It picked itself.',
   },
   smog: {
     title: 'Smog Over',
     subtitle: 'The city choked',
-    text: 'The smog sat on Scrapbot City for too long. Citizens packed up their pods, the bots powered down, and Miso went looking for a cleaner roof. Trash today... maybe a better tomorrow, next time.',
+    text: 'The smog sat on {city} for too long. Citizens packed up their pods, the bots powered down, and Miso went looking for a cleaner roof. Trash today... maybe a better tomorrow, next time.',
   },
 };
+
+export function endingText(kind: OutcomeKind, cityName: string): string {
+  return ENDINGS[kind].text.replace('{city}', cityName);
+}
 
 export function endingFor(s: GameState): OutcomeKind {
   if (s.alignment >= 35) return 'green';

@@ -1,5 +1,5 @@
-import { BUILDINGS, DAY_LENGTH, MAP_H, MAP_W, T, TILE } from './defs';
-import type { BuildingType, Resource } from './defs';
+import { BUILDINGS, DAY_LENGTH, DEFAULT_MODS, MAP_H, MAP_W, T, TILE } from './defs';
+import type { BuildingType, CityMods, Resource } from './defs';
 import { generateMap } from './world';
 
 export type BuildingStatus = 'building' | 'ok' | 'idle' | 'noPower' | 'noInput' | 'noFuel';
@@ -67,7 +67,7 @@ export interface Message {
   tone: MessageTone;
 }
 
-export type FxKind = 'collect' | 'built' | 'produce' | 'clean' | 'placed' | 'demolish' | 'storm';
+export type FxKind = 'collect' | 'built' | 'produce' | 'clean' | 'placed' | 'demolish' | 'storm' | 'star';
 
 export interface FxEvent {
   kind: FxKind;
@@ -82,12 +82,30 @@ export interface Stats {
   built: number;
   cleaned: number;
   creditsEarned: number;
+  maxPollution: number;
+  industrialBuilt: number;
+  catPets: number;
+  partsMade: number;
+}
+
+export interface Hints {
+  free: number; // free hints left
+  paid: number; // hints bought so far (drives the price)
+  nextFreeDay: number; // day a free hint recharges
 }
 
 export interface GameState {
   version: number;
   seed: number;
   cityName: string;
+  cityId: string | null; // campaign city, null in free play
+  mods: CityMods;
+  tutorial: boolean;
+  spireDone: boolean;
+  endingKind: OutcomeKind | null; // ending reached when the Spire was finished
+  stars: boolean[]; // campaign goals reached in this city
+  hints: Hints;
+  warnedFullAt: number; // last "storage full" warning, so it does not flood the feed
   tiles: Uint8Array;
   amount: Uint16Array; // junk per tile
   occ: Int32Array; // building id per tile or -1 (derived, not saved)
@@ -119,7 +137,7 @@ export interface GameState {
   pendingEvent: string | null;
 }
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export function idx(x: number, y: number): number {
   return y * MAP_W + x;
@@ -147,12 +165,32 @@ export function emptyDerived(): Derived {
   };
 }
 
-export function createGame(seed = Math.floor(Math.random() * 1e9), cityName = 'Scrapbot City'): GameState {
-  const map = generateMap(seed);
+export interface NewGameOptions {
+  seed?: number;
+  cityName?: string;
+  cityId?: string | null;
+  mods?: CityMods;
+  tutorial?: boolean;
+}
+
+export const FREE_HINTS = 3;
+
+export function createGame(opts: NewGameOptions = {}): GameState {
+  const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
+  const mods = opts.mods ?? DEFAULT_MODS;
+  const map = generateMap(seed, mods);
   const s: GameState = {
     version: SAVE_VERSION,
     seed,
-    cityName,
+    cityName: opts.cityName ?? 'Scrapbot City',
+    cityId: opts.cityId ?? null,
+    mods,
+    tutorial: opts.tutorial ?? false,
+    spireDone: false,
+    endingKind: null,
+    stars: [false, false, false],
+    hints: { free: FREE_HINTS, paid: 0, nextFreeDay: 6 },
+    warnedFullAt: -999,
     tiles: map.tiles,
     amount: map.amount,
     occ: new Int32Array(MAP_W * MAP_H).fill(-1),
@@ -169,21 +207,21 @@ export function createGame(seed = Math.floor(Math.random() * 1e9), cityName = 'S
       sitting: true,
       facing: -1,
     },
-    res: { scrap: 0, parts: 40, credits: 150 },
+    res: { ...mods.startRes },
     pop: 0,
-    pollution: 15,
+    pollution: mods.startPollution,
     alignment: 0,
     happyMod: 0,
     time: 0,
     waste: 0,
     smog: 0,
-    nextEventAt: 95,
-    nextStormAt: 200,
+    nextEventAt: 95 * mods.eventEvery,
+    nextStormAt: 200 * mods.stormEvery,
     overtimeUntil: 0,
     botSpeedMul: 1,
     eventsSeen: [],
     objective: 0,
-    stats: { scrapCollected: 0, built: 0, cleaned: 0, creditsEarned: 0 },
+    stats: { scrapCollected: 0, built: 0, cleaned: 0, creditsEarned: 0, maxPollution: mods.startPollution, industrialBuilt: 0, catPets: 0, partsMade: 0 },
     outcome: null,
     derived: emptyDerived(),
     dirtyTiles: [],
@@ -191,6 +229,11 @@ export function createGame(seed = Math.floor(Math.random() * 1e9), cityName = 'S
     messages: [],
     pendingEvent: null,
   };
+  if (s.tutorial) {
+    // no surprises while learning: events and storms start after the tutorial
+    s.nextEventAt = 1e9;
+    s.nextStormAt = 1e9;
+  }
   const hq = addBuilding(s, 'hq', map.hq.x, map.hq.y);
   hq.built = 1;
   hq.status = 'ok';
@@ -245,72 +288,38 @@ export function pushMessage(s: GameState, text: string, tone: MessageTone = 'inf
 
 // ---------- save / load ----------
 
-interface SaveData {
-  version: number;
-  seed: number;
-  cityName: string;
+// Everything except the map arrays (stored compactly) and runtime-only data.
+type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages'> & {
   tiles: string;
   amount: number[];
-  buildings: Building[];
-  nextId: number;
-  cat: Cat;
-  res: Record<Resource, number>;
-  pop: number;
-  pollution: number;
-  alignment: number;
-  happyMod: number;
-  time: number;
-  waste: number;
-  smog: number;
-  nextEventAt: number;
-  nextStormAt: number;
-  overtimeUntil: number;
-  botSpeedMul: number;
-  eventsSeen: string[];
-  objective: number;
-  stats: Stats;
-  outcome: Outcome | null;
-}
+};
 
 export function serialize(s: GameState): string {
-  const data: SaveData = {
-    version: s.version,
-    seed: s.seed,
-    cityName: s.cityName,
-    tiles: Array.from(s.tiles).join(''),
-    amount: Array.from(s.amount),
-    buildings: s.buildings,
-    nextId: s.nextId,
-    cat: s.cat,
-    res: s.res,
-    pop: s.pop,
-    pollution: s.pollution,
-    alignment: s.alignment,
-    happyMod: s.happyMod,
-    time: s.time,
-    waste: s.waste,
-    smog: s.smog,
-    nextEventAt: s.nextEventAt,
-    nextStormAt: s.nextStormAt,
-    overtimeUntil: s.overtimeUntil,
-    botSpeedMul: s.botSpeedMul,
-    eventsSeen: s.eventsSeen,
-    objective: s.objective,
-    stats: s.stats,
-    outcome: s.outcome,
-  };
+  const { tiles, amount, occ: _occ, claims: _claims, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
+  const data: SaveData = { ...rest, tiles: Array.from(tiles).join(''), amount: Array.from(amount) };
   return JSON.stringify(data);
 }
 
 export function deserialize(json: string): GameState {
-  const d = JSON.parse(json) as SaveData;
-  if (d.version !== SAVE_VERSION) throw new Error(`Unsupported save version ${d.version}`);
+  const d = JSON.parse(json) as Partial<SaveData> & { version: number; tiles: string; amount: number[]; buildings: Building[]; nextId: number };
+  if (d.version !== 1 && d.version !== SAVE_VERSION) throw new Error(`Unsupported save version ${d.version}`);
   const size = MAP_W * MAP_H;
   if (d.tiles.length !== size || d.amount.length !== size) throw new Error('Corrupted save: wrong map size');
   const tiles = new Uint8Array(size);
   for (let i = 0; i < size; i++) tiles[i] = Number(d.tiles[i]) || T.GROUND;
+  // Start from a fresh city so fields added in newer versions get sane defaults.
+  const base = createGame({ seed: 1 });
+  const spireDone = d.spireDone ?? d.buildings.some((b) => b.type === 'spire' && b.built >= 1);
   const s: GameState = {
-    ...d,
+    ...base,
+    ...(d as Omit<SaveData, 'tiles' | 'amount'>),
+    version: SAVE_VERSION,
+    mods: { ...DEFAULT_MODS, ...(d.mods ?? {}) },
+    stats: { ...base.stats, maxPollution: d.pollution ?? 0, ...(d.stats ?? {}) },
+    hints: { ...base.hints, ...(d.hints ?? {}) },
+    stars: d.stars ?? [false, false, false],
+    spireDone,
+    endingKind: d.endingKind ?? (d.outcome && d.outcome.kind !== 'smog' ? d.outcome.kind : null),
     tiles,
     amount: Uint16Array.from(d.amount),
     occ: new Int32Array(size).fill(-1),
@@ -321,11 +330,12 @@ export function deserialize(json: string): GameState {
     dirtyTiles: [],
     fx: [],
     messages: [],
-    pendingEvent: null,
+    // an event dialog that was open when the game was saved comes back on load
+    pendingEvent: d.pendingEvent ?? null,
   };
   for (const b of d.buildings) {
     const placed = addBuilding(s, b.type, b.x, b.y, b.id);
-    Object.assign(placed, b);
+    Object.assign(placed, { paused: false }, b);
   }
   s.nextId = Math.max(d.nextId, ...s.buildings.map((b) => b.id + 1));
   return s;

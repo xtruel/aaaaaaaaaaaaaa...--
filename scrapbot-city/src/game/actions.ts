@@ -26,6 +26,7 @@ export function gain(s: GameState, cost: Cost): void {
   for (const r of Object.keys(cost) as Resource[]) {
     s.res[r] += cost[r] ?? 0;
     if (r === 'credits') s.stats.creditsEarned += cost[r] ?? 0;
+    if (r === 'parts') s.stats.partsMade += cost[r] ?? 0;
   }
 }
 
@@ -36,6 +37,15 @@ export function costText(cost: Cost): string {
 
 export function shiftAlignment(s: GameState, delta: number): void {
   s.alignment = Math.max(-100, Math.min(100, s.alignment + delta));
+}
+
+// Building price in this city: campaign cities make green or industrial buildings cheaper or pricier.
+export function buildCost(s: GameState, type: BuildingType): Cost {
+  const def = BUILDINGS[type];
+  const mul = def.path === 'industrial' ? s.mods.industrialCost : def.path === 'green' ? s.mods.greenCost : 1;
+  const out: Cost = {};
+  for (const r of Object.keys(def.cost) as Resource[]) out[r] = Math.round((def.cost[r] ?? 0) * mul);
+  return out;
 }
 
 export interface PlaceCheck {
@@ -55,12 +65,16 @@ export function placeCheck(s: GameState, type: BuildingType, x: number, y: numbe
       const i = idx(tx, ty);
       if (s.occ[i] !== -1) return { ok: false, reason: 'Something is already there' };
       const t = s.tiles[i];
-      if (t === T.JUNK) return { ok: false, reason: 'Junk in the way: let the bots clear it' };
+      if (t === T.JUNK) {
+        const full = s.res.scrap >= s.derived.storage;
+        return { ok: false, reason: full ? 'Junk in the way, and storage is full' : 'Junk in the way: let the bots clear it' };
+      }
       if (t === T.SLUDGE) return { ok: false, reason: 'Toxic sludge: a Purifier can clean it' };
       if (t === T.RUBBLE) return { ok: false, reason: 'Rubble: bulldoze it first' };
     }
   }
-  if (!canAfford(s, def.cost)) return { ok: false, reason: `Costs ${costText(def.cost)}` };
+  const cost = buildCost(s, type);
+  if (!canAfford(s, cost)) return { ok: false, reason: `Costs ${costText(cost)}` };
   return { ok: true };
 }
 
@@ -71,9 +85,9 @@ export function placeBuilding(s: GameState, type: BuildingType, x: number, y: nu
     return null;
   }
   const def = BUILDINGS[type];
-  pay(s, def.cost);
+  pay(s, buildCost(s, type));
   const b = addBuilding(s, type, x, y);
-  s.stats.built++;
+  if (def.path === 'industrial') s.stats.industrialBuilt++;
   if (def.path === 'green') shiftAlignment(s, ALIGN_BUILD_SHIFT);
   if (def.path === 'industrial') shiftAlignment(s, -ALIGN_BUILD_SHIFT);
   const c = buildingCenter(b);
@@ -81,11 +95,11 @@ export function placeBuilding(s: GameState, type: BuildingType, x: number, y: nu
   return b;
 }
 
-export function refundFor(b: Building): Cost {
-  const def = BUILDINGS[b.type];
+export function refundFor(s: GameState, b: Building): Cost {
+  const cost = buildCost(s, b.type);
   const share = b.built < 1 ? 0.8 : 0.5;
   const out: Cost = {};
-  for (const r of Object.keys(def.cost) as Resource[]) out[r] = Math.floor((def.cost[r] ?? 0) * share);
+  for (const r of Object.keys(cost) as Resource[]) out[r] = Math.floor((cost[r] ?? 0) * share);
   return out;
 }
 
@@ -94,8 +108,13 @@ export function demolish(s: GameState, b: Building): boolean {
     pushMessage(s, 'The HQ stays. Where else would USA-9 sleep?', 'bad');
     return false;
   }
-  const refund = refundFor(b);
-  gain(s, refund);
+  const refund = refundFor(s, b);
+  // a refund is not income: it must not count toward "credits earned" goals
+  for (const r of Object.keys(refund) as Resource[]) s.res[r] += refund[r] ?? 0;
+  // the city no longer has this building, so its pull on the path meter goes too
+  const def = BUILDINGS[b.type];
+  if (def.path === 'green') shiftAlignment(s, -ALIGN_BUILD_SHIFT);
+  if (def.path === 'industrial') shiftAlignment(s, ALIGN_BUILD_SHIFT);
   removeBuilding(s, b);
   const c = buildingCenter(b);
   s.fx.push({ kind: 'demolish', x: c.x, y: c.y, text: `+${costText(refund)}` });
@@ -187,6 +206,7 @@ export function spawnSludge(s: GameState, count: number): number {
   return spawned;
 }
 
+// Returns false when there is no free tile near the pods (the caller then refunds).
 export function placeFreeGarden(s: GameState): boolean {
   const homes = s.buildings.filter((b) => b.type === 'pods');
   const home = homes[Math.floor(Math.random() * homes.length)];

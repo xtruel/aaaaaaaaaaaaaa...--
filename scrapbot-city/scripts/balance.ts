@@ -1,6 +1,8 @@
 // Headless balance check: an autopilot plays a Green and an Industrial city and prints how each run goes.
 // Run with: npm run balance
 import { importParts, placeBuilding, placeCheck } from '../src/game/actions';
+import { CITIES } from '../src/game/cities';
+import type { CityDef } from '../src/game/cities';
 import { BUILDINGS, DAY_LENGTH, SIM_STEP } from '../src/game/defs';
 import type { BuildingType, PathKind } from '../src/game/defs';
 import { step } from '../src/game/sim';
@@ -67,8 +69,8 @@ function think(s: GameState, plan: Plan): void {
   }
 }
 
-function run(plan: Plan, seed: number): void {
-  const s = createGame(seed);
+function run(plan: Plan, seed: number, city?: CityDef): void {
+  const s = city ? createGame({ seed: city.seed, cityName: city.name, cityId: city.id, mods: city.mods }) : createGame({ seed });
   const log: string[] = [];
   const milestones = new Map<string, number>();
   const mark = (k: string, cond: boolean) => {
@@ -104,7 +106,8 @@ function run(plan: Plan, seed: number): void {
     }
   }
   const junkLeft = Array.from(s.amount).reduce((a, b) => a + b, 0);
-  console.log(`\n[${plan}] seed ${seed} -> ${s.outcome ? `${s.outcome.kind} on day ${s.outcome.day}` : `no ending after ${maxDays} days`}`);
+  const stars = city ? ` stars ${s.stars.map((x) => (x ? '★' : '☆')).join('')}` : '';
+  console.log(`\n[${plan}] ${city ? city.name : `seed ${seed}`} -> ${s.outcome ? `${s.outcome.kind} on day ${s.outcome.day}` : `no ending after ${maxDays} days`}${stars}`);
   console.log(log.join('\n'));
   console.log(`  milestones: ${[...milestones].map(([k, v]) => `${k}@d${v}`).join(', ')}`);
   console.log(`  buildings: ${Object.keys(BUILDINGS).map((k) => `${k}:${count(s, k as BuildingType)}`).filter((x) => !x.endsWith(':0')).join(' ')}`);
@@ -114,4 +117,8 @@ function run(plan: Plan, seed: number): void {
 for (const seed of [1234, 777]) {
   run('green', seed);
   run('industrial', seed);
+}
+for (const city of CITIES) {
+  run('green', city.seed, city);
+  run('industrial', city.seed, city);
 }

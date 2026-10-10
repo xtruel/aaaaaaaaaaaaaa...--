@@ -1,24 +1,34 @@
 // A running city: owns the game loop, input, camera, HUD and in-game dialogs.
+import { checkCampaign, checkCity, checkOutcome, unlock } from './achievements';
 import { audio } from './audio';
+import { recordCity } from './campaign';
 import { bulldozeRubble, demolish, importParts, placeBuilding } from './game/actions';
+import { cityById } from './game/cities';
 import { BUILDINGS, SIM_STEP, T, TILE } from './game/defs';
 import type { BuildingType } from './game/defs';
+import { freeHintsLeft, hintPrice, suggest } from './game/hints';
 import { step } from './game/sim';
 import { day, idx, inBounds, pushMessage } from './game/state';
 import type { FxEvent, GameState } from './game/state';
-import { ENDINGS, eventById } from './game/story';
+import { ENDINGS, endingText, eventById } from './game/story';
 import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
-import { clearSlot, saveGame, unlockEnding } from './storage';
+import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
-import { openSettings, openSlots, openStoryEvent } from './ui/dialogs';
+import { openHint, openHintPay, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
 import { Hud, typeForHotkey } from './ui/hud';
+import { esc } from './ui/escape';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
+import type { ModalAction } from './ui/modal';
+import { Tutorial } from './ui/tutorial';
 
 export interface SessionHandlers {
   onExitToMenu(): void;
   onLoadSlot(slot: SlotId): void;
   onNewGame(): void;
+  onRegionMap(): void;
+  onRestartCity(): void;
+  onTutorialDone(startCampaign: boolean): void;
   onSettingsChanged(s: Settings): void;
 }
 
@@ -33,6 +43,8 @@ interface Drag {
 }
 
 const PAN_SPEED = 260; // screen px per second
+// WASD by physical position: ZQSD on AZERTY keyboards.
+const PAN_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 
 export class GameSession {
   readonly s: GameState;
@@ -41,6 +53,7 @@ export class GameSession {
   private hud: Hud;
   private handlers: SessionHandlers;
   private settings: Settings;
+  private tutorial: Tutorial | null = null;
   private speed = 1;
   private lastSpeed = 1;
   private build: BuildingType | null = null;
@@ -50,14 +63,24 @@ export class GameSession {
   private pointer = { x: -1, y: -1, inside: false };
   private keys = new Set<string>();
   private drag: Drag | null = null;
+  private pointers = new Map<number, { x: number; y: number }>();
+  private pinch: { dist: number; zoom: number } | null = null;
+  private wheelAcc = 0;
+  private saveFailed = false;
   private raf = 0;
   private last = 0;
   private acc = 0;
   private hudTimer = 0;
+  private checkTimer = 0;
   private lastDay = 0;
   private lastCoin = 0;
   private endingShown = false;
   private smogWarned = false;
+  private cameraMoved = false;
+  private hintUsed = false;
+  private pausedByHide = false;
+  private newlyUnlocked: string[] = [];
+  private endingUnlocks: string[] = [];
   private alive = false;
   private disposers: (() => void)[] = [];
 
@@ -68,19 +91,25 @@ export class GameSession {
     this.handlers = handlers;
     root.innerHTML = '<canvas class="world" aria-label="City map"></canvas><div class="hud"></div>';
     this.renderer = new Renderer(root.querySelector('canvas')!);
-    this.hud = new Hud(root.querySelector('.hud')!, {
-      onBuild: (t) => this.selectBuild(t),
-      onBulldoze: () => this.toggleBulldoze(),
-      onImport: () => audio.play(importParts(this.s) ? 'coin' : 'error'),
-      onSpeed: (v) => this.setSpeed(v),
-      onMenu: () => this.openPause(),
-      onDemolish: (id) => this.demolishById(id),
-      onTogglePause: (id) => {
-        const b = this.s.buildings.find((o) => o.id === id);
-        if (b) b.paused = !b.paused;
+    this.hud = new Hud(
+      root.querySelector('.hud')!,
+      {
+        onBuild: (t) => this.selectBuild(t),
+        onBulldoze: () => this.toggleBulldoze(),
+        onImport: () => audio.play(importParts(this.s) ? 'coin' : 'error'),
+        onSpeed: (v) => this.setSpeed(v),
+        onMenu: () => this.openPause(),
+        onDemolish: (id) => this.demolishById(id),
+        onTogglePause: (id) => {
+          const b = this.s.buildings.find((o) => o.id === id);
+          if (b) b.paused = !b.paused;
+        },
+        onCloseInspector: () => (this.selectedId = -1),
+        onHint: () => this.askHint(),
+        onRegion: () => openTrade(this.s, () => this.save()),
       },
-      onCloseInspector: () => (this.selectedId = -1),
-    });
+      s,
+    );
     this.renderer.zoom = window.innerHeight >= 900 ? 3 : 2;
     this.renderer.resize();
     this.renderer.paintAllTerrain(s);
@@ -102,20 +131,49 @@ export class GameSession {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
-    if (intro) this.showIntro();
-    else if (this.s.outcome) this.showEnding();
+    if (this.s.tutorial) {
+      this.tutorial = new Tutorial(
+        this.root,
+        (campaign) => this.endTutorial(true, campaign),
+        () => this.endTutorial(false, false),
+      );
+    } else if (this.s.outcome) {
+      this.showEnding();
+    } else if (intro) {
+      this.showIntro();
+    }
+    const slot = this.slot;
+    if (slot) setLastPlayed(slot);
   }
 
   dispose(): void {
     this.alive = false;
     cancelAnimationFrame(this.raf);
     for (const d of this.disposers) d();
+    this.tutorial?.dispose();
     this.root.innerHTML = '';
     this.root.hidden = true;
   }
 
   applySettings(settings: Settings): void {
     this.settings = settings;
+  }
+
+  // Where this city is saved: campaign cities have their own slot, the tutorial is never saved.
+  private get slot(): SlotId | null {
+    if (this.s.tutorial) return null;
+    return this.s.cityId ? citySlot(this.s.cityId) : 'auto';
+  }
+
+  save(): void {
+    const slot = this.slot;
+    if (!slot || this.s.outcome?.kind === 'smog') return;
+    const ok = saveGame(slot, this.s);
+    if (!ok && !this.saveFailed) pushMessage(this.s, 'Saving failed: browser storage is full or blocked. Your progress may be lost.', 'bad');
+    this.saveFailed = !ok;
+    if (!ok) return;
+    setLastPlayed(slot);
+    if (this.s.cityId) recordCity(this.s);
   }
 
   // ---------- loop ----------
@@ -152,11 +210,18 @@ export class GameSession {
 
     if (day(s) !== this.lastDay) {
       this.lastDay = day(s);
-      if (!s.outcome) saveGame('auto', s);
+      if (!s.outcome) this.save();
+    }
+
+    this.checkTimer -= dt;
+    if (this.checkTimer <= 0) {
+      this.checkTimer = 1;
+      if (!s.tutorial) checkCity(s);
     }
 
     if (!modal && s.pendingEvent) this.showEvent();
-    if (!modal && s.outcome && !this.endingShown) this.showEnding();
+    // The ending dialog cannot be dismissed: if another dialog replaced it and was closed, show it again.
+    if (!modal && s.outcome) this.showEnding();
 
     if (!modal) this.panCamera(dt);
     this.updateHover();
@@ -177,6 +242,7 @@ export class GameSession {
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.1;
       this.hud.update(s, { speed: this.speed, build: this.build, bulldoze: this.bulldoze, selectedId: this.selectedId });
+      this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hintUsed: this.hintUsed });
     }
   }
 
@@ -209,6 +275,16 @@ export class GameSession {
       case 'clean':
         audio.play('collect');
         break;
+      case 'star': {
+        audio.play('event');
+        const { unlocked } = recordCity(this.s);
+        for (const city of unlocked) {
+          this.newlyUnlocked.push(city.name);
+          pushMessage(this.s, `New city unlocked on the Scrap Coast: ${city.name}!`, 'event');
+        }
+        checkCampaign();
+        break;
+      }
     }
   }
 
@@ -216,10 +292,10 @@ export class GameSession {
     let dx = 0;
     let dy = 0;
     const k = this.keys;
-    if (k.has('a') || k.has('arrowleft')) dx -= 1;
-    if (k.has('d') || k.has('arrowright')) dx += 1;
-    if (k.has('w') || k.has('arrowup')) dy -= 1;
-    if (k.has('s') || k.has('arrowdown')) dy += 1;
+    if (k.has('KeyA') || k.has('ArrowLeft')) dx -= 1;
+    if (k.has('KeyD') || k.has('ArrowRight')) dx += 1;
+    if (k.has('KeyW') || k.has('ArrowUp')) dy -= 1;
+    if (k.has('KeyS') || k.has('ArrowDown')) dy += 1;
     if (this.settings.edgeScroll && this.pointer.inside && !this.drag) {
       const m = 14;
       if (this.pointer.x < m) dx -= 1;
@@ -229,9 +305,10 @@ export class GameSession {
     }
     if (dx || dy) {
       const r = this.renderer;
-      r.cam.x += (dx * PAN_SPEED * dt) / r.zoom;
-      r.cam.y += (dy * PAN_SPEED * dt) / r.zoom;
+      r.cam.x += (dx * PAN_SPEED * dt) / r.pxZoom;
+      r.cam.y += (dy * PAN_SPEED * dt) / r.pxZoom;
       r.clampCam();
+      this.cameraMoved = true;
     }
   }
 
@@ -246,8 +323,9 @@ export class GameSession {
   // ---------- input ----------
 
   private listen<K extends keyof WindowEventMap>(target: Window, type: K, fn: (e: WindowEventMap[K]) => void): void;
+  private listen<K extends keyof DocumentEventMap>(target: Document, type: K, fn: (e: DocumentEventMap[K]) => void): void;
   private listen<K extends keyof HTMLElementEventMap>(target: HTMLElement, type: K, fn: (e: HTMLElementEventMap[K]) => void, opts?: AddEventListenerOptions): void;
-  private listen(target: Window | HTMLElement, type: string, fn: (e: Event) => void, opts?: AddEventListenerOptions): void {
+  private listen(target: Window | Document | HTMLElement, type: string, fn: (e: Event) => void, opts?: AddEventListenerOptions): void {
     target.addEventListener(type, fn, opts);
     this.disposers.push(() => target.removeEventListener(type, fn, opts));
   }
@@ -259,6 +337,14 @@ export class GameSession {
     this.listen(canvas, 'pointerdown', (e) => {
       audio.unlock();
       canvas.setPointerCapture(e.pointerId);
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pointers.size >= 2) {
+        // second finger: pinch to zoom, and the first finger's tap is cancelled
+        const [a, b] = [...this.pointers.values()];
+        this.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.renderer.zoom };
+        this.drag = null;
+        return;
+      }
       this.drag = {
         x: e.clientX,
         y: e.clientY,
@@ -271,6 +357,15 @@ export class GameSession {
     });
     this.listen(canvas, 'pointermove', (e) => {
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
+      if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pinch && this.pointers.size >= 2) {
+        const [a, b] = [...this.pointers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const target = Math.round(this.pinch.zoom * (dist / Math.max(1, this.pinch.dist)));
+        if (target !== this.renderer.zoom) this.renderer.setZoom(target, (a.x + b.x) / 2, (a.y + b.y) / 2);
+        this.cameraMoved = true;
+        return;
+      }
       const d = this.drag;
       if (!d) return;
       const dist = Math.hypot(e.clientX - d.x, e.clientY - d.y);
@@ -278,18 +373,28 @@ export class GameSession {
       if (!d.moved && dist > 6 && canPan) d.moved = true;
       if (d.moved) {
         const r = this.renderer;
-        r.cam.x = d.camX - (e.clientX - d.x) / r.zoom;
-        r.cam.y = d.camY - (e.clientY - d.y) / r.zoom;
+        r.cam.x = d.camX - (e.clientX - d.x) / r.pxZoom;
+        r.cam.y = d.camY - (e.clientY - d.y) / r.pxZoom;
         r.clampCam();
+        this.cameraMoved = true;
       }
     });
+    const release = (e: PointerEvent) => {
+      this.pointers.delete(e.pointerId);
+      if (this.pointers.size < 2) this.pinch = null;
+    };
     this.listen(canvas, 'pointerup', (e) => {
+      release(e);
       const d = this.drag;
       this.drag = null;
       if (!d || d.moved) return;
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
       if (d.button === 2) this.cancelTool();
       else if (d.button === 0) this.click(e.clientX, e.clientY);
+    });
+    this.listen(canvas, 'pointercancel', (e) => {
+      release(e);
+      this.drag = null;
     });
     this.listen(canvas, 'pointerleave', () => {
       this.pointer.inside = false;
@@ -299,16 +404,42 @@ export class GameSession {
       'wheel',
       (e) => {
         e.preventDefault();
-        this.renderer.setZoom(this.renderer.zoom + (e.deltaY < 0 ? 1 : -1), e.clientX, e.clientY);
+        // Trackpads send many small deltas: add them up so one gesture is one zoom step.
+        // Mostly-sideways swipes are ignored; Ctrl+wheel is a trackpad pinch.
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+        const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1;
+        this.wheelAcc += e.deltaY * unit * (e.ctrlKey ? 4 : 1);
+        if (Math.abs(this.wheelAcc) < 90) return;
+        this.renderer.setZoom(this.renderer.zoom + (this.wheelAcc < 0 ? 1 : -1), e.clientX, e.clientY);
+        this.wheelAcc = 0;
+        this.cameraMoved = true;
       },
       { passive: false },
     );
     this.listen(window, 'keydown', (e) => this.onKeyDown(e));
-    this.listen(window, 'keyup', (e) => this.keys.delete(e.key.toLowerCase()));
+    this.listen(window, 'keyup', (e) => {
+      this.keys.delete(e.code);
+      if (e.key === 'Meta') this.keys.clear();
+    });
     this.listen(window, 'blur', () => this.keys.clear());
-    // closing the tab mid-day should not lose the day
-    this.listen(window, 'pagehide', () => {
-      if (!this.s.outcome) saveGame('auto', this.s);
+    // closing the tab or window mid-day should not lose the day
+    this.listen(window, 'pagehide', () => this.save());
+    // pause while the game is hidden (alt-tab, minimised window), resume when it comes back
+    this.listen(document, 'visibilitychange', () => {
+      if (document.hidden) {
+        audio.suspend();
+        if (this.speed > 0) {
+          this.pausedByHide = true;
+          this.setSpeed(0);
+        }
+        this.save();
+      } else {
+        audio.resume();
+        if (this.pausedByHide) {
+          this.pausedByHide = false;
+          this.setSpeed(this.lastSpeed || 1);
+        }
+      }
     });
   }
 
@@ -316,44 +447,58 @@ export class GameSession {
     if (this.root.hidden) return;
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-    const key = e.key.toLowerCase();
     if (isModalOpen()) return;
-    if (['w', 'a', 's', 'd', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(key)) {
-      this.keys.add(key);
+    // Shortcuts like Cmd+S or Ctrl+Tab belong to the system (macOS never sends key-up while Cmd is held).
+    if (e.ctrlKey || e.metaKey || e.altKey) {
+      this.keys.clear();
+      return;
+    }
+    const code = e.code;
+    if (PAN_KEYS.includes(code)) {
+      this.keys.add(code);
       e.preventDefault();
       return;
     }
-    const type = typeForHotkey(e.key);
-    if (type && !e.ctrlKey && !e.metaKey) {
+    // Holding a toggle key must not flip it back and forth.
+    if (e.repeat) return;
+    const type = typeForHotkey(code);
+    if (type) {
       this.selectBuild(type);
       return;
     }
-    switch (key) {
-      case 'escape':
+    switch (code) {
+      case 'Escape':
         if (this.build || this.bulldoze || this.selectedId >= 0) this.cancelTool();
         else this.openPause();
         break;
-      case ' ':
+      case 'Space':
         e.preventDefault();
         this.setSpeed(this.speed === 0 ? this.lastSpeed || 1 : 0);
         break;
-      case 'tab':
+      case 'Tab':
+        if (e.shiftKey) return; // Shift+Tab opens the Steam overlay
         e.preventDefault();
         this.setSpeed((this.speed % 3) + 1);
         break;
-      case 'x':
+      case 'KeyX':
         this.toggleBulldoze();
         break;
-      case 'h': {
+      case 'KeyQ':
+        this.askHint();
+        break;
+      case 'KeyH': {
         const hq = this.s.buildings.find((b) => b.type === 'hq');
         if (hq) this.renderer.centerOn((hq.x + 1.5) * TILE, (hq.y + 1.5) * TILE);
         break;
       }
-      case '+':
-      case '=':
+      case 'Equal':
+      case 'NumpadAdd':
+      case 'BracketRight':
         this.renderer.setZoom(this.renderer.zoom + 1);
         break;
-      case '_':
+      case 'Minus':
+      case 'NumpadSubtract':
+      case 'BracketLeft':
         this.renderer.setZoom(this.renderer.zoom - 1);
         break;
     }
@@ -361,6 +506,7 @@ export class GameSession {
 
   private click(sx: number, sy: number): void {
     const s = this.s;
+    if (s.outcome) return;
     const t = this.renderer.screenToTile(sx, sy);
     if (this.build) {
       const def = BUILDINGS[this.build];
@@ -395,6 +541,7 @@ export class GameSession {
     const w = this.renderer.screenToWorld(sx, sy);
     if (Math.hypot(w.x - s.cat.x, w.y - (s.cat.y - 4)) < 8) {
       s.happyMod = Math.min(s.happyMod + 1, 15);
+      s.stats.catPets++;
       pushMessage(s, ['Miso: mrrp.', 'Miso purrs. Citizens feel a bit better.', 'Miso ignores you, as cats do.'][Math.floor(Math.random() * 3)], 'good');
       return;
     }
@@ -424,6 +571,7 @@ export class GameSession {
   private setSpeed(v: number): void {
     if (v > 0) this.lastSpeed = v;
     this.speed = v;
+    if (v > 0) this.pausedByHide = false;
   }
 
   private demolishById(id: number): void {
@@ -431,18 +579,88 @@ export class GameSession {
     if (b && demolish(this.s, b)) this.selectedId = -1;
   }
 
+  // ---------- hints ----------
+
+  private askHint(): void {
+    if (isModalOpen()) return;
+    const s = this.s;
+    this.hintUsed = true;
+    unlock('hint');
+    if (freeHintsLeft(s) > 0) {
+      s.hints.free--;
+      this.showHint(s.hints.free > 0 ? `Free hints left in this city: ${s.hints.free}.` : 'That was your last free hint for now. A new one comes back every 5 days.');
+      return;
+    }
+    const price = hintPrice(s);
+    audio.play('click');
+    openHintPay(price, s.res.credits >= price, () => {
+      s.res.credits -= price;
+      s.hints.paid++;
+      this.showHint(`Paid ${price} credits. The next hint costs ${hintPrice(s)}.`);
+    });
+  }
+
+  private showHint(footer: string): void {
+    const hint = suggest(this.s);
+    audio.play('event');
+    openHint(hint, footer, () => {
+      closeModal();
+      if (!hint.build) return;
+      this.build = null;
+      this.selectBuild(hint.build);
+      const btn = this.root.querySelector<HTMLElement>(`[data-tool="${hint.build}"]`);
+      btn?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      btn?.classList.add('flash');
+      window.setTimeout(() => btn?.classList.remove('flash'), 1800);
+    });
+  }
+
+  // ---------- tutorial ----------
+
+  private endTutorial(finished: boolean, startCampaign: boolean): void {
+    const s = this.s;
+    this.tutorial = null;
+    s.tutorial = false;
+    s.nextEventAt = s.time + 60;
+    s.nextStormAt = s.time + 200;
+    setTutorialDone();
+    if (finished) unlock('tutorial');
+    if (startCampaign) {
+      this.handlers.onTutorialDone(true);
+      return;
+    }
+    pushMessage(s, finished ? 'Tutorial complete! This city is yours now: it saves like any free play city.' : 'Tutorial skipped. The light bulb (Q) asks USA-9 for advice.', 'good');
+    this.save();
+  }
+
   // ---------- dialogs ----------
 
   private showIntro(): void {
+    const s = this.s;
+    const city = cityById(s.cityId);
+    if (city) {
+      openModal({
+        title: city.name,
+        eyebrow: city.tagline,
+        portrait: portraitUrl('usa'),
+        className: 'modal-story speaker-usa',
+        body: `
+          <p class="story">${city.desc}</p>
+          <ul class="traits">${city.traits.map((t) => `<li>${t}</li>`).join('')}</ul>
+          <ul class="goals">${city.goals.map((g, i) => `<li class="${s.stars[i] ? 'got' : ''}"><span class="star">★</span>${g.text}</li>`).join('')}</ul>`,
+        actions: [{ label: "Let's build", primary: true, onClick: closeModal }],
+      });
+      return;
+    }
     openModal({
-      title: `Welcome to ${this.s.cityName}`,
+      title: `Welcome to ${s.cityName}`,
       eyebrow: 'USA-9 · Lead scrapbot',
       portrait: portraitUrl('usa'),
       className: 'modal-story speaker-usa',
       body: `
         <p class="story">Hi boss! I'm USA-9. My bots fly out and collect junk on their own. You decide what we turn it into.</p>
-        <p class="story">Recycle it for a <b class="g">green</b> future, or smelt it for quick <b class="i">profit</b>. Just keep the smog meter under 100%.</p>
-        <p class="story">Finish the <b>Scrap Spire</b> and the whole city will follow the path you picked. Miso says hi.</p>`,
+        <p class="story">Recycle it for a <b class="g">green</b> future, or smelt it for quick <b class="i">profit</b>. Just keep the smog meter low.</p>
+        <p class="story">Finish the <b>Scrap Spire</b> and the whole city will follow the path you picked. Stuck? Click the light bulb. Miso says hi.</p>`,
       actions: [{ label: "Let's go", primary: true, onClick: closeModal }],
     });
   }
@@ -465,19 +683,80 @@ export class GameSession {
   private showEnding(): void {
     const s = this.s;
     if (!s.outcome) return;
-    this.endingShown = true;
-    const e = ENDINGS[s.outcome.kind];
-    unlockEnding(s.outcome.kind);
-    clearSlot('auto');
-    audio.play(s.outcome.kind === 'smog' ? 'alert' : 'event');
+    const kind = s.outcome.kind;
+    const e = ENDINGS[kind];
+    const city = cityById(s.cityId);
+    if (!this.endingShown) {
+      // results are recorded once, even if the dialog is shown again
+      this.endingShown = true;
+      unlockEnding(kind);
+      checkOutcome(kind);
+      checkCity(s);
+      if (kind !== 'smog' && s.cityId) {
+        const { unlocked } = recordCity(s);
+        checkCampaign();
+        this.endingUnlocks = [...this.newlyUnlocked, ...unlocked.map((c) => c.name)];
+        this.newlyUnlocked = [];
+      }
+      audio.play(kind === 'smog' ? 'alert' : 'event');
+    }
+    const unlockedNote = this.endingUnlocks.length ? `<p class="unlock-note">New on the Scrap Coast: <b>${this.endingUnlocks.join(', ')}</b></p>` : '';
+    // A lost city keeps its last autosave (from the start of the day), so the player can retry from there.
+    const retrySlot = kind === 'smog' && this.slot && slotMeta(this.slot) ? this.slot : null;
+    const stars = city
+      ? `<ul class="goals">${city.goals.map((g, i) => `<li class="${s.stars[i] ? 'got' : ''}"><span class="star">★</span>${g.text}</li>`).join('')}</ul>`
+      : '';
+    // After a Spire ending the city can keep going; clearing the outcome lets the sim run again.
+    const keepBuilding = () => {
+      s.outcome = null;
+      this.endingShown = false;
+      this.endingUnlocks = [];
+      closeModal();
+      this.save();
+    };
+    const leave = (fn: () => void) => () => {
+      if (kind !== 'smog') s.outcome = null;
+      this.save();
+      fn();
+    };
+    let actions: ModalAction[];
+    if (kind === 'smog') {
+      const retry: ModalAction[] = retrySlot
+        ? [{ label: 'Load the last autosave', primary: true, hint: 'start of the day', onClick: () => this.handlers.onLoadSlot(retrySlot) }]
+        : [];
+      actions = s.cityId
+        ? [
+            ...retry,
+            { label: 'Restart this city', primary: !retrySlot, hint: 'stars stay', onClick: () => this.handlers.onRestartCity() },
+            { label: 'Region map', onClick: () => this.handlers.onRegionMap() },
+          ]
+        : [
+            ...retry,
+            { label: 'New city', primary: !retrySlot, onClick: () => this.handlers.onNewGame() },
+            { label: 'Main menu', onClick: () => this.handlers.onExitToMenu() },
+          ];
+    } else if (s.cityId) {
+      actions = [
+        { label: 'Region map', primary: true, onClick: leave(() => this.handlers.onRegionMap()) },
+        { label: 'Keep building here', hint: 'earn the stars you missed', onClick: keepBuilding },
+      ];
+    } else {
+      actions = [
+        { label: 'Keep building', primary: true, onClick: keepBuilding },
+        { label: 'New city', onClick: leave(() => this.handlers.onNewGame()) },
+        { label: 'Main menu', onClick: leave(() => this.handlers.onExitToMenu()) },
+      ];
+    }
     openModal({
       title: e.title,
-      eyebrow: e.subtitle,
+      eyebrow: `${s.cityName} · ${e.subtitle}`,
       wide: true,
       dismissable: false,
-      className: `modal-ending ending-${s.outcome.kind}`,
+      className: `modal-ending ending-${kind}`,
       body: `
-        <p class="story">${e.text}</p>
+        <p class="story">${endingText(kind, esc(s.cityName))}</p>
+        ${stars}
+        ${unlockedNote}
         <dl class="stats">
           <dt>Days</dt><dd>${s.outcome.day}</dd>
           <dt>Citizens</dt><dd>${Math.floor(s.pop)}</dd>
@@ -488,39 +767,76 @@ export class GameSession {
           <dt>Path</dt><dd>${s.alignment >= 0 ? `${Math.round(s.alignment)} green` : `${Math.round(-s.alignment)} industrial`}</dd>
           <dt>Final smog</dt><dd>${Math.round(s.pollution)}%</dd>
         </dl>`,
-      actions: [
-        { label: 'New city', primary: true, onClick: () => this.handlers.onNewGame() },
-        { label: 'Main menu', onClick: () => this.handlers.onExitToMenu() },
-      ],
+      actions,
     });
   }
 
   private openPause(): void {
     const s = this.s;
-    openModal({
-      title: 'Paused',
-      eyebrow: `${s.cityName} · Day ${day(s)}`,
-      body: `<p class="pause-tip">Tip: press <kbd>H</kbd> to jump back to the HQ, <kbd>Tab</kbd> to change speed.</p>`,
-      actions: [
+    const settings = {
+      label: 'Settings',
+      onClick: () =>
+        openSettings(
+          (set) => this.handlers.onSettingsChanged(set),
+          () => this.openPause(),
+        ),
+    };
+    let actions: ModalAction[];
+    if (s.tutorial) {
+      actions = [
         { label: 'Resume', primary: true, onClick: closeModal },
-        { label: 'Save game', onClick: () => openSlots('save', { state: s, onBack: () => this.openPause() }) },
-        { label: 'Load game', onClick: () => openSlots('load', { onLoad: (slot) => this.handlers.onLoadSlot(slot), onBack: () => this.openPause() }) },
+        settings,
         {
-          label: 'Settings',
-          onClick: () =>
-            openSettings(
-              (set) => this.handlers.onSettingsChanged(set),
-              () => this.openPause(),
-            ),
-        },
-        {
-          label: 'Save & main menu',
+          label: 'Skip the tutorial',
           onClick: () => {
-            if (!s.outcome) saveGame('auto', s);
+            closeModal();
+            this.tutorial?.dispose();
+            this.endTutorial(false, false);
+          },
+        },
+        { label: 'Main menu', hint: 'the tutorial is not saved', onClick: () => this.handlers.onExitToMenu() },
+      ];
+    } else if (s.cityId) {
+      actions = [
+        { label: 'Resume', primary: true, onClick: closeModal },
+        {
+          label: 'Region map',
+          hint: 'this city is saved',
+          onClick: () => {
+            this.save();
+            this.handlers.onRegionMap();
+          },
+        },
+        settings,
+        {
+          label: 'Main menu',
+          hint: 'this city is saved',
+          onClick: () => {
+            this.save();
             this.handlers.onExitToMenu();
           },
         },
-      ],
+      ];
+    } else {
+      actions = [
+        { label: 'Resume', primary: true, onClick: closeModal },
+        { label: 'Save game', onClick: () => openSlots('save', { state: s, onBack: () => this.openPause() }) },
+        { label: 'Load game', onClick: () => openSlots('load', { onLoad: (slot) => this.handlers.onLoadSlot(slot), onBack: () => this.openPause() }) },
+        settings,
+        {
+          label: 'Save & main menu',
+          onClick: () => {
+            this.save();
+            this.handlers.onExitToMenu();
+          },
+        },
+      ];
+    }
+    openModal({
+      title: 'Paused',
+      eyebrow: `${s.cityName} · Day ${day(s)}`,
+      body: `<p class="pause-tip">Tip: <kbd>Q</kbd> asks USA-9 for a hint, <kbd>H</kbd> jumps back to the HQ, <kbd>Tab</kbd> changes speed.</p>`,
+      actions,
     });
   }
 }
