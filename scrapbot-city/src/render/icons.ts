@@ -3,6 +3,7 @@ import { BUILDINGS } from '../game/defs';
 import type { BuildingType } from '../game/defs';
 import type { Speaker } from '../game/story';
 import { PAL, botSprite, buildingSprite, heroBotSprite, heroCatSprite, makeCanvas } from './sprites';
+import { atlasImage, frame } from './iso/atlas';
 
 const ICON_PAL: Record<string, string> = {
   K: PAL.ink,
@@ -70,20 +71,31 @@ export function iconUrl(name: IconName, scale = 2): string {
   return url;
 }
 
+// Toolbar and dialog thumbnails: the half-size isometric sprite from the atlas (the old top-down art
+// stands in for the few milliseconds before the atlas image has decoded).
 export function buildingThumb(type: BuildingType): string {
   const key = `thumb:${type}`;
   const cached = urlCache.get(key);
   if (cached) return cached;
-  const sp = buildingSprite(type);
   const size = 48;
   const [c, ctx] = makeCanvas(size, size);
+  const img = atlasImage();
+  const f = frame(`b/${type}/icon`);
+  if (img && f) {
+    const scale = Math.min(1, size / Math.max(f.w, f.h));
+    const w = Math.round(f.w * scale);
+    const h = Math.round(f.h * scale);
+    ctx.drawImage(img, f.x, f.y, f.w, f.h, Math.round((size - w) / 2), size - h, w, h);
+    const url = c.toDataURL();
+    urlCache.set(key, url);
+    return url;
+  }
+  const sp = buildingSprite(type);
   const scale = Math.min(1, size / Math.max(sp.canvas.width, sp.canvas.height));
   const w = Math.round(sp.canvas.width * scale);
   const h = Math.round(sp.canvas.height * scale);
   ctx.drawImage(sp.canvas, Math.round((size - w) / 2), size - h, w, h);
-  const url = c.toDataURL();
-  urlCache.set(key, url);
-  return url;
+  return c.toDataURL();
 }
 
 export function portraitUrl(speaker: Speaker): string {

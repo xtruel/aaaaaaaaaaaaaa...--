@@ -66,6 +66,7 @@ export class GameSession implements PadTarget {
   private bulldoze = false;
   private selectedId = -1;
   private hover: { x: number; y: number } | null = null;
+  private hoverId = -1; // building under the pointer (its visible pixels)
   private pointer = { x: -1, y: -1, inside: false };
   private keys = new Set<string>();
   private drag: Drag | null = null;
@@ -258,6 +259,7 @@ export class GameSession implements PadTarget {
           build: this.build,
           bulldoze: this.bulldoze,
           selectedId: this.selectedId,
+          hoverId: this.hoverId,
           reducedMotion: this.settings.reducedMotion,
         },
         dt,
@@ -342,9 +344,11 @@ export class GameSession implements PadTarget {
   private updateHover(): void {
     if (!this.pointer.inside || (this.drag && this.drag.moved)) {
       this.hover = this.pointer.inside && this.build ? this.hover : null;
+      this.hoverId = -1;
       return;
     }
     this.hover = this.renderer.screenToTile(this.pointer.x, this.pointer.y);
+    this.hoverId = this.build ? -1 : this.renderer.pickBuilding(this.pointer.x, this.pointer.y);
   }
 
   // ---------- input ----------
@@ -561,6 +565,17 @@ export class GameSession implements PadTarget {
       else if (type === 'spire') this.build = null;
       return;
     }
+    // what you see is what you click: a building's roof or walls select it even over another tile
+    const picked = this.renderer.pickBuilding(sx, sy);
+    if (picked >= 0 && !(this.bulldoze && inBounds(tile.x, tile.y) && s.tiles[idx(tile.x, tile.y)] === T.RUBBLE && s.occ[idx(tile.x, tile.y)] === -1)) {
+      this.selectedId = picked;
+      audio.play('click');
+      return;
+    }
+    if (picked === -2 && !this.bulldoze) {
+      this.petCat();
+      return;
+    }
     if (!inBounds(tile.x, tile.y)) {
       this.selectedId = -1;
       return;
@@ -583,16 +598,21 @@ export class GameSession implements PadTarget {
       return;
     }
     const w = this.renderer.screenToWorld(sx, sy);
-    if (Math.hypot(w.x - s.cat.x, w.y - (s.cat.y - 4)) < 8) {
-      s.happyMod = Math.min(s.happyMod + 1, 15);
-      s.stats.catPets++;
-      pushMessage(s, t((['msg.miso1', 'msg.miso2', 'msg.miso3'] as const)[Math.floor(Math.random() * 3)]), 'good');
+    if (Math.hypot(w.x - s.cat.x, w.y - s.cat.y) < 6) {
+      this.petCat();
       return;
     }
     this.selectedId = -1;
     if (s.tiles[i] === T.JUNK) pushMessage(s, t(s.res.scrap >= s.derived.storage ? 'msg.junkInfoFull' : 'msg.junkInfo', { n: s.amount[i] }), 'info');
     else if (s.tiles[i] === T.SLUDGE) pushMessage(s, t('msg.sludgeInfo'), 'info');
     else if (s.tiles[i] === T.RUBBLE) pushMessage(s, t('msg.rubbleInfo'), 'info');
+  }
+
+  private petCat(): void {
+    const s = this.s;
+    s.happyMod = Math.min(s.happyMod + 1, 15);
+    s.stats.catPets++;
+    pushMessage(s, t((['msg.miso1', 'msg.miso2', 'msg.miso3'] as const)[Math.floor(Math.random() * 3)]), 'good');
   }
 
   private selectBuild(type: BuildingType | null): void {
@@ -627,15 +647,9 @@ export class GameSession implements PadTarget {
   private hqBox(): Box | null {
     const hq = this.s.buildings.find((b) => b.type === 'hq');
     if (!hq) return null;
-    const r = this.renderer;
-    const def = BUILDINGS.hq;
-    const m = 2 * TILE;
-    return {
-      left: (hq.x * TILE - m - r.cam.x) * r.pxZoom,
-      top: (hq.y * TILE - m - r.cam.y) * r.pxZoom,
-      right: ((hq.x + def.w) * TILE + m - r.cam.x) * r.pxZoom,
-      bottom: ((hq.y + def.h) * TILE + m - r.cam.y) * r.pxZoom,
-    };
+    const box = this.renderer.buildingScreenBox(hq);
+    const m = 24;
+    return { left: box.left - m, top: box.top - m, right: box.right + m, bottom: box.bottom + m };
   }
 
   // ---------- controller ----------
@@ -678,7 +692,9 @@ export class GameSession implements PadTarget {
       this.cameraMoved = true;
     }
 
-    // D-pad: one tile at a time, for precise placing; the map scrolls when the cursor nears the HUD
+    // D-pad: one tile at a time along the grid axes, turned 45° for the isometric view (up = north-east,
+    // right = south-east, down = south-west, left = north-west), so every tile can be reached;
+    // the map scrolls when the cursor nears the HUD
     for (const [dir, dx, dy] of [
       ['up', 0, -1],
       ['down', 0, 1],
@@ -687,12 +703,10 @@ export class GameSession implements PadTarget {
     ] as const) {
       if (!f.pressed.has(dir)) continue;
       const tile = r.screenToTile(c.x, c.y);
-      const toScreen = () => ({ x: ((tile.x + dx + 0.5) * TILE - r.cam.x) * r.pxZoom, y: ((tile.y + dy + 0.5) * TILE - r.cam.y) * r.pxZoom });
+      const toScreen = () => r.tileToScreen(tile.x + dx, tile.y + dy);
       let p = toScreen();
       if (p.x < w * 0.15 || p.x > w * 0.85 || p.y < h * 0.18 || p.y > h * 0.75) {
-        r.cam.x += dx * TILE;
-        r.cam.y += dy * TILE;
-        r.clampCam();
+        r.panTiles(dx, dy);
         this.cameraMoved = true;
         p = toScreen();
       }
