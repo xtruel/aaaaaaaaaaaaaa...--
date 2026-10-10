@@ -88,10 +88,21 @@ export function buildingThumb(type: BuildingType): string {
 
 // Build bar and inspector pictures: a 2x close-up of a 32x32 window of the sprite. Whole sprites are up to
 // 140 px tall, and shrinking them to fit drops pixels; a whole-number zoom keeps the pixel art crisp.
+// Short drawings (Solar Array, Pixel Garden) fit the window whole.
 const THUMB_WINDOW = 32;
-// Where the window sits on each drawing, from its top (0) to its base (1): its most telling part.
-// Doors, signs and furnaces sit low (the default); the Fix-It Lab's wrench and the Spire's crown sit high.
-const THUMB_FOCUS: Partial<Record<BuildingType, number>> = { pods: 0.5, fixlab: 0, purifier: 0.75, burner: 0.75, spire: 0 };
+// Where the window sits on the drawings that are taller than it, chosen so the button keeps the outline the
+// player sees on the map. `y`: rows below the drawing's first opaque row (default: the window rests on the
+// base, which suits the Bot Dock's door). `x`: 0 left to 1 right on wide drawings (default centred).
+const THUMB_AT: Partial<Record<BuildingType, { y: number; x?: number }>> = {
+  recycler: { y: 4 }, // green roof edge down to the recycling sign
+  pods: { y: 7 }, // the stacked pods
+  fixlab: { y: 0 }, // wrench sign and striped awning
+  purifier: { y: 0 }, // capped tank with its bands
+  smelter: { y: 0 }, // the single banded smokestack and brown roof
+  burner: { y: 2 }, // twin red-tipped smokestacks and the 2PM sign
+  factory: { y: 0, x: 1 }, // sawtooth roof and the striped smokestack
+  spire: { y: 0 }, // the crown
+};
 
 function firstOpaqueRow(c: HTMLCanvasElement): number {
   const data = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
@@ -107,8 +118,9 @@ export function toolThumb(type: BuildingType): string {
   const top = firstOpaqueRow(sp);
   const sw = Math.min(THUMB_WINDOW, sp.width);
   const sh = Math.min(THUMB_WINDOW, sp.height - top);
-  const sx = Math.floor((sp.width - sw) / 2);
-  const sy = top + Math.round((sp.height - top - sh) * (THUMB_FOCUS[type] ?? 1));
+  const at = THUMB_AT[type];
+  const sx = Math.round((sp.width - sw) * (at?.x ?? 0.5));
+  const sy = at ? Math.min(top + at.y, sp.height - sh) : sp.height - sh;
   const size = THUMB_WINDOW * 2;
   const [c, ctx] = makeCanvas(size, size);
   ctx.drawImage(sp, sx, sy, sw, sh, (size - sw * 2) / 2, size - sh * 2, sw * 2, sh * 2);

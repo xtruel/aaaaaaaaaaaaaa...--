@@ -33,6 +33,7 @@ export interface HudView {
   build: BuildingType | null;
   bulldoze: boolean;
   selectedId: number;
+  goalCard: boolean; // false while the tutorial talks, so there is one card to read at a time
 }
 
 function statusText(s: GameState, b: Building): string {
@@ -404,7 +405,7 @@ export class Hud {
 
     const obj = OBJECTIVES[s.objective];
     const city = cityById(s.cityId);
-    this.el.objective.hidden = !obj && !city;
+    this.el.objective.hidden = (!obj && !city) || !view.goalCard;
     if (obj) {
       set('obj-step', t('hud.goal', { n: s.objective + 1, total: OBJECTIVES.length }));
       set('obj-text', objectiveText(obj));
@@ -440,7 +441,10 @@ export class Hud {
       const locked = !!def.minPop && s.pop < def.minPop;
       btn.classList.toggle('cant', !affordable || locked);
       btn.classList.toggle('active', view.build === type);
-      btn.classList.toggle('next', next.includes(type) && view.build !== type);
+      const glow = next.includes(type) && view.build !== type;
+      // on a window too narrow for the whole bar, a button that starts glowing scrolls into sight
+      if (glow && !btn.classList.contains('next')) btn.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+      btn.classList.toggle('next', glow);
     }
     this.root.querySelector('[data-doze]')!.classList.toggle('active', view.bulldoze);
 

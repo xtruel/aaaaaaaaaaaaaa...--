@@ -4,7 +4,8 @@ import { audio } from '../audio';
 import { SMOG_DANGER } from '../game/defs';
 import type { BuildingType } from '../game/defs';
 import type { GameState } from '../game/state';
-import { t, tk } from '../i18n';
+import { padMode } from '../gamepad';
+import { hasKey, t, tk } from '../i18n';
 import { localizeKeys } from '../keys';
 import { portraitUrl } from '../render/icons';
 
@@ -26,19 +27,20 @@ const overlap = (a: Box, b: Box) =>
   Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
 
 interface Step {
-  id: string; // text keys: tut.<id>.title / .text / .action
+  id: string; // text keys: tut.<id>.title / .text / .action, plus .actionPad / .textPad naming controller buttons
   action?: boolean;
   target?: string; // selector inside the game screen; every match gets a ring
   done?: (c: TutorialCtx) => boolean;
+  builds?: boolean; // done by placing a building
 }
 
 const has = (s: GameState, ...types: BuildingType[]) => s.buildings.some((b) => types.includes(b.type));
 
 const STEPS: Step[] = [
   { id: 'hi', action: true, done: (c) => c.cameraMoved },
-  { id: 'recycler', action: true, target: '[data-tool="recycler"]', done: (c) => has(c.s, 'recycler') },
-  { id: 'citizens', action: true, target: '[data-tool="pods"]', done: (c) => has(c.s, 'pods') },
-  { id: 'power', action: true, target: '[data-tool="solar"], [data-tool="burner"]', done: (c) => has(c.s, 'solar', 'burner') },
+  { id: 'recycler', action: true, builds: true, target: '[data-tool="recycler"]', done: (c) => has(c.s, 'recycler') },
+  { id: 'citizens', action: true, builds: true, target: '[data-tool="pods"]', done: (c) => has(c.s, 'pods') },
+  { id: 'power', action: true, builds: true, target: '[data-tool="solar"], [data-tool="burner"]', done: (c) => has(c.s, 'solar', 'burner') },
   { id: 'speed', action: true, target: '.speed', done: (c) => c.speed >= 2 },
   { id: 'path', target: '.meters' },
   { id: 'ready', target: '[data-hint], [data-objective]' },
@@ -49,6 +51,7 @@ export class Tutorial {
   private bubble: HTMLElement;
   private rings: HTMLElement[] = [];
   private rendered = -1;
+  private renderedPad = false; // the controller lines were shown: picking up the pad (or the mouse) swaps them
   private spot = -1; // which of the candidate places the bubble sits in
 
   constructor(
@@ -72,16 +75,25 @@ export class Tutorial {
     return this.index < STEPS.length;
   }
 
-  update(ctx: TutorialCtx): void {
-    if (!this.active) return;
+  // The goal card waits until the last step, which introduces it: one card to read at a time.
+  get showsGoal(): boolean {
+    return !this.active || STEPS[this.index].id === 'ready';
+  }
+
+  // True right after a step the player finished by placing a building (the caller puts the build tool away).
+  update(ctx: TutorialCtx): boolean {
+    if (!this.active) return false;
     const step = STEPS[this.index];
-    if (step.done && step.done(ctx)) {
+    const done = !!step.done && step.done(ctx);
+    if (done) {
       audio.play('done');
       this.index++;
-      if (!this.active) return;
     }
-    if (this.rendered !== this.index) this.render();
-    this.position(ctx);
+    if (this.active) {
+      if (this.rendered !== this.index || this.renderedPad !== padMode()) this.render();
+      this.position(ctx);
+    }
+    return done && !!step.builds;
   }
 
   relabel(): void {
@@ -96,17 +108,24 @@ export class Tutorial {
 
   private render(): void {
     this.rendered = this.index;
+    this.renderedPad = padMode();
     this.spot = -1;
     const step = STEPS[this.index];
     const last = this.index === STEPS.length - 1;
-    const text = (part: string) => localizeKeys(tk(`tut.${step.id}.${part}`, { limit: SMOG_DANGER }));
+    // keyboard lines name keys in the player's layout; with a controller the lines that name keys have a
+    // version naming buttons (A, Y, L3...), which must not go through the keyboard rewrite
+    const text = (part: string) => {
+      const pad = `tut.${step.id}.${part}Pad`;
+      if (this.renderedPad && hasKey(pad)) return tk(pad, { limit: SMOG_DANGER });
+      return localizeKeys(tk(`tut.${step.id}.${part}`, { limit: SMOG_DANGER }));
+    };
     this.bubble.innerHTML = `
       <img class="coach-face" src="${portraitUrl('usa')}" alt="" />
       <div class="coach-body">
         <p class="coach-step">${t('tut.step', { n: this.index + 1, total: STEPS.length })}</p>
         <h3>${text('title')}</h3>
         <p>${text('text')}</p>
-        ${step.action ? `<p class="coach-action"><span class="dot"></span>${text('action')}</p>` : ''}
+        ${step.action ? `<p class="coach-action"><span class="dot"></span><span>${text('action')}</span></p>` : ''}
         <div class="coach-buttons">
           ${
             last

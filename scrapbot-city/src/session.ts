@@ -268,8 +268,11 @@ export class GameSession implements PadTarget {
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.1;
-      this.hud.update(s, { speed: this.speed, build: this.build, bulldoze: this.bulldoze, selectedId: this.selectedId });
-      this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hq: this.hqBox() });
+      const goalCard = !this.tutorial || this.tutorial.showsGoal;
+      this.hud.update(s, { speed: this.speed, build: this.build, bulldoze: this.bulldoze, selectedId: this.selectedId, goalCard });
+      // a tutorial step done by placing a building puts the build tool away, so the next step starts clean
+      // instead of with a red "already there" ghost on the building just placed
+      if (this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hq: this.hqBox() })) this.cancelTool();
     }
   }
 
@@ -801,7 +804,7 @@ export class GameSession implements PadTarget {
       this.handlers.onTutorialDone(true);
       return;
     }
-    pushMessage(s, finished ? t('msg.tutorialDone') : localizeKeys(t('msg.tutorialSkipped')), 'good');
+    pushMessage(s, finished ? t('msg.tutorialDone') : padMode() ? t('msg.tutorialSkippedPad') : localizeKeys(t('msg.tutorialSkipped')), 'good');
     this.save();
   }
 
