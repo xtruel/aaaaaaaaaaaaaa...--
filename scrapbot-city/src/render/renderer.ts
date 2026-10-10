@@ -128,7 +128,9 @@ export class Renderer {
   quality: 'high' | 'low' = 'high';
   private frameAvg = 16; // average interval between frames (ms)
   private workAvg = 2; // average time render() itself takes (ms)
-  private displayMs = Infinity; // the display's own frame interval: the shortest recent one
+  private displayMs = Infinity; // the display's own frame interval (a low percentile of recent intervals)
+  private intervals = new Float32Array(120);
+  private intervalCount = 0;
   private lastWork = 0;
   private slowFor = 0;
   private fastFor = 0;
@@ -609,8 +611,17 @@ export class Renderer {
     const ms = dt * 1000;
     this.frameAvg += (ms - this.frameAvg) * 0.05;
     this.workAvg += (this.lastWork - this.workAvg) * 0.05;
-    // the shortest recent interval, slowly forgotten (so a monitor change is picked up)
-    this.displayMs = Math.min(Math.max(ms, 4), this.displayMs + dt * 0.1);
+    // the display's rate: the 25th percentile of the last 120 intervals, so a stray early frame does not
+    // make a 40 Hz screen look like a 60 Hz one that is struggling, and slow frames do not hide the real rate
+    this.intervals[this.intervalCount++ % this.intervals.length] = ms;
+    if (this.intervalCount % 30 === 0) {
+      const n = Math.min(this.intervals.length, this.intervalCount);
+      const sorted = Array.from(this.intervals.subarray(0, n)).sort((a, b) => a - b);
+      const p25 = Math.max(4, sorted[Math.floor(n * 0.25)]);
+      // falls at once, rises slowly (about 1% a second): a screen seldom changes its rate, slow frames do.
+      // If dropping the extras does not speed the frames up, the estimate catches up and they come back.
+      this.displayMs = this.displayMs === Infinity ? p25 : Math.min(p25, this.displayMs * 1.005);
+    }
     const slow = this.frameAvg > this.displayMs * 1.35 || this.workAvg > this.displayMs * 0.7;
     const fast = this.frameAvg < this.displayMs * 1.12 && this.workAvg < this.displayMs * 0.4;
     if (slow) {

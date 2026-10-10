@@ -34,7 +34,7 @@ import type { Settings, SlotId } from './storage';
 import { openLanguage, openModeChooser, openSettings, openSlots } from './ui/dialogs';
 import { esc } from './ui/escape';
 import { MainMenu } from './ui/menu';
-import { closeModal, openModal } from './ui/modal';
+import { closeModal, isModalOpen, openModal } from './ui/modal';
 import { RegionMap } from './ui/region';
 
 // Present only in the desktop (Electron) build, see electron/preload.cjs.
@@ -264,6 +264,8 @@ function nextToast(): void {
   toastBusy = true;
   audio.play('done');
   const root = document.getElementById('toasts')!;
+  // over a dialog (an ending, a story event) the toast goes to the bottom, clear of the dialog's title
+  root.classList.toggle('below', isModalOpen());
   const el = document.createElement('div');
   el.className = 'toast';
   el.innerHTML = `<span class="toast-ico"><img src="${iconUrl(next.icon, 2)}" alt="" /></span><span><small>${esc(next.title)}</small><b>${esc(next.text)}</b></span>`;

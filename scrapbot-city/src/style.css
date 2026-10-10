@@ -2568,6 +2568,11 @@ input[type='number'] {
   pointer-events: none;
 }
 
+.toasts.below {
+  top: auto;
+  bottom: 24px;
+}
+
 .toast {
   display: flex;
   align-items: center;
