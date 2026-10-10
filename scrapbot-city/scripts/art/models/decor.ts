@@ -97,20 +97,34 @@ function line(v: Vox, a: readonly number[], b: readonly number[], m: number, siz
   }
 }
 
-// Leafy crown from a few balls, shaded in clean bands (not voxel by voxel, which striped every z step):
-// a light cap where the ball faces the sky, a dark band on its underside, the base colour between.
-function balls(v: Vox, list: readonly (readonly number[])[], base: number, light: number, dark: number): void {
-  for (const [x, y, z, r] of list) v.sphere(x, y, z, r, base);
-  const tone = new Map<number, [number, number, number, number]>();
-  for (const [cx, cy, cz, r] of list)
-    for (let z = Math.floor(cz - r - 1); z <= Math.ceil(cz + r + 1); z++)
+// Leafy crown from a few soft cubes (superellipsoids: flat tops and sides, rounded corners, so the surface does not
+// break into a voxel staircase), shaded in clean bands: a light cap where a lobe faces the sky, a dark band on its
+// underside, the base colour between. Each lobe is [cx, cy, cz, r, rz?].
+function balls(v: Vox, list: readonly (readonly number[])[], base: number, light: number, dark: number, p = 3): void {
+  const inLobe = (l: readonly number[], x: number, y: number, z: number) => {
+    const [cx, cy, cz, r] = l;
+    const rz = l[4] ?? r;
+    return Math.abs((x + 0.5 - cx) / r) ** p + Math.abs((y + 0.5 - cy) / r) ** p + Math.abs((z + 0.5 - cz) / rz) ** p <= 1;
+  };
+  const each = (l: readonly number[], f: (x: number, y: number, z: number) => void) => {
+    const [cx, cy, cz, r] = l;
+    const rz = l[4] ?? r;
+    for (let z = Math.floor(cz - rz - 1); z <= Math.ceil(cz + rz + 1); z++)
       for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
-        for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
-          if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 + (z + 0.5 - cz) ** 2 > r * r || v.get(x, y, z) !== base) continue;
-          const k = (z * v.d + y) * v.w + x;
-          if (!v.get(x, y, z + 1) && z + 0.5 >= cz + 0.35 * r) tone.set(k, [x, y, z, light]);
-          else if (tone.get(k)?.[3] !== light && z + 0.5 <= cz - 0.4 * r && !v.get(x, y, z - 1)) tone.set(k, [x, y, z, dark]);
-        }
+        for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) if (inLobe(l, x, y, z)) f(x, y, z);
+  };
+  for (const l of list) each(l, (x, y, z) => v.set(x, y, z, base));
+  const tone = new Map<number, [number, number, number, number]>();
+  for (const l of list) {
+    const cz = l[2];
+    const rz = l[4] ?? l[3];
+    each(l, (x, y, z) => {
+      if (v.get(x, y, z) !== base) return;
+      const k = (z * v.d + y) * v.w + x;
+      if (!v.get(x, y, z + 1) && z + 0.5 >= cz + 0.35 * rz) tone.set(k, [x, y, z, light]);
+      else if (tone.get(k)?.[3] !== light && z + 0.5 <= cz - 0.4 * rz && !v.get(x, y, z - 1)) tone.set(k, [x, y, z, dark]);
+    });
+  }
   for (const [x, y, z, m] of tone.values()) v.set(x, y, z, m);
 }
 
@@ -172,9 +186,9 @@ function drum(v: Vox, cx: number, cy: number, h: number, body: number, ring: num
 function treeRound(kind: 'a' | 'b' | 'blossom'): Vox {
   const v = tile(1, 1, 24);
   if (kind === 'a') {
-    // a big stacked cube-cluster crown (the asset sheet's tree) on a short trunk with a root flare
+    // a cluster of chunky leaf cubes (the asset sheet's tree) on a short trunk with a root flare
     v.cylZ(8, 8, 6, 0, 1, GRASS);
-    v.box(7, 7, 0, 9, 9, 8, BARK);
+    v.box(7, 7, 0, 9, 9, 10, BARK);
     v.box(6, 7, 0, 10, 9, 2, BARK);
     v.box(7, 6, 0, 9, 10, 2, BARK);
     v.box(5, 7, 0, 11, 9, 1, BARK);
@@ -182,10 +196,11 @@ function treeRound(kind: 'a' | 'b' | 'blossom'): Vox {
     blocks(
       v,
       [
-        [1, 1, 5, 15, 15, 12],
-        [3, 3, 11, 13, 13, 17],
-        [5, 5, 16, 11, 11, 20],
-        [8, 9, 9, 16, 16, 15],
+        [3, 3, 8, 13, 13, 15],
+        [5, 5, 14, 11, 11, 20],
+        [8, 9, 9, 15, 15, 14],
+        [1, 8, 11, 7, 14, 16],
+        [9, 2, 12, 15, 8, 18],
       ],
       LEAF,
       LEAF_L,
@@ -194,40 +209,52 @@ function treeRound(kind: 'a' | 'b' | 'blossom'): Vox {
     return v;
   }
   if (kind === 'b') {
-    // a conifer: three stacked tiers, dark skirts underneath, lit tops
+    // a pine: square tiers stepping in towards the top, dark under each overhang, lit on top
     v.cylZ(8, 8, 5.2, 0, 1, GRASS);
-    v.box(7, 7, 0, 9, 9, 6, BARK);
+    v.box(7, 7, 0, 9, 9, 7, BARK);
     v.box(6, 7, 0, 10, 9, 1, BARK);
     v.box(7, 6, 0, 9, 10, 1, BARK);
-    const tiers = [
-      [4, 11, 6.2, 3.4],
-      [10, 16, 5, 2.4],
-      [15, 22, 3.6, 0.7],
-    ];
-    for (const [z0, z1, r0, r1] of tiers) {
-      v.cone(8, 8, z0, z1, r0, r1, LEAF);
-      v.cylZ(8, 8, r0, z0, z0 + 1, M.greenD);
-    }
-    v.cone(8, 8, 18, 22, 1.9, 0.7, LEAF_L);
-    for (const [z0, z1, r0] of tiers) {
-      // the sunny upper slope of each tier
-      for (let z = z0 + 1; z < z1; z++)
-        for (let y = 0; y < 16; y++)
-          for (let x = 0; x < 16; x++) if (v.get(x, y, z) === LEAF && !v.get(x, y, z + 1) && z >= z0 + (z1 - z0) / 2 - 0.5 && r0 > 0) v.set(x, y, z, LEAF_L);
-    }
+    blocks(
+      v,
+      [
+        [5, 5, 9, 11, 11, 11],
+        [5, 5, 13, 11, 11, 15],
+        [6, 6, 17, 10, 10, 19],
+      ],
+      LEAF,
+      LEAF,
+      LEAF,
+    );
+    blocks(
+      v,
+      [
+        [2, 2, 5, 14, 14, 9],
+        [3, 3, 10, 13, 13, 13],
+        [4, 4, 14, 12, 12, 17],
+        [5, 5, 18, 11, 11, 21],
+        [7, 7, 21, 9, 9, 24],
+      ],
+      LEAF,
+      LEAF_L,
+      M.greenD,
+    );
     return v;
   }
-  v.cylZ(8, 8, 5.2, 0, 1, GRASS);
+  // a cherry tree: a wide soft pink crown on a forked trunk
+  v.cylZ(8, 8, 5.4, 0, 1, GRASS);
   v.box(7, 7, 0, 9, 9, 10, BARK);
   v.box(6, 7, 0, 10, 9, 1, BARK);
   v.box(7, 6, 0, 9, 10, 1, BARK);
+  line(v, [7.5, 8, 8], [5, 9, 11], BARK, 2);
+  line(v, [8, 8, 8], [11, 9.5, 11], BARK, 2);
   balls(
     v,
     [
-      [8, 8, 14, 6],
-      [5.2, 10.6, 11.4, 3.6],
-      [10.8, 10.4, 12, 3.6],
-      [8.4, 7.6, 18.4, 4],
+      [8, 8, 14, 5.6, 4],
+      [4.5, 10, 12, 3.4, 2.8],
+      [11.5, 10.5, 12.5, 3.4, 2.8],
+      [10.5, 5, 15, 3.4, 3],
+      [7.5, 7.5, 18.5, 3.8, 2.6],
     ],
     BLOSSOM,
     BLOSSOM_L,
@@ -510,11 +537,11 @@ function forklift(): Vox {
     v.box(Math.floor(x), 11, 1, Math.floor(x) + 1, 12, 3, M.steelL);
   }
   // seat and steering wheel
-  v.box(6, 6, 6, 9, 9, 7, M.ink);
-  v.box(6, 6, 7, 7, 9, 9, M.ink);
+  v.box(6, 6, 6, 8, 9, 7, M.darkL);
+  v.box(6, 6, 7, 7, 9, 9, M.darkL);
   v.box(10, 7, 6, 11, 8, 8, M.steelD);
-  v.box(10, 6, 8, 11, 9, 9, M.ink);
-  // overhead guard: four thin posts and two roof rails, an orange lamp on top
+  v.box(9, 6, 8, 11, 9, 9, M.steelD);
+  // overhead guard: four thin black posts and two roof rails, an orange lamp on top
   for (const [x, y] of [
     [3, 4],
     [3, 10],
@@ -524,8 +551,7 @@ function forklift(): Vox {
     v.box(x, y, 6, x + 1, y + 1, 11, M.ink);
   v.box(3, 4, 10, 12, 5, 11, M.ink);
   v.box(3, 10, 10, 12, 11, 11, M.ink);
-  v.box(3, 5, 10, 4, 10, 11, M.ink);
-  v.box(4, 9, 11, 6, 11, 12, M.orange);
+  v.box(3, 9, 11, 5, 11, 12, M.orange);
   // mast, carriage and forks
   v.box(12, 5, 1, 13, 6, 11, M.ink);
   v.box(12, 9, 1, 13, 10, 11, M.ink);
