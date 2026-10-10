@@ -46,7 +46,27 @@ apri le iscrizioni a un numero limitato di persone.
 
 Segna ogni momento con: **bloccato** (chiede aiuto o resta fermo più di 30 secondi), **confuso**, **ok**, **divertito**.
 
-## 5. Le 6 domande finali
+### Costruzione modulare (dalla 0.7, incremento 1)
+
+Pavimento industriale, recinzione, cancello, lampione, deposito per il Bot Dock e filtro per la Fonderia
+(pulsante «Oggetti e moduli», tasto `O`). **Non dirlo ai giocatori**: guarda se li trovano da soli.
+
+| Momento | Domanda | Se va male |
+|---|---|---|
+| Prima città, a metà | Aprono il catalogo senza che glielo si dica? | posizione del pulsante, `src/ui/hud.ts` |
+| Primo pezzo | Capiscono l'anteprima, la rotazione (`R`, Y sul controller, «Ruota» sul touch) e perché un posto non va bene? | motivi di `pieceCheck` in `src/game/pieces.ts` |
+| Recinzioni | Le usano per delimitare una zona? Gli angoli si formano come si aspettano? | maschere `pc/fence/*` |
+| Moduli | Capiscono dal pannello dell'edificio cosa cambia (prima → dopo) e lo installano **per una ragione** (magazzino pieno, smog alto) o a caso? | sezione «Moduli» del pannello |
+| Attesa della Guglia | Quando hanno i crediti ma mancano i pezzi, fanno qualcosa (altro Riciclatore, deposito) o accelerano e aspettano? | economia dei pezzi, `src/game/defs.ts` |
+| Dopo la Guglia | **Tornano a sistemare la città** (recinzioni, pavimenti, lampioni) senza un obiettivo che lo chieda? | è la domanda più importante di questa versione |
+
+Nelle partite simulate della 0.6 la città smette di costruire per 1,5–2 giorni di gioco su 9–12 (15–20% del tempo) per
+mettere da parte i pezzi della Guglia: guarda come vivono quel momento le persone vere.
+
+## 5. Le domande finali
+
+**La domanda decisiva:** «Dopo aver capito come funziona, ti è venuta voglia di costruire ancora qualcosa? Cosa?»
+(Non «ti piace la grafica?».)
 
 1. Con parole tue: di cosa parla il gioco?
 2. Qual è stato il momento più bello? E il più noioso?
@@ -54,6 +74,8 @@ Segna ogni momento con: **bloccato** (chiede aiuto o resta fermo più di 30 seco
 4. Verde o industria: cosa hai scelto e perché?
 5. Lo compreresti? A quale prezzo ti sembrerebbe giusto?
 6. Lo consiglieresti a un amico? A chi?
+7. Hai usato recinzioni, pavimenti o lampioni? Perché sì o perché no?
+8. Il filtro o il deposito: li hai installati? Ti sono serviti davvero?
 
 ## 6. Numeri da annotare
 
@@ -62,6 +84,9 @@ Segna ogni momento con: **bloccato** (chiede aiuto o resta fermo più di 30 seco
 - Minuti per la prima Scrap Spire nella prima città (obiettivo: 40–60).
 - Quante città perse per lo smog (qualcuna va bene: insegna; tante vuol dire che l'avviso non si vede).
 - Quanti suggerimenti usati e quanti pagati.
+- Dopo quanti minuti aprono il catalogo «Oggetti e moduli» per la prima volta (o se non lo aprono mai).
+- Quanti pezzi decorativi posano senza che serva a un obiettivo, e se continuano dopo la Guglia.
+- Quanti minuti passano a velocità massima senza costruire nulla prima della Guglia.
 
 Il pilota automatico `npm run balance` fa lo stesso controllo dei tempi su tutte le città in pochi secondi:
 usalo dopo ogni modifica ai numeri in `src/game/defs.ts`, e il playtest per tutto quello che un programma non sente.
