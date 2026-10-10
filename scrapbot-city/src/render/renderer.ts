@@ -341,15 +341,16 @@ export class Renderer {
     const sc = placeScenery(s.seed, RING, decorArt);
     this.scenery = sc.items;
     this.sceneryTaken = sc.taken;
-    // street lamps every third tile on the curbs of the old streets (not on crossings, not on the canal)
+    // street lamps every fifth tile on the curbs of the old streets (not on crossings, not on the canal):
+    // enough to light the streets at night without a forest of poles by day
     this.lamps = [];
     for (let ty = -RING; ty < MAP_H + RING; ty++)
       for (let tx = -RING; tx < MAP_W + RING; tx++) {
         const row = isRoadRow(ty);
         const col = isRoadCol(tx);
         if (row === col || isCanal(tx, ty)) continue;
-        if (row && ((tx % 3) + 3) % 3 === 1) this.lamps.push({ tx, ty, axis: 'x' });
-        if (col && ((ty % 3) + 3) % 3 === 1) this.lamps.push({ tx, ty, axis: 'y' });
+        if (row && ((tx % 5) + 5) % 5 === 2) this.lamps.push({ tx, ty, axis: 'x' });
+        if (col && ((ty % 5) + 5) % 5 === 2) this.lamps.push({ tx, ty, axis: 'y' });
       }
     const ctx = this.tctx;
     ctx.clearRect(0, 0, this.terrain.width, this.terrain.height);
