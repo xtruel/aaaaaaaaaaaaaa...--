@@ -36,7 +36,6 @@ const CONT_RD = mat('decor-contRD', { rgb: hex('#6b3721'), jitter: 0.05 });
 const CAR = mat('decor-car', { rgb: hex('#4f8189'), jitter: 0.03 });
 const CAR_D = mat('decor-carD', { rgb: hex('#365a64'), jitter: 0.03 });
 const PRIMER = mat('decor-primer', { rgb: hex('#a29fb0'), jitter: 0.03 });
-const POLE = mat('decor-pole', { rgb: hex('#6b4c38'), jitter: 0.04 });
 const DRUM_G = mat('decor-drumG', { rgb: hex('#4f7a3c'), jitter: 0.03 });
 const TYRE = mat('decor-tyre', { rgb: hex('#4b4559'), jitter: 0.03 });
 const DUMP = mat('decor-dump', { rgb: hex('#3c6d4c'), jitter: 0.03 });
@@ -111,7 +110,7 @@ function balls(v: Vox, list: readonly (readonly number[])[], base: number, light
     const rz = l[4] ?? r;
     for (let z = Math.floor(cz - rz - 1); z <= Math.ceil(cz + rz + 1); z++)
       for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
-        for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) if (inLobe(l, x, y, z)) f(x, y, z);
+        for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) if (v.inside(x, y, z) && inLobe(l, x, y, z)) f(x, y, z);
   };
   for (const l of list) each(l, (x, y, z) => v.set(x, y, z, base));
   const tone = new Map<number, [number, number, number, number]>();
@@ -460,9 +459,12 @@ function billboard(): Vox {
   v.box(3, 8, 13, 29, 9, 29, M.dark);
   isoText(v, 'BETTER', '+y', 4, 8, 26, M.cyanLit);
   isoText(v, 'ROBOTS', '+y', 4, 8, 19, M.cyanLit);
-  // rust running down from the top of the frame
-  for (const x of [9, 24]) v.box(x, 8, 28, x + 1, 9, 31, M.rustD);
-  v.box(9, 8, 29, 11, 9, 31, M.rustD);
+  // weathering: rust running down the frame from its top corners
+  for (const [x, z0] of [
+    [1, 22],
+    [29, 24],
+  ])
+    v.box(x, 8, z0, x + 2, 9, 31, M.rustD);
   // the 2PM tab on top
   v.box(18, 6, 31, 31, 9, 38, M.pink);
   v.box(18, 6, 31, 31, 7, 38, M.pinkD);
@@ -478,9 +480,12 @@ function billboard(): Vox {
 
 function sign(): Vox {
   const v = tile(1, 1, 11);
-  for (const x of [3, 11]) v.box(x, 8, 0, x + 2, 9, 10, M.steel);
-  v.box(0, 9, 2, 15, 11, 11, M.pinkD);
-  v.box(1, 10, 3, 14, 11, 10, M.pink);
+  for (const x of [3, 11]) {
+    v.box(x - 1, 8, 0, x + 3, 11, 1, M.concrete);
+    v.box(x, 9, 0, x + 2, 10, 3, M.steel);
+  }
+  v.box(0, 9, 3, 15, 11, 11, M.pinkD);
+  v.box(1, 10, 4, 14, 11, 10, M.pink);
   isoText(v, '2PM', '+y', 2, 10, 8, M.white);
   return v;
 }
@@ -520,7 +525,7 @@ function fence(): Vox {
 // Side-on to the front-left: a yellow body with a counterweight at the back, a thin black cage, black tyres
 // sticking out below and two steel forks to the +x.
 function forklift(): Vox {
-  const v = tile(1, 1, 13);
+  const v = tile(1, 1, 12);
   // body and counterweight, a dark skirt along the bottom
   v.box(2, 4, 1, 12, 11, 7, M.yellow);
   v.box(1, 4, 1, 5, 11, 9, M.yellow);
@@ -547,7 +552,7 @@ function forklift(): Vox {
     v.box(x, y, 7, x + 1, y + 1, 12, M.ink);
   v.box(3, 4, 11, 11, 5, 12, M.ink);
   v.box(3, 10, 11, 11, 11, 12, M.ink);
-  v.box(3, 9, 12, 5, 11, 13, M.orange);
+  v.box(3, 9, 11, 5, 11, 12, M.orange);
   // mast, carriage and forks
   v.box(12, 5, 1, 13, 6, 12, M.steel);
   v.box(12, 9, 1, 13, 10, 12, M.steel);
@@ -637,14 +642,14 @@ function pipeRun(): Vox {
 function cablePole(): Vox {
   const v = tile(1, 1, 37);
   v.box(6, 6, 0, 10, 10, 1, M.concrete);
-  v.box(7, 7, 0, 9, 9, 35, POLE);
+  v.box(7, 7, 0, 9, 9, 35, BARK);
   v.box(7, 7, 35, 9, 9, 36, M.steelD);
   // two crossarms set across the view (along x − y) so they read as a T on screen, insulators on their ends
   for (const [z, n] of [
     [31, 6],
     [26, 4],
   ]) {
-    for (let k = -n; k <= n; k++) v.box(8 + k, 7 - k, z - 1, 9 + k, 9 - k, z + 1, POLE);
+    for (let k = -n; k <= n; k++) v.box(8 + k, 7 - k, z - 1, 9 + k, 9 - k, z + 1, BARK);
     for (const k of [-n, n]) v.box(8 + k, 7 - k, z + 1, 9 + k, 9 - k, z + 3, M.white);
   }
   // loose drop cables hanging from the upper arm's ends

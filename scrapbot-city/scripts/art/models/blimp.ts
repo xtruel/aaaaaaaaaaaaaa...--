@@ -9,6 +9,8 @@ import { FONT, Vox, hex, mat } from '../voxel';
 export const BLIMP_FRAMES = 2;
 
 const BAND = mat('blimp-band', { rgb: hex('#ff3d8b'), emit: 0.4, glow: hex('#ff5c9e'), jitter: 0 });
+// the lettering on the ad panel: lit from inside, crisp white by day and glowing at night
+const LETTER = mat('blimp-letter', { rgb: hex('#fff7fc'), emit: 0.6, glow: hex('#ffd6ea'), flat: true, jitter: 0 });
 
 const W = 52;
 const D = 14;
@@ -18,7 +20,7 @@ const CZ = 14.5;
 const R = 6.5;
 const TAIL = 3; // envelope from x = TAIL to W
 const BODY0 = 14; // straight mid-section from BODY0 to BODY1
-const BODY1 = 40;
+const BODY1 = 37;
 const ZC = Math.floor(CZ); // the voxel row just under the axis
 
 // Envelope radius at x: a tail cone, a straight body (flat planes on screen, no stair-step stripes), a round nose.
@@ -33,7 +35,7 @@ function radius(x: number): number {
 // Cross-sections are slightly squared off (superellipse) so the side and the top read as clean faces.
 function inside(y: number, z: number, r: number): boolean {
   if (r <= 0) return false;
-  const p = 3;
+  const p = 4;
   return Math.abs((y + 0.5 - CY) / r) ** p + Math.abs((z + 0.5 - CZ) / r) ** p <= 1;
 }
 
@@ -59,10 +61,10 @@ export function blimpModel(frame: number): Vox {
   // envelope
   for (let x = TAIL; x < W; x++) {
     const r = radius(x + 0.5);
-    for (let z = 0; z < H; z++) for (let y = 0; y < D; y++) if (inside(y, z, r)) v.set(x, y, z, x >= W - 5 ? M.pink : M.white);
+    for (let z = 0; z < H; z++) for (let y = 0; y < D; y++) if (inside(y, z, r)) v.set(x, y, z, x >= W - 4 ? M.pink : M.white);
   }
   // pink belts behind the nose cap and in front of the tail
-  v.paint(W - 7, 0, 0, W - 6, D, H, M.pinkD);
+  v.paint(W - 5, 0, 0, W - 4, D, H, M.pinkD);
   v.paint(BODY0 - 1, 0, 0, BODY0, D, H, M.pinkD);
   // the ad panel: flat, one voxel proud of the hull, pink trim rows, white 2PM, a rim of chasing bulbs
   const P0 = 17;
@@ -71,12 +73,11 @@ export function blimpModel(frame: number): Vox {
   v.box(P0, D - 1, ZC - 3, P1, D, ZC - 2, M.pinkD);
   v.box(P0, D - 1, ZC + 4, P1, D, ZC + 5, M.pinkD);
   for (let x = P0; x < P1; x += 2) {
-    const lit = (x / 2 + frame) % 2 === 0 ? M.yellowLit : M.pinkD;
+    const lit = ((x - P0) / 2 + frame) % 2 === 0 ? M.yellowLit : M.pinkD;
     v.set(x, D - 1, ZC - 3, lit);
     v.set(x + 1, D - 1, ZC + 4, lit);
   }
-  isoTextY(v, '2PM', 21, D - 1, ZC + 2, M.white);
-  isoTextY(v, '2PM', 34 - 11 + 3, D - 1, ZC + 2, M.white);
+  isoTextY(v, '2PM', 21, D - 1, ZC + 2, LETTER);
   // tail fins: top and bottom swept back, side fins 2 thick reaching out sideways
   for (let x = TAIL; x < TAIL + 8; x++) {
     const k = x - TAIL; // 0 at the tail
