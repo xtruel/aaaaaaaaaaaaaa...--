@@ -149,6 +149,8 @@ export interface SceneryItem {
   frames: number;
   fps: number;
   back: boolean; // entirely behind the map on one axis: drawn before everything on the map
+  names: string[]; // atlas frame names, per animation frame (built once, not every frame)
+  glows: string[];
 }
 
 // Deterministic per city: the same seed always gives the same surroundings.
@@ -184,7 +186,8 @@ export function placeScenery(seed: number, ring: number, meta: Record<string, De
       const isBack = tx + m.w <= 0 || ty + m.d <= 0;
       if (m.tall && !isBack) continue;
       for (let y = ty; y < ty + m.d; y++) for (let x = tx; x < tx + m.w; x++) taken.add(key(x, y));
-      items.push({ name, tx, ty, w: m.w, d: m.d, frames: m.frames, fps: m.fps, back: isBack });
+      const frameNames = Array.from({ length: Math.max(1, m.frames) }, (_, k) => `d/${name}/${k}`);
+      items.push({ name, tx, ty, w: m.w, d: m.d, frames: m.frames, fps: m.fps, back: isBack, names: frameNames, glows: frameNames.map((n) => `${n}/g`) });
     }
   items.sort((a, b) => a.tx + a.w + a.ty + a.d - (b.tx + b.w + b.ty + b.d));
   return { items, taken };

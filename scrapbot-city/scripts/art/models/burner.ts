@@ -9,8 +9,15 @@ import type { BuildingArt } from './common';
 
 const SCRAP = [M.rust, M.steelL, M.rustD, M.steel, M.orange, M.pinkD, M.rust, M.steelL];
 
+// "2PM" in letters 7 rows tall (the 3×5 house font reads as "ZFM" on the side wall).
+const LOGO = [
+  ['.#.', '#.#', '..#', '.#.', '#..', '#..', '###'],
+  ['##.', '#.#', '#.#', '##.', '#..', '#..', '#..'],
+  ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'],
+];
+
 // Flame heights in the firebox: each tongue takes the next height every frame, so the fire visibly jumps.
-const TONGUES = [2, 7, 4, 6];
+const TONGUES = [3, 8, 4, 6];
 // Flame tongues licking out of the big stack, swapping sides every frame.
 const STACK_FLAME: [number, number][] = [
   [3, 1],
@@ -33,10 +40,16 @@ export const burner: BuildingArt = {
     v.box(2, 2, 19, 29, 25, 21, M.concrete); // roof lip
     v.box(4, 4, 21, 27, 23, 22, M.dark);
 
-    // 2PM logo on the right wall (outer layer x = 27)
-    v.box(27, 4, 7, 29, 19, 17, M.pink);
-    v.box(28, 5, 8, 29, 18, 16, M.pinkD);
-    v.text('2PM', '+x', 28, 16, 14, M.white, true);
+    // 2PM logo on the right wall (outer layer x = 27), in 7-row letters so the 2 and the P read
+    v.box(27, 3, 6, 29, 19, 18, M.pink);
+    v.box(28, 4, 7, 29, 18, 17, M.pinkD);
+    let ly = 17; // the +x face reads along −y
+    for (const g of LOGO) {
+      g.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) if (row[c] === '#') v.set(28, ly - c, 15 - r, M.white);
+      });
+      ly -= g[0].length + 1;
+    }
 
     // energy meter beside it: a steel-framed gauge whose 4 bars fill up while the burner makes power
     v.box(27, 19, 6, 29, 24, 19, M.steel);
@@ -48,11 +61,11 @@ export const burner: BuildingArt = {
     v.paint(4, 24, 3, 21, 29, 5, M.rustD);
     v.box(3, 23, 15, 22, 30, 16, M.rustD); // top lip
     v.box(4, 24, 16, 21, 29, 17, M.red);
-    // the firebox behind the grate (outer layer y = 28): always dark inside, so the flames read against it
+    // the firebox (outer layer y = 28): always dark inside, so the flames read against it
     v.box(6, 25, 5, 19, 28, 14, M.ink);
-    v.clear(6, 26, 6, 19, 29, 14);
+    v.clear(7, 26, 6, 18, 29, 14);
     if (working) {
-      v.box(6, 26, 5, 19, 28, 6, M.orangeLit); // embers
+      v.box(7, 26, 5, 18, 28, 6, M.orangeLit); // embers
       for (let k = 0; k < 4; k++) {
         const x = 7 + k * 3;
         const h = TONGUES[(k + f) % 4];
@@ -60,9 +73,9 @@ export const burner: BuildingArt = {
         v.box(x, 27, 6, x + 2, 28, 5 + h, M.fire); // its hot core in front
       }
     } else v.box(7, 26, 6, 18, 28, 8, M.rustD); // ash
-    // grate: a bottom bar and three bars, with wide gaps so the fire shows
+    // a low fire grate the flames rise from
     v.box(6, 28, 5, 19, 29, 6, M.ink);
-    for (const x of [6, 12, 18]) v.box(x, 28, 5, x + 1, 29, 14, M.ink);
+    for (const x of [9, 12, 15]) v.box(x, 28, 5, x + 1, 29, 9, M.ink);
     hazardBand(v, 4, 28, 3, 21, 29, 5);
 
     // ---------- the big red stack (back) and its small twin ----------

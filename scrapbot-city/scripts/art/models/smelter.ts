@@ -29,6 +29,12 @@ function tiltedCup(v: Vox, cx: number, cy: number, cz: number, r: number, h: num
       }
 }
 
+// Flame heights in the furnace mouth (each tongue takes the next one every frame), heat gauge bars per frame.
+const MOUTH = [3, 8, 5, 9];
+const HEAT = [1, 2, 3, 2];
+// Where the molten stream falls on the casting line.
+const STREAM_Y = 14;
+
 export const smelter: BuildingArt = {
   frames: 4,
   fps: 6,
@@ -42,7 +48,7 @@ export const smelter: BuildingArt = {
     v.box(2, 2, 29, 21, 12, 30, M.steel);
     v.box(4, 4, 30, 19, 10, 31, M.steelD);
     // glowing vents on its front wall, above the kiln
-    for (const x of [6, 10, 14]) v.box(x, 10, 24, x + 2, 11, 27, working ? M.orangeLit : M.ink);
+    [6, 10, 14].forEach((x, k) => v.box(x, 10, 24, x + 2, 11, 27, working ? ((k + f) % 3 ? M.orangeLit : M.fire) : M.ink));
 
     // ---------- kiln: the orange body ----------
     v.box(3, 11, 3, 19, 28, 22, M.orange);
@@ -55,23 +61,25 @@ export const smelter: BuildingArt = {
     v.box(8, 19, 25, 10, 21, 26, M.steelD); // its handle
     v.box(18, 27, 3, 20, 29, 22, M.steelD); // front corner post
 
-    // furnace mouth on the front-left wall (outer layer y = 27): a hot lining inside a dark steel frame
-    const lining = working ? M.orangeLit : M.rustD;
-    v.box(7, 23, 4, 16, 27, 16, lining);
+    // furnace mouth on the front-left wall (outer layer y = 28): a dark firebox inside a steel frame, so the
+    // flame tongues read against it
+    v.box(7, 24, 4, 16, 27, 16, M.rustD); // lining
     v.box(7, 27, 4, 16, 29, 16, M.steelD); // frame, standing out of the wall
-    v.clear(8, 24, 5, 15, 29, 15); // the opening
+    v.box(8, 25, 5, 15, 26, 15, M.ink); // back wall
+    v.clear(8, 26, 5, 15, 29, 15); // the opening
     v.box(8, 27, 14, 9, 29, 15, M.steelD); // rounded arch corners
     v.box(14, 27, 14, 15, 29, 15, M.steelD);
     if (working) {
-      // flickering flames: tongues of different heights that change every frame
+      // flames: tongues that take the next height every frame
       for (let k = 0; k < 4; k++) {
         const x = 8 + k * 2;
-        const h = 3 + ((k * 3 + f * 5) % 6);
-        v.box(x, 24, 5, Math.min(15, x + 2), 26, 5 + h, M.fire);
+        const h = MOUTH[(k + f) % 4];
+        v.box(x, 26, 5, Math.min(15, x + 2), 28, 5 + h, M.orangeLit);
+        v.box(x, 27, 5, Math.min(15, x + 2), 28, 4 + h, M.fire);
       }
     } else {
-      v.box(8, 24, 4, 15, 29, 5, M.ink); // cold hearth
-      v.box(9, 24, 5, 14, 26, 7, M.rustD); // cold slag
+      v.box(8, 26, 4, 15, 28, 5, M.ink); // cold hearth
+      v.box(9, 26, 5, 14, 28, 7, M.rustD); // cold slag
     }
     hazardBand(v, 7, 28, 15, 16, 29, 16);
 
@@ -79,8 +87,10 @@ export const smelter: BuildingArt = {
     v.box(18, 19, 3, 20, 26, 13, M.steelD);
     v.box(19, 20, 3, 20, 25, 12, M.steel);
     v.box(19, 21, 8, 20, 24, 10, M.window);
-    v.box(18, 13, 9, 20, 18, 16, M.steelD);
-    for (let k = 0; k < 3; k++) v.box(19, 14, 10 + k * 2, 20, 17, 11 + k * 2, working ? (k === 2 ? M.redLit : M.orangeLit) : M.ink);
+    // heat gauge: three bars that rise and fall with the fire
+    v.box(18, 13, 8, 20, 18, 16, M.steelD);
+    const heat = working ? HEAT[f] : 0;
+    for (let k = 0; k < 3; k++) v.box(19, 14, 9 + k * 2, 20, 17, 11 + k * 2, k < heat ? (k === 2 ? M.redLit : M.orangeLit) : M.ink);
 
     // ---------- chimney ----------
     const cx = 11;
@@ -88,7 +98,7 @@ export const smelter: BuildingArt = {
     v.cylZ(cx, cy, 4.8, 31, 34, M.orange); // hot collar
     v.cylZ(cx, cy, 3.7, 31, 46, M.dark);
     v.cylZ(cx, cy, 3.7, 37, 38, M.darkL);
-    v.cylZ(cx, cy, 4.3, 45, 47, M.rust); // rim
+    v.cylZ(cx, cy, 4.3, 45, 47, M.dark); // rim
     v.cylZ(cx, cy, 2.7, 46, 47, working ? M.orangeLit : M.ink);
     v.point('smoke', cx, cy, 47);
 
@@ -104,19 +114,25 @@ export const smelter: BuildingArt = {
     v.box(21, 12, 3, 30, 22, 5, M.steelD);
     v.box(21, 12, 5, 22, 22, 6, M.steel);
     v.box(29, 12, 5, 30, 22, 6, M.steel);
-    const shift = f * 2;
-    for (let k = 0; k < 2; k++) {
-      const y = 12 + ((k * 8 + shift) % 16);
-      if (y + 4 > 22) continue;
-      v.box(22, y, 5, 29, y + 4, 7, M.steel);
-      const fresh = y < 18;
-      v.box(23, y + 1, 6, 28, y + 3, 7, working && fresh ? M.orangeLit : M.yellow);
+    // a continuous casting chain: 6-long moulds between 2-wide dividers, moving 2 voxels per frame towards the
+    // front. Empty before the stream, molten under it, cooling just past it, set gold at the end of the line.
+    for (let y = 12; y < 22; y++) {
+      const p = (((y - 12 - f * 2) % 8) + 8) % 8;
+      const start = y - p; // where this mould's divider begins; its tray is start + 2 .. start + 7
+      if (p < 2) {
+        v.box(22, y, 5, 29, y + 1, 7, M.steel); // divider
+        continue;
+      }
+      v.box(22, y, 5, 29, y + 1, 6, M.steel);
+      v.box(22, y, 6, 23, y + 1, 7, M.steel);
+      v.box(28, y, 6, 29, y + 1, 7, M.steel);
+      let fill = M.steelD; // empty: not under the stream yet (or the line is stopped)
+      if (working && start + 8 > STREAM_Y) fill = start < 16 ? M.orangeLit : start < 18 ? M.orange : M.yellow;
+      v.box(23, y, 6, 28, y + 1, 7, fill);
     }
     // the molten stream from the lip into the moulds
-    if (working) {
-      for (let z = 7; z < 19; z++) v.box(25, 14, z, 27, 15, z + 1, (z + f * 2) % 4 < 2 ? M.fire : M.orangeLit);
-      v.point('spark', 26, 15, 8);
-    }
+    if (working) for (let z = 7; z < 19; z++) v.box(25, STREAM_Y, z, 27, STREAM_Y + 1, z + 1, (z + f * 2) % 4 < 2 ? M.fire : M.orangeLit);
+    v.point('spark', 26, 15, 8);
 
     // ---------- stacks of ingots at the front ----------
     // a pyramid of bars on a pallet: 3, 2, 1, with a gap between the bars of each layer

@@ -98,6 +98,37 @@ function valueNoise(x: number, y: number, salt: number): number {
   return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
 }
 
+// Frame names per building type, built once: the renderer asks for them several times per building per frame.
+interface BuildingNames {
+  c: string[];
+  off: string;
+  w: string[];
+  shadow: string;
+}
+const buildingNames = new Map<BuildingType, BuildingNames>();
+function namesOf(type: BuildingType, frames: number): BuildingNames {
+  let n = buildingNames.get(type);
+  if (!n || n.w.length !== frames) {
+    n = {
+      c: [0, 1, 2, 3].map((k) => `b/${type}/c${k}`),
+      off: `b/${type}/off`,
+      w: Array.from({ length: frames }, (_, k) => `b/${type}/w${k}`),
+      shadow: `b/${type}/shadow`,
+    };
+    buildingNames.set(type, n);
+  }
+  return n;
+}
+const glowNames = new Map<string, string>();
+function glowOf(name: string): string {
+  let g = glowNames.get(name);
+  if (!g) {
+    g = `${name}/g`;
+    glowNames.set(name, g);
+  }
+  return g;
+}
+
 function isWorking(s: GameState, b: Building): boolean {
   if (b.built < 1 || b.paused) return false;
   if (b.type === 'solar') return dayPhase(s) < 0.58 && s.derived.efficiency > 0;
@@ -829,7 +860,7 @@ export class Renderer {
     for (let k = 0; k < this.scenery.length; k++) {
       const d = this.scenery[k];
       if (d.back) continue;
-      const f = frame(`d/${d.name}/0`);
+      const f = frame(d.names[0]);
       if (!f) continue;
       const top = tileTop(d.tx, d.ty);
       const sx = top.X - f.ax;
@@ -915,13 +946,14 @@ export class Renderer {
 
   private buildingFrameName(s: GameState, b: Building): string {
     const art = buildingArt[b.type];
-    if (b.built < 1) return `b/${b.type}/c${Math.min(3, Math.floor(b.built * 4))}`;
-    if (!art) return `b/${b.type}/off`;
+    const n = namesOf(b.type, art?.frames ?? 1);
+    if (b.built < 1) return n.c[Math.min(3, Math.floor(b.built * 4))];
+    if (!art) return n.off;
     // always-animated buildings (radar, lights, elevators) still go dark without power or when paused
     const animate = ALWAYS_ANIMATED.has(b.type) ? !b.paused && b.status !== 'noPower' : isWorking(s, b);
-    if (!animate) return `b/${b.type}/off`;
+    if (!animate) return n.off;
     const f = Math.floor(this.clock * art.fps + b.id * 0.37) % art.frames;
-    return `b/${b.type}/w${f}`;
+    return n.w[f];
   }
 
   private drawShadows(s: GameState, camX: number, camY: number): void {
@@ -930,7 +962,7 @@ export class Renderer {
     sc.clearRect(0, 0, this.viewW, this.viewH);
     for (const b of s.buildings) {
       if (b.built < 0.5) continue;
-      const f = frame(`b/${b.type}/shadow`);
+      const f = frame(namesOf(b.type, buildingArt[b.type]?.frames ?? 1).shadow);
       if (!f) continue;
       const top = tileTop(b.x, b.y);
       const x = top.X - f.ax - camX;
@@ -1149,7 +1181,7 @@ export class Renderer {
 
   private drawScenery(d: SceneryItem, camX: number, camY: number, img: HTMLImageElement, reduced: boolean): void {
     const fr = d.frames > 1 && !reduced ? Math.floor(this.clock * d.fps + d.tx * 0.37 + d.ty * 0.61) % d.frames : 0;
-    const f = frame(`d/${d.name}/${fr}`);
+    const f = frame(d.names[fr]);
     if (!f) return;
     const top = tileTop(d.tx, d.ty);
     const x = top.X - f.ax - camX;
@@ -1500,7 +1532,7 @@ export class Renderer {
       if (d.kind !== K_BUILDING || !d.f) continue;
       const b = s.buildings[d.index];
       if (!b || b.id !== d.ref || b.built < 1) continue;
-      const g = frame(`${this.buildingFrameName(s, b)}/g`);
+      const g = frame(glowOf(this.buildingFrameName(s, b)));
       if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, d.sx - camX, d.sy - camY, g.w, g.h);
       // blinking beacons from the model's light points
       const art = buildingArt[b.type];
@@ -1561,7 +1593,7 @@ export class Renderer {
     }
     for (const d of this.scenery) {
       const fr = d.frames > 1 ? Math.floor(this.clock * d.fps + d.tx * 0.37 + d.ty * 0.61) % d.frames : 0;
-      const g = frame(`d/${d.name}/${fr}/g`);
+      const g = frame(d.glows[fr]);
       if (!g) continue;
       const top = tileTop(d.tx, d.ty);
       const x = top.X - g.ax - camX;

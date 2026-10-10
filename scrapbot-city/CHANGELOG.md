@@ -92,6 +92,7 @@
 - Testi fluttuanti disegnati una volta e riusati, saltati fuori schermo e al massimo 48: alla velocità massima erano metà
   del costo del disegno.
 - Desktop: la tastiera a schermo di Steam Deck si apre davvero (la risposta della richiesta veniva riletta come vuota).
+- Le notifiche degli achievement si spostano in basso mentre è aperto un dialogo: non coprono più il titolo di un finale.
 - Desktop/Steam: steamworks.js (quando installato) si carica all'avvio, così l'overlay di Steam funziona; lanciato dal
   client Steam il gioco prende l'App ID da Steam anche senza `steam_appid.txt`.
 
