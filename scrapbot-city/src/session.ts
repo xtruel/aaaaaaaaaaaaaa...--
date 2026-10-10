@@ -4,10 +4,11 @@ import { audio } from './audio';
 import { recordCity } from './campaign';
 import { bulldozeRubble, demolish, packsToBuild, placeBuilding, placeCheck } from './game/actions';
 import { cityById, cityDesc, cityTagline, cityTraits, goalText } from './game/cities';
-import { BUILDINGS, BUILD_ORDER, SIM_STEP, T, TILE } from './game/defs';
+import { BUILDINGS, BUILD_ORDER, T, TILE } from './game/defs';
 import type { BuildingType } from './game/defs';
 import { freeHintsLeft, hintPrice, suggest } from './game/hints';
-import { computeDerived, dayPhase, step } from './game/sim';
+import type { Hint } from './game/hints';
+import { advance, computeDerived, dayPhase } from './game/sim';
 import { canAutosave, day, idx, inBounds, pushMessage } from './game/state';
 import type { FxEvent, GameState } from './game/state';
 import { endingSubtitle, endingText, endingTitle, eventById } from './game/story';
@@ -125,7 +126,7 @@ export class GameSession implements PadTarget {
         },
         onCloseInspector: () => (this.selectedId = -1),
         onHint: () => this.askHint(),
-        onRegion: () => openTrade(this.s, () => this.save()),
+        onRegion: () => openTrade(this.s, () => this.autosave()),
       },
       s,
     );
@@ -217,15 +218,7 @@ export class GameSession implements PadTarget {
     const modal = isModalOpen();
     const running = !modal && this.speed > 0 && !s.outcome && !s.pendingEvent;
     if (running) {
-      this.acc += this.simDt * this.speed;
-      let n = 0;
-      while (this.acc >= SIM_STEP && n < 16) {
-        step(s, SIM_STEP);
-        this.acc -= SIM_STEP;
-        n++;
-        if (s.pendingEvent || s.outcome) break;
-      }
-      if (n >= 16) this.acc = 0;
+      this.acc = advance(s, this.acc, this.simDt, this.speed);
     } else {
       computeDerived(s);
     }
@@ -482,7 +475,7 @@ export class GameSession implements PadTarget {
           this.pausedByHide = true;
           this.setSpeed(0);
         }
-        this.save();
+        this.autosave();
       } else {
         audio.resume();
         if (this.pausedByHide) {
@@ -785,7 +778,7 @@ export class GameSession implements PadTarget {
     const next = suggest(s);
     const title = next.title;
     if (next.free || (title === s.hints.lastTitle && day(s) === s.hints.lastDay)) {
-      this.showHint(t('hint.repeat'));
+      this.showHint(t('hint.repeat'), next);
       return;
     }
     // only a hint that is actually shown counts as "asked today" (declining the paid one does not)
@@ -796,7 +789,7 @@ export class GameSession implements PadTarget {
     if (freeHintsLeft(s) > 0) {
       s.hints.free--;
       remember();
-      this.showHint(s.hints.free > 0 ? t('hint.freeLeft', { n: s.hints.free }) : t('hint.lastFree'));
+      this.showHint(s.hints.free > 0 ? t('hint.freeLeft', { n: s.hints.free }) : t('hint.lastFree'), next);
       return;
     }
     const price = hintPrice(s);
@@ -805,12 +798,12 @@ export class GameSession implements PadTarget {
       s.res.credits -= price;
       s.hints.paid++;
       remember();
-      this.showHint(t('hint.paid', { n: price, next: hintPrice(s) }));
+      // the advice paid for is the one chosen before paying (paying must not change it)
+      this.showHint(t('hint.paid', { n: price, next: hintPrice(s) }), next);
     });
   }
 
-  private showHint(footer: string): void {
-    const hint = suggest(this.s);
+  private showHint(footer: string, hint: Hint = suggest(this.s)): void {
     audio.play('event');
     openHint(hint, footer, () => {
       closeModal();

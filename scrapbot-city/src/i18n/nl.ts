@@ -544,6 +544,7 @@ export const nl: Dict = {
   'trade.title': 'Vrachtzeppelin',
   'trade.eyebrow': 'Regionale bank',
   'trade.intro': 'De vrachtzeppelin vervoert credits en onderdelen tussen de steden van de Schrootkust. Als brandstof houdt hij {fee}% van wat je stuurt.',
+  'trade.smog': 'Het vrachtluchtschip kan niet door deze smog vliegen. Maak eerst de lucht schoon.',
   'trade.city': 'Stad',
   'trade.bank': 'Bank',
   'trade.send': 'Stuur {n}',

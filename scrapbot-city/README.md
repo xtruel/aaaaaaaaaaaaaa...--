@@ -14,6 +14,8 @@ npm run dev          # gioco nel browser: http://localhost:3001
 npm run build        # dist/index.html: un unico file con codice, CSS e font
 npm run balance      # partite automatiche su tutte le città per controllare il bilanciamento
 npm run i18n:check   # controlla che le 7 traduzioni abbiano tutte le chiavi, i {segnaposto} e i tag dell'inglese
+npm run art          # rigenera gli sprite isometrici dai modelli voxel (atlante + PNG singoli + foglio di controllo)
+npm test             # test automatici (proiezione, ordine di disegno, salvataggi, simulazione)
 npm run desktop      # app desktop (Electron)
 npm run dist:win     # build per Steam in release/ (anche dist:linux, dist:mac)
 ```
@@ -108,10 +110,17 @@ src/
     sim.ts             simulazione a passo fisso
     state.ts           stato e salvataggi (versione 2, legge anche la 1)
     actions.ts, story.ts, world.ts
-  render/              pixel art procedurale, mappa della regione
+  render/              renderer isometrico, icone, menu e mappa della regione
+    renderer.ts        il mondo in 2.5D: terreno in cache, ordine di disegno, ombre, luci, clic sugli sprite
+    iso/               proiezione, atlante, ordinamento per profondità, cittadini e scenografia
+  assets/iso/          atlante generato da npm run art (atlas.png + atlas.json con gli ancoraggi)
   ui/                  menu, HUD, tutorial, regione, finestre di dialogo
 electron/              app desktop per Steam
 scripts/balance.ts     pilota automatico per il bilanciamento
+scripts/art/           pipeline della grafica: modelli voxel (models/), ray casting (voxel.ts), PNG, atlante
+art/sprites/           ogni fotogramma come PNG singolo; art/contact-sheet.png li mostra tutti
+art/overrides/         PNG ritoccati a mano con lo stesso nome di uno sprite: sostituiscono quello generato
+docs/ISO-MIGRATION.md  piano tecnico del passaggio all'isometrico
 scripts/i18n-check.ts  controllo delle traduzioni
 docs/STEAM.md          guida alla pubblicazione su Steam
 docs/PLAYTEST.md       come organizzare un playtest e cosa osservare

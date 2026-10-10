@@ -1,7 +1,7 @@
 // Dialogs shared by the main menu and the in-game pause menu.
 import { ACHIEVEMENTS, achDesc, achName, unlockedAchievements } from '../achievements';
 import { audio } from '../audio';
-import { BANK_FEE, loadCampaign, sendToBank, withdrawFromBank } from '../campaign';
+import { BANK_FEE, canTrade, loadCampaign, sendToBank, withdrawFromBank } from '../campaign';
 import { importParts } from '../game/actions';
 import { IMPORT_PARTS } from '../game/defs';
 import type { Hint } from '../game/hints';
@@ -338,18 +338,21 @@ export function openTrade(s: GameState, onChange: () => void): void {
   const body = el('div', 'trade');
   const render = () => {
     const c = loadCampaign();
+    // no trades while the city chokes: a city lost to smog must not leave its money in the bank
+    const blocked = !canTrade(s);
     const row = (res: 'credits' | 'parts', amounts: number[]) => `
       <div class="trade-row">
         <span class="trade-res"><img src="${iconUrl(res)}" alt="" />${res === 'credits' ? t('res.credits') : t('res.parts')}</span>
         <span class="trade-have">${t('trade.city')} <b>${Math.floor(s.res[res])}</b></span>
         <span class="trade-have">${t('trade.bank')} <b>${Math.floor(c.bank[res])}</b></span>
         <span class="trade-btns">
-          ${amounts.map((a) => `<button type="button" class="btn" data-send="${res}:${a}" ${s.res[res] < a ? 'disabled' : ''}>${t('trade.send', { n: a })}</button>`).join('')}
-          ${amounts.map((a) => `<button type="button" class="btn tone-neutral" data-take="${res}:${a}" ${c.bank[res] < 1 ? 'disabled' : ''}>${t('trade.take', { n: a })}</button>`).join('')}
+          ${amounts.map((a) => `<button type="button" class="btn" data-send="${res}:${a}" ${blocked || s.res[res] < a ? 'disabled' : ''}>${t('trade.send', { n: a })}</button>`).join('')}
+          ${amounts.map((a) => `<button type="button" class="btn tone-neutral" data-take="${res}:${a}" ${blocked || c.bank[res] < 1 ? 'disabled' : ''}>${t('trade.take', { n: a })}</button>`).join('')}
         </span>
       </div>`;
     body.innerHTML = `
       <p>${t('trade.intro', { fee: Math.round(BANK_FEE * 100) })}</p>
+      ${blocked ? `<p class="trade-blocked">${t('trade.smog')}</p>` : ''}
       ${row('credits', [100, 500])}
       ${row('parts', [20, 100])}`;
     body.querySelectorAll<HTMLButtonElement>('[data-send]').forEach((b) =>

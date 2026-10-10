@@ -90,11 +90,21 @@ export function placeBuilding(s: GameState, type: BuildingType, x: number, y: nu
   pay(s, buildCost(s, type));
   const b = addBuilding(s, type, x, y);
   if (def.path === 'industrial') s.stats.industrialBuilt++;
+  const before = s.alignment;
   if (def.path === 'green') shiftAlignment(s, ALIGN_BUILD_SHIFT);
   if (def.path === 'industrial') shiftAlignment(s, -ALIGN_BUILD_SHIFT);
+  b.align = s.alignment - before;
   const c = buildingCenter(b);
   s.fx.push({ kind: 'placed', x: c.x, y: c.y });
   return b;
+}
+
+// Storage left after a building goes: clamp the scrap to it.
+function computeStorage(s: GameState): void {
+  let storage = 0;
+  for (const o of s.buildings) if (o.built >= 1) storage += BUILDINGS[o.type].storage ?? 0;
+  s.derived.storage = storage;
+  s.res.scrap = Math.min(s.res.scrap, storage);
 }
 
 export function refundFor(s: GameState, b: Building): Cost {
@@ -113,11 +123,14 @@ export function demolish(s: GameState, b: Building): boolean {
   const refund = refundFor(s, b);
   // a refund is not income: it must not count toward "credits earned" goals
   for (const r of Object.keys(refund) as Resource[]) s.res[r] += refund[r] ?? 0;
-  // the city no longer has this building, so its pull on the path meter goes too
+  // the city no longer has this building, so its pull on the path meter goes too: exactly the pull it
+  // had (a shift swallowed by the ±100 limit is not given back twice)
   const def = BUILDINGS[b.type];
-  if (def.path === 'green') shiftAlignment(s, -ALIGN_BUILD_SHIFT);
-  if (def.path === 'industrial') shiftAlignment(s, ALIGN_BUILD_SHIFT);
+  const pull = b.align ?? (def.path === 'green' ? ALIGN_BUILD_SHIFT : def.path === 'industrial' ? -ALIGN_BUILD_SHIFT : 0);
+  shiftAlignment(s, -pull);
   removeBuilding(s, b);
+  // scrap above the storage that is left is lost (it used to stay over the cap and stop the bots)
+  computeStorage(s);
   const c = buildingCenter(b);
   s.fx.push({ kind: 'demolish', x: c.x, y: c.y, text: `+${costText(refund)}` });
   return true;
@@ -240,5 +253,6 @@ export function placeFreeGarden(s: GameState): boolean {
   if (i < 0) return false;
   const b = addBuilding(s, 'garden', i % MAP_W, Math.floor(i / MAP_W));
   b.built = 0.5;
+  b.align = 0; // a gift: it never moved the path meter, so demolishing it does not either
   return true;
 }

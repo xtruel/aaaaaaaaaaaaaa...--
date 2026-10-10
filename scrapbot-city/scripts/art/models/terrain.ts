@@ -126,6 +126,10 @@ export function sludgeTiles(): Record<string, Image> {
         const [ix, iy] = cell(x, y);
         const b = hash(ix >> 1, iy >> 1, 700 + f);
         if (b > 0.92) return hi;
+        // oily swirls: darker bands that wander across the pool, so it never reads as grass
+        const swirl = Math.sin((x + y * 0.6) * 0.7 + Math.sin(y * 0.5 + f) * 1.6);
+        if (swirl > 0.82) return mid;
+        if (swirl < -0.9) return hex('#a8f55a');
         return core;
       });
     }
@@ -183,6 +187,32 @@ export function groundStyles(): Record<string, Image> {
       if (h > 0.94) return hex('#6c7096');
       if (h < 0.06) return hex('#1f1a2c');
       return hex('#2c2639');
+    });
+  }
+  return out;
+}
+
+// The canal outside the map: water with banks where the neighbour is land (mask bits as for sludge).
+export function waterTiles(): Record<string, Image> {
+  const out: Record<string, Image> = {};
+  const deep = hex('#1f2f73');
+  const mid = hex('#2a44a3');
+  const line = hex('#4d73d9');
+  const foam = hex('#a9c0ff');
+  const bank = hex('#3b3247');
+  for (let mask = 0; mask < 16; mask++) {
+    out[`t/water/${mask}`] = tile((x, y) => {
+      const dl = mask & 1 ? 99 : x;
+      const dr = mask & 2 ? 99 : 16 - x;
+      const du = mask & 4 ? 99 : y;
+      const dd = mask & 8 ? 99 : 16 - y;
+      const d = Math.min(dl, dr, du, dd);
+      if (d < 1.5) return bank;
+      if (d < 2.5) return foam;
+      // gentle ripples along the canal
+      const [cx, cy] = cell(x, y);
+      if ((cx + cy * 3) % 11 === 0 && hash(cx, cy, 1500) > 0.4) return line;
+      return d < 5 ? mid : deep;
     });
   }
   return out;

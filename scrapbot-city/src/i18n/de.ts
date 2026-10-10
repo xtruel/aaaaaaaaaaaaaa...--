@@ -544,6 +544,7 @@ export const de: Dict = {
   'trade.title': 'Frachtzeppelin',
   'trade.eyebrow': 'Regionalbank',
   'trade.intro': 'Der Frachtzeppelin bringt Credits und Teile zwischen den Städten der Schrottküste hin und her. Als Treibstoff behält er {fee}% von allem, was du schickst.',
+  'trade.smog': 'Das Frachtluftschiff kann bei diesem Smog nicht fliegen. Mach zuerst die Luft sauber.',
   'trade.city': 'Stadt',
   'trade.bank': 'Bank',
   'trade.send': '{n} schicken',

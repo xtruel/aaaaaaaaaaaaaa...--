@@ -16,6 +16,9 @@ export interface Building {
   status: BuildingStatus;
   paused: boolean; // production switched off by the player
   lastWork: number; // sim time of the last finished cycle, drives smoke and sparkles
+  // path meter change this building really made when placed (after the ±100 clamp); demolishing undoes
+  // exactly this. Missing in older saves: then the standard shift is used.
+  align?: number;
 }
 
 export type BotState = 'idle' | 'toJunk' | 'collect' | 'toDrop';

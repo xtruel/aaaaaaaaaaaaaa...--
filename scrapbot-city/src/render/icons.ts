@@ -98,6 +98,27 @@ export function buildingThumb(type: BuildingType): string {
   return c.toDataURL();
 }
 
+// Build bar and inspector pictures (64×64): the half-size isometric sprite at a whole-number zoom, so the
+// pixel art stays crisp; a sprite taller than the picture keeps its top (the Spire's crown).
+export function toolThumb(type: BuildingType): string {
+  const key = `tool:${type}`;
+  const cached = urlCache.get(key);
+  if (cached) return cached;
+  const img = atlasImage();
+  const f = frame(`b/${type}/icon`);
+  if (!img || !f) return buildingThumb(type);
+  const size = 64;
+  const k = Math.max(1, Math.floor(size / Math.max(f.w, f.h)));
+  const sw = Math.min(f.w, Math.floor(size / k));
+  const sh = Math.min(f.h, Math.floor(size / k));
+  const sx = f.x + Math.floor((f.w - sw) / 2);
+  const [c, ctx] = makeCanvas(size, size);
+  ctx.drawImage(img, sx, f.y, sw, sh, Math.round((size - sw * k) / 2), size - sh * k, sw * k, sh * k);
+  const url = c.toDataURL();
+  urlCache.set(key, url);
+  return url;
+}
+
 export function portraitUrl(speaker: Speaker): string {
   const key = `portrait:${speaker}`;
   const cached = urlCache.get(key);

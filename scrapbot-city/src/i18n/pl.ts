@@ -547,6 +547,7 @@ export const pl: Dict = {
   'trade.title': 'Sterowiec towarowy',
   'trade.eyebrow': 'Bank regionu',
   'trade.intro': 'Sterowiec towarowy przewozi kredyty i części między miastami Złomowego Wybrzeża. Na paliwo zatrzymuje {fee}% tego, co wysyłasz.',
+  'trade.smog': 'Sterowiec towarowy nie poleci w tym smogu. Najpierw oczyść powietrze.',
   'trade.city': 'Miasto',
   'trade.bank': 'Bank',
   'trade.send': 'Wyślij {n}',

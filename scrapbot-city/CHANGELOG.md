@@ -47,6 +47,18 @@
 - I fotogrammi lenti non fanno più perdere tempo di gioco (fino a 0,25 s recuperati, poi il limite di 16 passi).
 - Partita libera: Invio avvia la città, il seme 0 è valido, "Indietro" conserva nome e seme scritti.
 - Menu principale: Invio/Spazio attivano la voce evidenziata anche prima di usare le frecce.
+- Banca regionale: "Ricomincia questa città" riprende dalla banca quello che la vecchia partita ci aveva messo
+  (prima si potevano stampare crediti e pezzi all'infinito); niente scambi durante il conto alla rovescia dello smog
+  o dopo una sconfitta per smog (i crediti di una città persa esistevano due volte).
+- Barra del percorso: demolire restituisce solo lo spostamento che l'edificio aveva davvero fatto (al limite ±100
+  si poteva comprare un finale costruendo e demolendo); il giardino regalato non sposta la barra.
+- Demolendo un magazzino i rottami in eccesso si perdono invece di restare sopra il limite e fermare i bot.
+- Bot: un Dock nuovo fa partire i suoi bot da sé; quando i bot calano si ritirano prima quelli vuoti e il carico
+  degli altri va nel magazzino; un bot in volo davanti a un edificio non ne blocca più il clic.
+- L'offerta dei propulsori per i bot ("tieni i progetti per dopo") torna davvero finché non la compri.
+- Il consiglio a pagamento è quello scelto prima di pagare (pagare non lo cambia più).
+- Finestre di dialogo: tutto quello che sta dietro è inerte (Tab e tastiera restano nel dialogo).
+- Il salvataggio quando la finestra viene nascosta segue le stesse regole dell'autosalvataggio.
 - Impostazioni: aprirle non azzera più niente con lo storage bloccato; lo schermo intero resta allineato quando cambia
   con F11, Esc o i controlli della finestra.
 
@@ -55,6 +67,11 @@
 - Tetto alle voci contemporanee e intervallo minimo per ogni effetto; il rumore riusa un unico buffer (niente allocazioni).
 
 ### Test
+- `tests/timing.test.ts`: la stessa produzione a 1×, 2×, 3× e a 144/60/30/10/4 fps; nessun tempo perso con fotogrammi
+  lenti; l'Inceneritore non perde corrente tra due carichi (il test ritrova il vecchio bug: 65 interruzioni).
+- `tests/economy.test.ts`: banca e riavvio, scambi bloccati nello smog, barra del percorso al limite, magazzino dopo
+  una demolizione, bot dei Dock, offerta dei propulsori.
+- `tests/storage.test.ts`: slot nel browser, salvataggi danneggiati o più nuovi che non vengono mai sostituiti.
 - `tests/iso.test.ts`: andata e ritorno della proiezione, casella giusta per ogni pixel a ogni zoom, ordinamento per
   profondità (3×3 accanto a 1×1, bot sopra un tetto, 300 oggetti).
 - `tests/saves.test.ts`: niente autosalvataggio durante lo smog, file del desktop accettati solo se validi.

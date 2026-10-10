@@ -6,6 +6,8 @@ import type { GameState } from '../../game/state';
 import { hash2 } from '../../game/world';
 
 export const isRoadRow = (ty: number) => ty % 11 === 4;
+// a canal runs behind the map, two tiles wide (bridges where the old streets cross it)
+export const isCanal = (tx: number, ty: number) => (ty === -3 || ty === -4) && !isRoadCol(tx);
 export const isRoadCol = (tx: number) => ((tx % 14) + 14) % 14 === 6;
 
 // ---------- citizens ----------
@@ -172,7 +174,7 @@ export function placeScenery(seed: number, ring: number, meta: Record<string, De
       let fits = true;
       for (let y = ty; y < ty + m.d && fits; y++)
         for (let x = tx; x < tx + m.w && fits; x++) {
-          if (!inRing(x, y) || taken.has(key(x, y)) || isRoadRow(y) || isRoadCol(x)) fits = false;
+          if (!inRing(x, y) || taken.has(key(x, y)) || isRoadRow(y) || isRoadCol(x) || isCanal(x, y)) fits = false;
           // keep the first row in front of the map clear, so nothing hides the city's edge
           if (x >= MAP_W && x === MAP_W && y >= 0) fits = false;
           if (y >= MAP_H && y === MAP_H && x >= 0) fits = false;

@@ -145,3 +145,20 @@ L'atlante è importato da Vite e finisce dentro `dist/index.html` come oggi (fil
 | Bot che attraversano edifici alti | Quota di volo sopra il modello più alto sotto di loro |
 | Il tutorial punta all'HQ con coordinate dall'alto | `buildingScreenBox()` dal renderer |
 | Arte "generata" che sembra finta | Palette del gioco, contorni e luci regolari, override PNG a mano |
+
+## 11. Stato e risultati delle verifiche
+
+### Fetta verticale (commit bbbe517)
+HQ, Riciclatore, Bot Dock, bot animati, terreno, piazzamento isometrico. Verificata prima di migrare il resto:
+
+| Verifica | Risultato |
+|---|---|
+| Mouse sopra una casella → evidenziata quella giusta (centro e 4 angoli di ogni casella, zoom 1–5) | 881/881 punti |
+| Clic sulle orecchie dell'HQ, disegnate sopra un'altra casella → si apre l'ispettore dell'HQ (zoom 2 e 4) | ok |
+| Riciclatore / Bot Dock piazzati col mouse sulla casella sotto il cursore (zoom 1, 2, 3, 4) | 4/4 |
+| Edificio nascosto dietro un altro → il clic prende quello davanti | ok |
+| D-pad: destra = +x, su = −y, sinistra = −x, giù = +y; D-pad fino alla casella e A costruisce | ok |
+| Test automatici (vitest): proiezione, casella per ogni pixel a ogni zoom, ordine di disegno | 7/7 |
+| Prestazioni: 121 edifici, 35 bot, velocità 3 | 60 fps a 1280×800 e 2560×1440 (Chromium senza GPU) |
+
+### Dopo la migrazione

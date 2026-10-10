@@ -7,6 +7,7 @@ import {
   DAY_LENGTH,
   MAP_H,
   MAP_W,
+  SIM_STEP,
   SMOG_DANGER,
   SMOG_LIMIT_SECONDS,
   T,
@@ -80,6 +81,22 @@ export function step(s: GameState, dt: number): void {
   }
 
   if (day(s) !== dayBefore) pushMessage(s, t('msg.newDay', { n: day(s) }), 'info');
+}
+
+// Advances the city by realDt seconds of wall time at the given speed, in fixed SIM_STEP steps.
+// Returns the leftover time to carry into the next frame. At most 16 steps run per frame (a very slow
+// frame drops the rest instead of freezing the game); a pending event or an ending stops the steps.
+export const MAX_STEPS_PER_FRAME = 16;
+export function advance(s: GameState, acc: number, realDt: number, speed: number): number {
+  acc += realDt * speed;
+  let n = 0;
+  while (acc >= SIM_STEP && n < MAX_STEPS_PER_FRAME) {
+    step(s, SIM_STEP);
+    acc -= SIM_STEP;
+    n++;
+    if (s.pendingEvent || s.outcome) break;
+  }
+  return n >= MAX_STEPS_PER_FRAME ? 0 : acc;
 }
 
 function burnFuel(s: GameState, dt: number): void {
@@ -329,7 +346,8 @@ function syncBots(s: GameState): void {
   const target = s.derived.botTarget;
   const homes = dropoffs(s);
   while (s.bots.length < target && homes.length > 0) {
-    const home = homes[s.bots.length % homes.length];
+    // each home launches its own share of bots (the HQ 3, every Dock 2...), so a new Dock's bots leave from it
+    const home = homeFor(homes, s.bots.length);
     const c = buildingCenter(home);
     s.bots.push({
       id: s.nextId++,
@@ -344,9 +362,27 @@ function syncBots(s: GameState): void {
     });
   }
   while (s.bots.length > target) {
-    const bot = s.bots.pop()!;
+    // retire an empty idle bot first; the scrap of a loaded one goes into storage as far as it fits
+    let k = s.bots.findIndex((b) => b.state === 'idle' && b.carry === 0);
+    if (k < 0) k = s.bots.length - 1;
+    const bot = s.bots.splice(k, 1)[0];
     releaseClaim(s, bot);
+    if (bot.carry > 0) s.res.scrap = Math.min(s.derived.storage, s.res.scrap + bot.carry);
   }
+}
+
+function homeFor(homes: Building[], k: number): Building {
+  let n = k;
+  const total = homes.reduce((sum, h) => sum + (BUILDINGS[h.type].bots ?? 0), 0);
+  if (total > 0) {
+    n = k % total;
+    for (const h of homes) {
+      const share = BUILDINGS[h.type].bots ?? 0;
+      if (n < share) return h;
+      n -= share;
+    }
+  }
+  return homes[k % homes.length];
 }
 
 function releaseClaim(s: GameState, bot: Bot): void {

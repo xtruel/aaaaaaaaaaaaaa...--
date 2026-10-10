@@ -547,6 +547,7 @@ export const es: Dict = {
   'trade.title': 'Dirigible de carga',
   'trade.eyebrow': 'Banco regional',
   'trade.intro': 'El dirigible de carga lleva créditos y piezas entre las ciudades de la Costa Chatarra. Se queda un {fee}\u00a0% de lo que envías como combustible.',
+  'trade.smog': 'El dirigible de carga no puede volar con este smog. Primero limpia el aire.',
   'trade.city': 'Ciudad',
   'trade.bank': 'Banco',
   'trade.send': 'Enviar {n}',

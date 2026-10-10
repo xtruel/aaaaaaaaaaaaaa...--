@@ -18,7 +18,7 @@ import type { Frame } from './iso/atlas';
 import { DepthSorter } from './iso/depth';
 import type { DepthItem } from './iso/depth';
 import { groundAt, tileAt, tileTop } from './iso/projection';
-import { Walkers, isRoadCol, isRoadRow, placeScenery, ringKey } from './iso/life';
+import { Walkers, isCanal, isRoadCol, isRoadRow, placeScenery, ringKey } from './iso/life';
 import type { SceneryItem } from './iso/life';
 
 interface Particle {
@@ -251,7 +251,7 @@ export class Renderer {
       if (d.f && !opaqueAt(d.f, ix - d.sx, iy - d.sy)) continue;
       if (d.kind === K_BUILDING) return d.ref;
       if (d.kind === K_CAT) return -2;
-      return -1; // something else (a bot) is in front
+      // bots, citizens and scenery never take a click: what is behind them stays clickable
     }
     return -1;
   }
@@ -315,6 +315,10 @@ export class Renderer {
     const inside = tx >= 0 && ty >= 0 && tx < MAP_W && ty < MAP_H;
     const h = hash2(tx, ty);
     if (!inside) {
+      if (isCanal(tx, ty)) {
+        const mask = (isCanal(tx - 1, ty) ? 1 : 0) | (isCanal(tx + 1, ty) ? 2 : 0) | (isCanal(tx, ty - 1) ? 4 : 0) | (isCanal(tx, ty + 1) ? 8 : 0);
+        return `t/water/${mask}`;
+      }
       if (isRoadRow(ty) && tx >= -RING && tx < MAP_W + RING && (tx < 0 || tx >= MAP_W)) return isRoadCol(tx) ? 't/road/c' : 't/road/x';
       if (isRoadCol(tx) && (ty < 0 || ty >= MAP_H)) return 't/road/y';
       return `t/outer/${Math.floor(h * 4)}`;
@@ -366,7 +370,7 @@ export class Renderer {
       // scattered scrap and rubble outside the fence (low props only on the front side)
       const behind = tx < 0 || ty < 0;
       const near = tx >= MAP_W ? tx - MAP_W : ty >= MAP_H ? ty - MAP_H : 99;
-      if (isRoadRow(ty) || isRoadCol(tx) || this.sceneryTaken.has(ringKey(tx, ty, RING))) return;
+      if (isRoadRow(ty) || isRoadCol(tx) || isCanal(tx, ty) || this.sceneryTaken.has(ringKey(tx, ty, RING))) return;
       if (h > 0.9 && (behind || near >= 1)) this.blitT(`p/junk/${Math.floor(hash2(tx, ty, 32) * 3)}/${Math.floor(hash2(tx, ty, 33) * 4)}`, tx, ty);
       else if (h > 0.82) this.blitT(`p/rubble/${Math.floor(hash2(tx, ty, 34) * 4)}`, tx, ty);
       return;
@@ -497,7 +501,10 @@ export class Renderer {
     this.trackRemovals(s, view.reducedMotion);
 
     ctx.drawImage(this.terrain, this.tox - camX, this.toy - camY);
-    if (!view.reducedMotion) this.drawSludgeBubbles(s, camX, camY);
+    if (!view.reducedMotion) {
+      this.drawSludgeBubbles(s, camX, camY);
+      this.drawWaterGlints(camX, camY);
+    }
     this.drawBackScenery(camX, camY, img, view.reducedMotion);
 
     this.updateTileHeights(s);
@@ -764,6 +771,25 @@ export class Renderer {
         const top = tileTop(tx, ty);
         const ox = ((tx * 5 + ty * 3) % 13) - 6;
         ctx.fillRect(top.X + ox - camX, top.Y + 9 - Math.floor(p * 6) - camY, 1, 1);
+      }
+  }
+
+  // Little glints drifting on the canal.
+  private drawWaterGlints(camX: number, camY: number): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = 'rgba(190,210,255,0.8)';
+    for (let tx = -RING; tx < MAP_W + RING; tx++)
+      for (const ty of [-4, -3]) {
+        if (!isCanal(tx, ty)) continue;
+        const top = tileTop(tx, ty);
+        const x = top.X - camX;
+        const y = top.Y - camY;
+        if (x < -20 || x > this.viewW + 20 || y < -20 || y > this.viewH + 20) continue;
+        const p = (this.clock * 0.5 + tx * 0.29 + ty * 0.53) % 1;
+        if (p > 0.6) continue;
+        const gx = Math.round(x - 8 + p * 16);
+        const gy = Math.round(y + 8 - p * 4 + ((tx * 3) % 3));
+        ctx.fillRect(gx, gy, 2, 1);
       }
   }
 
@@ -1215,6 +1241,24 @@ export class Renderer {
       const pose = bot.state === 'collect' ? 'work' : bot.carry > 0 ? 'carry' : 'fly';
       const g = frame(`bot/${BOT_DIRS[v.dir]}/${pose}/0/g`);
       if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, d.sx - camX, d.sy - camY, g.w, g.h);
+    }
+    // toxic sludge glows faintly in the dark
+    {
+      const a = tileAt(camX, camY);
+      const b = tileAt(camX + this.viewW, camY + this.viewH);
+      const c = tileAt(camX + this.viewW, camY);
+      const d = tileAt(camX, camY + this.viewH);
+      const prev = ctx.globalAlpha;
+      ctx.globalAlpha = prev * 0.35;
+      for (let ty = Math.max(0, c.y); ty <= Math.min(MAP_H - 1, d.y); ty++)
+        for (let tx = Math.max(0, a.x); tx <= Math.min(MAP_W - 1, b.x); tx++) {
+          if (s.tiles[idx(tx, ty)] !== T.SLUDGE) continue;
+          const f = frame('t/sludge/15/0');
+          if (!f) break;
+          const top = tileTop(tx, ty);
+          ctx.drawImage(img, f.x, f.y, f.w, f.h, top.X - f.ax - camX, top.Y - f.ay - camY, f.w, f.h);
+        }
+      ctx.globalAlpha = prev;
     }
     for (const d of this.scenery) {
       const fr = d.frames > 1 ? Math.floor(this.clock * d.fps + d.tx * 0.37 + d.ty * 0.61) % d.frames : 0;

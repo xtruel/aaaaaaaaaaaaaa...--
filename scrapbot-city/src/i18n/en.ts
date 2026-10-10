@@ -543,6 +543,7 @@ export const en = {
   'trade.title': 'Cargo blimp',
   'trade.eyebrow': 'Region bank',
   'trade.intro': 'The cargo blimp carries credits and parts between the cities of the Scrap Coast. It keeps {fee}% of what you send as fuel.',
+  'trade.smog': "The cargo blimp can't fly through this smog. Clean the air first.",
   'trade.city': 'City',
   'trade.bank': 'Bank',
   'trade.send': 'Send {n}',

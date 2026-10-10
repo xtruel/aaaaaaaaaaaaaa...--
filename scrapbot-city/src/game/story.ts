@@ -211,7 +211,9 @@ export const EVENTS: StoryEvent[] = [
   {
     id: 'thrusters',
     speaker: 'usa',
-    when: (s) => s.bots.length >= 7,
+    // "keep the blueprints for later" really means later: the offer comes back until it is bought
+    repeatable: true,
+    when: (s) => s.bots.length >= 7 && s.botSpeedMul === 1,
     choices: [
       {
         path: 'neutral',

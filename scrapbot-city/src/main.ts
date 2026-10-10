@@ -14,6 +14,7 @@ import './fonts.css';
 import './style.css';
 
 import { achName, checkCampaign, onAchievement, syncAchievements } from './achievements';
+import { forgetCityTrades } from './campaign';
 import { audio } from './audio';
 import * as actions from './game/actions';
 import { CITIES } from './game/cities';
@@ -153,7 +154,10 @@ function showRegion(): void {
 
 function playCity(city: CityDef, restart: boolean): void {
   const slot = citySlot(city.id);
-  if (restart) clearSlot(slot);
+  if (restart) {
+    clearSlot(slot);
+    forgetCityTrades(city.id);
+  }
   const saved = restart ? null : loadGame(slot);
   // a save that exists but cannot be read (damaged, or from a newer version) is never silently replaced
   if (!restart && !saved && slotMeta(slot)) {

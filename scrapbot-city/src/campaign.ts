@@ -10,6 +10,8 @@ export interface CityProgress {
   stars: boolean[];
   spireDone: boolean;
   endingKind: OutcomeKind | null;
+  // what this city has put into the bank so far, minus what it took out (see forgetCityTrades)
+  sent?: Record<'credits' | 'parts', number>;
 }
 
 export interface Campaign {
@@ -70,6 +72,7 @@ export function recordCity(s: GameState): { campaign: Campaign; unlocked: CityDe
   const before = CITIES.filter((city) => isUnlocked(c, city)).map((city) => city.id);
   const prev = progressOf(c, s.cityId);
   c.cities[s.cityId] = {
+    ...prev,
     stars: prev.stars.map((star, i) => star || !!s.stars[i]),
     spireDone: prev.spireDone || s.spireDone,
     endingKind: s.endingKind ?? prev.endingKind,
@@ -79,25 +82,56 @@ export function recordCity(s: GameState): { campaign: Campaign; unlocked: CityDe
   return { campaign: c, unlocked };
 }
 
+// Trades are refused while the city is choking (smog countdown or lost to smog): a lost city's credits
+// must not survive in the bank while the city itself is reloaded from before.
+export function canTrade(s: GameState): boolean {
+  return s.smog <= 0 && s.outcome?.kind !== 'smog';
+}
+
+function ledger(c: Campaign, cityId: string | null): Record<'credits' | 'parts', number> | null {
+  if (!cityId) return null;
+  const p = (c.cities[cityId] = progressOf(c, cityId));
+  p.sent ??= { credits: 0, parts: 0 };
+  return p.sent;
+}
+
 export function sendToBank(s: GameState, res: 'credits' | 'parts', amount: number): number {
+  if (!canTrade(s)) return 0;
   const c = loadCampaign();
   const sent = Math.min(amount, Math.floor(s.res[res as Resource]));
   if (sent <= 0) return 0;
   s.res[res as Resource] -= sent;
   const arrived = Math.floor(sent * (1 - BANK_FEE));
   c.bank[res] += arrived;
+  const l = ledger(c, s.cityId);
+  if (l) l[res] += arrived;
   saveCampaign(c);
   return arrived;
 }
 
 export function withdrawFromBank(s: GameState, res: 'credits' | 'parts', amount: number): number {
+  if (!canTrade(s)) return 0;
   const c = loadCampaign();
   const got = Math.min(amount, Math.floor(c.bank[res]));
   if (got <= 0) return 0;
   c.bank[res] -= got;
   s.res[res as Resource] += got;
+  const l = ledger(c, s.cityId);
+  if (l) l[res] -= got;
   saveCampaign(c);
   return got;
+}
+
+// "Restart this city" starts it again with its starting money: what the old run put into the bank goes
+// with it (the bank may go below zero, and then nothing can be taken out until it is paid back).
+// Without this, restart + send would print money.
+export function forgetCityTrades(cityId: string): void {
+  const c = loadCampaign();
+  const p = c.cities[cityId];
+  if (!p?.sent) return;
+  for (const res of ['credits', 'parts'] as const) c.bank[res] -= Math.max(0, p.sent[res]);
+  p.sent = { credits: 0, parts: 0 };
+  saveCampaign(c);
 }
 
 export type RegionEnding = 'green' | 'industrial' | 'balanced';

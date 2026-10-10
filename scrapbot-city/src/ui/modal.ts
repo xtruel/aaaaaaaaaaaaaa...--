@@ -37,11 +37,18 @@ export function isModalOpen(): boolean {
   return current !== null;
 }
 
+// While a dialog is open everything behind it is inert: Tab, the keyboard and screen readers stay in the
+// dialog (the HUD behind an ending or a story event cannot be reached).
+function setBackgroundInert(on: boolean): void {
+  for (const screen of document.querySelectorAll<HTMLElement>('#app > .screen')) screen.inert = on;
+}
+
 export function closeModal(): void {
   if (!current) return;
   const { el, opts } = current;
   current = null;
   el.remove();
+  setBackgroundInert(false);
   opts.onClose?.();
 }
 
@@ -129,6 +136,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
   }
   root.append(el);
   current = { el, opts };
+  setBackgroundInert(true);
   // Focus the dialog itself (Tab reaches the buttons) or its first text field; never pre-select a story choice.
   // With a controller, ordinary dialogs start on their main button so one press of A answers them
   // (the 400 ms guard above still swallows a press that was meant for the screen behind).

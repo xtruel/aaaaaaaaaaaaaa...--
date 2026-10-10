@@ -544,6 +544,7 @@ export const fr: Dict = {
   'trade.title': "Dirigeable cargo",
   'trade.eyebrow': "Banque régionale",
   'trade.intro': "Le dirigeable cargo transporte crédits et pièces entre les villes de la Côte Ferraille. Il garde {fee} % de chaque envoi comme carburant.",
+  'trade.smog': "Le dirigeable cargo ne peut pas voler dans ce smog. Nettoie d'abord l'air.",
   'trade.city': "Ville",
   'trade.bank': "Banque",
   'trade.send': "Envoyer {n}",
