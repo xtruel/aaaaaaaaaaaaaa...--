@@ -252,7 +252,7 @@ export const spire: BuildingArt = {
     // the pink gem orb on a gold stem rising above the front points, a white glint on it, a cross on top
     v.box(CX - 1, CY - 1, cz + 4, CX + 1, CY + 1, cz + 10, M.yellow);
     v.sphere(CX, CY, cz + 12, 3.2, on ? M.pinkLit : M.pinkD);
-    v.box(CX + 1, CY + 1, cz + 13, CX + 3, CY + 3, cz + 14, M.white);
+    v.paint(CX - 1, CY + 1, cz + 14, CX + 1, CY + 2, cz + 15, M.white); // glint on its upper left (the lit side)
     v.box(CX - 1, CY - 1, cz + 15, CX + 1, CY + 1, cz + 18, M.yellow);
     v.box(CX - 2, CY - 1, cz + 16, CX + 2, CY + 1, cz + 17, M.yellow);
     v.box(CX - 1, CY - 2, cz + 16, CX + 1, CY + 2, cz + 17, M.yellow);
