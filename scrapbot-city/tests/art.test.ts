@@ -109,4 +109,8 @@ describe('characters and terrain', () => {
     for (let size = 0; size < 3; size++) for (let k = 0; k < 4; k++) need.push(`p/junk/${size}/${k}`);
     for (const n of need) expect(meta.frames[n], n).toBeTruthy();
   });
+
+  it('street lamps light up at night (their lens is visible, so they have a glow frame)', () => {
+    for (const axis of ['x', 'y']) expect(meta.frames[`p/lamp/${axis}/g`], axis).toBeTruthy();
+  });
 });

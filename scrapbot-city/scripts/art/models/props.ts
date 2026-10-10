@@ -92,11 +92,12 @@ export function lampModel(axis: 'x' | 'y'): Vox {
   if (axis === 'x') {
     v.box(px, py - 4, 19, px + 1, py, 20, M.steel);
     v.box(px - 1, py - 6, 18, px + 2, py - 3, 19, M.steelD);
-    v.box(px, py - 5, 17, px + 1, py - 4, 18, M.yellowLit);
+    // the lens: a lit band under the whole head, flush with its sides so it shows from the camera
+    v.box(px - 1, py - 6, 17, px + 2, py - 3, 18, M.yellowLit);
   } else {
     v.box(px - 4, py, 19, px, py + 1, 20, M.steel);
     v.box(px - 6, py - 1, 18, px - 3, py + 2, 19, M.steelD);
-    v.box(px - 5, py, 17, px - 4, py + 1, 18, M.yellowLit);
+    v.box(px - 6, py - 1, 17, px - 3, py + 2, 18, M.yellowLit);
   }
   // a pink 2PM banner on every lamp
   v.box(axis === 'x' ? px + 1 : px, axis === 'x' ? py : py + 1, 10, axis === 'x' ? px + 2 : px + 1, axis === 'x' ? py + 1 : py + 2, 15, M.pink);

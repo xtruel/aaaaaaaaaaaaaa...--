@@ -82,7 +82,7 @@ const K_CAT = 3;
 const K_WALKER = 4;
 const K_DECOR = 5;
 const K_LAMP = 6;
-const POOL = [4, 8, 10, 8, 4]; // half-widths of a lamp's light pool, row by row
+const POOL = [5, 10, 14, 16, 14, 10, 5]; // half-widths of a lamp's light pool, row by row
 
 
 function valueNoise(x: number, y: number, salt: number): number {
@@ -1495,7 +1495,7 @@ export class Renderer {
         const px = Math.round(top.X + cx - cy) - camX;
         const py = Math.round(top.Y + (cx + cy) / 2) - camY;
         ctx.fillStyle = 'rgba(255,212,64,0.12)';
-        for (let r = 0; r < POOL.length; r++) ctx.fillRect(px - POOL[r], py - 2 + r, POOL[r] * 2, 1);
+        for (let r = 0; r < POOL.length; r++) ctx.fillRect(px - POOL[r], py - 3 + r, POOL[r] * 2, 1);
       }
     }
     for (const d of this.scenery) {
