@@ -1,8 +1,11 @@
 // Interactive tutorial: USA-9 points at the interface and waits for the player to try each thing.
+// Short on purpose: five things to do, one thing to read, then the goal card takes over.
 import { audio } from '../audio';
+import { SMOG_DANGER } from '../game/defs';
 import type { BuildingType } from '../game/defs';
 import type { GameState } from '../game/state';
-import { t, tk } from '../i18n';
+import { padMode } from '../gamepad';
+import { hasKey, t, tk } from '../i18n';
 import { localizeKeys } from '../keys';
 import { portraitUrl } from '../render/icons';
 
@@ -17,7 +20,6 @@ export interface TutorialCtx {
   s: GameState;
   cameraMoved: boolean;
   speed: number;
-  hintUsed: boolean;
   hq: Box | null; // the HQ and the ground around it, in screen pixels: where the player builds
 }
 
@@ -25,53 +27,47 @@ const overlap = (a: Box, b: Box) =>
   Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
 
 interface Step {
-  id: string; // text keys: tut.<id>.title / .text / .action
+  id: string; // text keys: tut.<id>.title / .text / .action, plus .actionPad / .textPad naming controller buttons
   action?: boolean;
-  target?: string;
+  target?: string; // selector inside the game screen; every match gets a ring
   done?: (c: TutorialCtx) => boolean;
+  builds?: boolean; // done by placing a building
 }
 
 const has = (s: GameState, ...types: BuildingType[]) => s.buildings.some((b) => types.includes(b.type));
 
 const STEPS: Step[] = [
-  { id: 'hi' },
-  { id: 'look', action: true, done: (c) => c.cameraMoved },
-  { id: 'bots', action: true, target: '[data-res="scrap"]', done: (c) => c.s.stats.scrapCollected >= 10 },
-  { id: 'recycler', action: true, target: '[data-tool="recycler"]', done: (c) => has(c.s, 'recycler') },
-  { id: 'resources', target: '.res-group' },
-  { id: 'citizens', action: true, target: '[data-tool="pods"]', done: (c) => has(c.s, 'pods') },
-  { id: 'power', action: true, target: '[data-res="energy"]', done: (c) => has(c.s, 'solar', 'burner') },
-  { id: 'path', target: '.meter-path' },
-  { id: 'smog', target: '.meter-smog' },
+  { id: 'hi', action: true, done: (c) => c.cameraMoved },
+  { id: 'recycler', action: true, builds: true, target: '[data-tool="recycler"]', done: (c) => has(c.s, 'recycler') },
+  { id: 'citizens', action: true, builds: true, target: '[data-tool="pods"]', done: (c) => has(c.s, 'pods') },
+  { id: 'power', action: true, builds: true, target: '[data-tool="solar"], [data-tool="burner"]', done: (c) => has(c.s, 'solar', 'burner') },
   { id: 'speed', action: true, target: '.speed', done: (c) => c.speed >= 2 },
-  { id: 'hint', action: true, target: '[data-hint]', done: (c) => c.hintUsed },
-  { id: 'goals', target: '[data-objective]' },
-  { id: 'ready' },
+  { id: 'path', target: '.meters' },
+  { id: 'ready', target: '[data-hint], [data-objective]' },
 ];
 
 export class Tutorial {
   private index = 0;
   private bubble: HTMLElement;
-  private ring: HTMLElement;
+  private rings: HTMLElement[] = [];
   private rendered = -1;
+  private renderedPad = false; // the controller lines were shown: picking up the pad (or the mouse) swaps them
   private spot = -1; // which of the candidate places the bubble sits in
 
   constructor(
-    root: HTMLElement,
+    private root: HTMLElement,
     private onFinish: (startCampaign: boolean) => void,
     private onSkip: () => void,
   ) {
-    this.ring = document.createElement('div');
-    this.ring.className = 'coach-ring';
     this.bubble = document.createElement('div');
     this.bubble.className = 'coach';
     this.bubble.setAttribute('role', 'dialog');
     this.bubble.setAttribute('aria-live', 'polite');
-    root.append(this.ring, this.bubble);
+    root.append(this.bubble);
   }
 
   dispose(): void {
-    this.ring.remove();
+    for (const ring of this.rings) ring.remove();
     this.bubble.remove();
   }
 
@@ -79,16 +75,25 @@ export class Tutorial {
     return this.index < STEPS.length;
   }
 
-  update(ctx: TutorialCtx): void {
-    if (!this.active) return;
+  // The goal card waits until the last step, which introduces it: one card to read at a time.
+  get showsGoal(): boolean {
+    return !this.active || STEPS[this.index].id === 'ready';
+  }
+
+  // True right after a step the player finished by placing a building (the caller puts the build tool away).
+  update(ctx: TutorialCtx): boolean {
+    if (!this.active) return false;
     const step = STEPS[this.index];
-    if (step.done && step.done(ctx)) {
+    const done = !!step.done && step.done(ctx);
+    if (done) {
       audio.play('done');
       this.index++;
-      if (!this.active) return;
     }
-    if (this.rendered !== this.index) this.render();
-    this.position(ctx);
+    if (this.active) {
+      if (this.rendered !== this.index || this.renderedPad !== padMode()) this.render();
+      this.position(ctx);
+    }
+    return done && !!step.builds;
   }
 
   relabel(): void {
@@ -103,16 +108,24 @@ export class Tutorial {
 
   private render(): void {
     this.rendered = this.index;
+    this.renderedPad = padMode();
     this.spot = -1;
     const step = STEPS[this.index];
     const last = this.index === STEPS.length - 1;
+    // keyboard lines name keys in the player's layout; with a controller the lines that name keys have a
+    // version naming buttons (A, Y, L3...), which must not go through the keyboard rewrite
+    const text = (part: string) => {
+      const pad = `tut.${step.id}.${part}Pad`;
+      if (this.renderedPad && hasKey(pad)) return tk(pad, { limit: SMOG_DANGER });
+      return localizeKeys(tk(`tut.${step.id}.${part}`, { limit: SMOG_DANGER }));
+    };
     this.bubble.innerHTML = `
       <img class="coach-face" src="${portraitUrl('usa')}" alt="" />
       <div class="coach-body">
         <p class="coach-step">${t('tut.step', { n: this.index + 1, total: STEPS.length })}</p>
-        <h3>${tk(`tut.${step.id}.title`)}</h3>
-        <p>${tk(`tut.${step.id}.text`)}</p>
-        ${step.action ? `<p class="coach-action"><span class="dot"></span>${localizeKeys(tk(`tut.${step.id}.action`))}</p>` : ''}
+        <h3>${text('title')}</h3>
+        <p>${text('text')}</p>
+        ${step.action ? `<p class="coach-action"><span class="dot"></span><span>${text('action')}</span></p>` : ''}
         <div class="coach-buttons">
           ${
             last
@@ -139,11 +152,21 @@ export class Tutorial {
     });
   }
 
-  // The bubble goes where it hides the least of what the player needs: the thing it points at,
+  private ring(i: number): HTMLElement {
+    while (this.rings.length <= i) {
+      const ring = document.createElement('div');
+      ring.className = 'coach-ring';
+      this.root.append(ring);
+      this.rings.push(ring);
+    }
+    return this.rings[i];
+  }
+
+  // The bubble goes where it hides the least of what the player needs: the things it points at,
   // the ground around the HQ (where they are asked to build), the goal card and the build bar.
   private position(ctx: TutorialCtx): void {
     const step = STEPS[this.index];
-    const target = step.target ? document.querySelector<HTMLElement>(`.game ${step.target}`) : null;
+    const targets = step.target ? [...this.root.querySelectorAll<HTMLElement>(step.target)].filter((el) => el.offsetParent !== null) : [];
     const b = this.bubble;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -155,33 +178,31 @@ export class Tutorial {
     const add = (el: Element | null, weight: number) => {
       if (el && (el as HTMLElement).offsetParent !== null) avoid.push({ box: el.getBoundingClientRect(), weight });
     };
-    add(document.querySelector('.game [data-objective]'), 1);
-    add(document.querySelector('.game [data-toolbar]'), 0.6);
-    add(document.querySelector('.game .hud-top'), 0.3);
-    add(document.querySelector('.game [data-feed]'), 0.5);
+    add(this.root.querySelector('[data-objective]'), 1);
+    add(this.root.querySelector('[data-toolbar]'), 0.6);
+    add(this.root.querySelector('.hud-top'), 0.3);
+    add(this.root.querySelector('[data-feed]'), 0.5);
     if (ctx.hq) avoid.push({ box: ctx.hq, weight: step.action ? 3 : 1 });
 
-    const shown = !!target && target.offsetParent !== null;
-    this.ring.hidden = !shown;
-    const r = shown ? target!.getBoundingClientRect() : null;
-    if (r) {
-      this.ring.style.left = `${r.left - 6}px`;
-      this.ring.style.top = `${r.top - 6}px`;
-      this.ring.style.width = `${r.width + 12}px`;
-      this.ring.style.height = `${r.height + 12}px`;
-      avoid.push({ box: { left: r.left - 8, top: r.top - 8, right: r.right + 8, bottom: r.bottom + 8 }, weight: 4 });
-    }
     const at = (left: number, top: number): Box => {
       const l = Math.max(12, Math.min(vw - bw - 12, left));
       const t = Math.max(8, Math.min(vh - bh - 8, top));
       return { left: l, top: t, right: l + bw, bottom: t + bh };
     };
-    const toolbarTop = document.querySelector('.game [data-toolbar]')?.getBoundingClientRect().top ?? vh;
     const spots: Box[] = [];
-    if (r) {
+    targets.forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      const ring = this.ring(i);
+      ring.style.left = `${r.left - 6}px`;
+      ring.style.top = `${r.top - 6}px`;
+      ring.style.width = `${r.width + 12}px`;
+      ring.style.height = `${r.height + 12}px`;
+      avoid.push({ box: { left: r.left - 8, top: r.top - 8, right: r.right + 8, bottom: r.bottom + 8 }, weight: 4 });
       const cx = r.left + r.width / 2 - bw / 2;
       spots.push(at(cx, r.bottom + 18), at(cx, r.top - 18 - bh), at(r.right + 18, r.top), at(r.left - 18 - bw, r.top));
-    }
+    });
+    this.rings.forEach((ring, i) => (ring.hidden = i >= targets.length));
+    const toolbarTop = this.root.querySelector('[data-toolbar]')?.getBoundingClientRect().top ?? vh;
     spots.push(at(12, toolbarTop - bh - 14), at(vw - bw - 12, toolbarTop - bh - 14), at((vw - bw) / 2, Math.max(80, vh * 0.2)));
     const cost = (c: Box) => avoid.reduce((sum, a) => sum + overlap(c, a.box) * a.weight, 0);
     let best = 0;

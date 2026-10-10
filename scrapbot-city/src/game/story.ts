@@ -293,19 +293,37 @@ export interface Objective {
   id: string;
   done: (s: GameState) => boolean;
   reward?: { credits?: number; parts?: number };
+  tools?: (s: GameState) => BuildingType[]; // the build buttons that move this goal forward right now
 }
+
+// More citizens only need more homes once every home is taken.
+const homesFull = (s: GameState): BuildingType[] => (s.pop >= s.derived.housing ? ['pods'] : []);
+// Alignment past this counts as a clear path: the money goal then points at that path's buildings only.
+const CLEAR_PATH = 15;
 
 export const OBJECTIVES: Objective[] = [
   { id: 'collect', done: (s) => s.stats.scrapCollected >= 25, reward: { credits: 40 } },
-  { id: 'recycler', done: (s) => has(s, 'recycler'), reward: { parts: 15 } },
-  { id: 'pods', done: (s) => has(s, 'pods'), reward: { credits: 40 } },
-  { id: 'power', done: (s) => has(s, 'solar') || has(s, 'burner'), reward: { parts: 20 } },
-  { id: 'pop10', done: (s) => s.pop >= 10, reward: { credits: 60 } },
-  { id: 'money', done: (s) => has(s, 'fixlab') || has(s, 'smelter') || has(s, 'factory'), reward: { credits: 80 } },
-  { id: 'pop30', done: (s) => s.pop >= 30, reward: { credits: 120 } },
-  { id: 'spireStart', done: (s) => s.buildings.some((b) => b.type === 'spire') },
+  { id: 'recycler', done: (s) => has(s, 'recycler'), reward: { parts: 15 }, tools: () => ['recycler'] },
+  { id: 'pods', done: (s) => has(s, 'pods'), reward: { credits: 40 }, tools: () => ['pods'] },
+  { id: 'power', done: (s) => has(s, 'solar') || has(s, 'burner'), reward: { parts: 20 }, tools: () => ['solar', 'burner'] },
+  { id: 'pop10', done: (s) => s.pop >= 10, reward: { credits: 60 }, tools: homesFull },
+  {
+    id: 'money',
+    done: (s) => has(s, 'fixlab') || has(s, 'smelter') || has(s, 'factory'),
+    reward: { credits: 80 },
+    tools: (s) => (s.alignment >= CLEAR_PATH ? ['fixlab'] : s.alignment <= -CLEAR_PATH ? ['smelter', 'factory'] : ['fixlab', 'smelter', 'factory']),
+  },
+  { id: 'pop30', done: (s) => s.pop >= 30, reward: { credits: 120 }, tools: homesFull },
+  { id: 'spireStart', done: (s) => s.buildings.some((b) => b.type === 'spire'), tools: () => ['spire'] },
   { id: 'spireDone', done: (s) => s.spireDone },
 ];
+
+// What the goal card asks the player to build next. Nothing while one of those is already going up:
+// the next step is under way, and a second one would only cost money.
+export function objectiveTools(s: GameState): BuildingType[] {
+  const tools = OBJECTIVES[s.objective]?.tools?.(s) ?? [];
+  return s.buildings.some((b) => b.built < 1 && tools.includes(b.type)) ? [] : tools;
+}
 
 export function objectiveText(o: Objective): string {
   return tk(`obj.${o.id}`);

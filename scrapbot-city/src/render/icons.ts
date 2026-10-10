@@ -98,22 +98,31 @@ export function buildingThumb(type: BuildingType): string {
   return c.toDataURL();
 }
 
-// Build bar and inspector pictures (64×64): the half-size isometric sprite at a whole-number zoom, so the
-// pixel art stays crisp; a sprite taller than the picture keeps its top (the Spire's crown).
+// Build bar and inspector pictures (64×64), always at a whole-number zoom so the pixel art stays crisp:
+// - a small building (Pixel Garden) is its half-size icon blown up 2× or 3×;
+// - a 2×2 building is its full map sprite at 1×, keeping the top (smokestacks, signs, the roof shape the
+//   player knows from the map) and losing only the tip of the base plate;
+// - the big ones (HQ, 2PM Factory, Scrap Spire) are their half-size icon at 1×, the Spire keeping its crown.
+const THUMB = 64;
 export function toolThumb(type: BuildingType): string {
   const key = `tool:${type}`;
   const cached = urlCache.get(key);
   if (cached) return cached;
   const img = atlasImage();
-  const f = frame(`b/${type}/icon`);
-  if (!img || !f) return buildingThumb(type);
-  const size = 64;
-  const k = Math.max(1, Math.floor(size / Math.max(f.w, f.h)));
-  const sw = Math.min(f.w, Math.floor(size / k));
-  const sh = Math.min(f.h, Math.floor(size / k));
+  const icon = frame(`b/${type}/icon`);
+  const full = frame(`b/${type}/off`);
+  if (!img || !icon) return buildingThumb(type);
+  let f = icon;
+  let k = Math.max(1, Math.floor(THUMB / Math.max(icon.w, icon.h)));
+  if (k < 2 && full && full.w <= THUMB + 2) {
+    f = full;
+    k = 1;
+  }
+  const sw = Math.min(f.w, Math.floor(THUMB / k));
+  const sh = Math.min(f.h, Math.floor(THUMB / k));
   const sx = f.x + Math.floor((f.w - sw) / 2);
-  const [c, ctx] = makeCanvas(size, size);
-  ctx.drawImage(img, sx, f.y, sw, sh, Math.round((size - sw * k) / 2), size - sh * k, sw * k, sh * k);
+  const [c, ctx] = makeCanvas(THUMB, THUMB);
+  ctx.drawImage(img, sx, f.y, sw, sh, Math.round((THUMB - sw * k) / 2), THUMB - sh * k, sw * k, sh * k);
   const url = c.toDataURL();
   urlCache.set(key, url);
   return url;

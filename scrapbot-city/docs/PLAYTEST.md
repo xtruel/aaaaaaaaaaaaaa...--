@@ -34,7 +34,8 @@ apri le iscrizioni a un numero limitato di persone.
 | Momento | Domanda | Se va male |
 |---|---|---|
 | Menu | Trovano "New game" e la lingua? | `src/ui/menu.ts` |
-| Tutorial passo 2–4 | Capiscono che i bot raccolgono da soli? | testi `tut.*` in `src/i18n/` |
+| Tutorial passo 2 | Capiscono che i bot raccolgono da soli? | testi `tut.*` in `src/i18n/` |
+| Dopo il tutorial | Seguono il bottone che pulsa nella barra (prossimo obiettivo)? | `tools` degli obiettivi in `src/game/story.ts` |
 | Primo Recycler | Lo piazzano vicino ai rottami? Capiscono i pezzi? | `tut.recycler.*`, hint in `src/game/hints.ts` |
 | Energia | Si accorgono che manca corrente? | avviso in `src/game/sim.ts`, chip energia nell'HUD |
 | Smog | Capiscono la barra e il pericolo sopra il 95%? | `hud.smog*`, `msg.storm` |

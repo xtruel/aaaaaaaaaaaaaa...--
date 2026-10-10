@@ -8,10 +8,10 @@ import type { BuildingType, Cost } from '../game/defs';
 import { dayPhase } from '../game/sim';
 import { day } from '../game/state';
 import type { Building, BuildingStatus, GameState, Message } from '../game/state';
-import { OBJECTIVES, objectiveHint, objectiveText } from '../game/story';
+import { OBJECTIVES, objectiveHint, objectiveText, objectiveTools } from '../game/story';
 import { bDesc, bName, pathLabel, t, tk } from '../i18n';
 import { keyLabel } from '../keys';
-import { buildingThumb, iconUrl, pathColor, portraitUrl } from '../render/icons';
+import { iconUrl, pathColor, portraitUrl, toolThumb } from '../render/icons';
 import type { IconName } from '../render/icons';
 import { esc } from './escape';
 
@@ -33,6 +33,7 @@ export interface HudView {
   build: BuildingType | null;
   bulldoze: boolean;
   selectedId: number;
+  goalCard: boolean; // false while the tutorial talks, so there is one card to read at a time
 }
 
 function statusText(s: GameState, b: Building): string {
@@ -84,6 +85,7 @@ export class Hud {
   private confirmDemolish = false;
   private starsKey = '';
   private s: GameState;
+  private layout = new ResizeObserver(() => this.placePanels());
 
   constructor(root: HTMLElement, handlers: HudHandlers, s: GameState) {
     this.root = root;
@@ -102,12 +104,35 @@ export class Hud {
     this.build();
   }
 
+  dispose(): void {
+    this.layout.disconnect();
+    document.documentElement.style.removeProperty('--toast-top');
+  }
+
+  // The top bar wraps on narrower windows (and when income rates widen its chips), and the build bar is
+  // taller or shorter with the window: the goal card, inspector, smog alert and messages sit between the two,
+  // so they follow both instead of covering the clock or the build buttons.
+  private placePanels(): void {
+    const vw = window.innerWidth;
+    const bars = [...this.root.querySelectorAll('.hud-top > *')].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0);
+    // how far down the top bar reaches over the left, middle and right third of the screen
+    const reach = (third: number) => Math.max(0, ...bars.filter((r) => r.right > (vw * third) / 3 && r.left < (vw * (third + 1)) / 3).map((r) => r.bottom));
+    const style = this.root.style;
+    style.setProperty('--top-l', `${reach(0)}px`);
+    style.setProperty('--top-c', `${reach(1)}px`);
+    style.setProperty('--top-r', `${reach(2)}px`);
+    style.setProperty('--dock', `${window.innerHeight - this.el.toolbar.getBoundingClientRect().top}px`);
+    // achievement toasts (outside the HUD) drop below the top bar and the smog alarm instead of covering them
+    const alarm = this.el['smog-alert'].getBoundingClientRect();
+    document.documentElement.style.setProperty('--toast-top', `${Math.max(reach(1), alarm.bottom) + 10}px`);
+  }
+
   private build(): void {
     const res = (key: string, icon: IconName, label: string, color: string) => `
       <div class="res" data-res="${key}" title="${label}" style="--c:${color}">
         <span class="res-ico"><img src="${iconUrl(icon)}" alt="" /></span>
         <span class="res-label">${label}</span>
-        <b data-v></b><small data-cap></small>
+        <span class="res-num"><b data-v></b><small data-cap></small></span>
       </div>`;
     this.root.innerHTML = `
       <div class="hud-top">
@@ -213,7 +238,7 @@ export class Hud {
       b.style.setProperty('--path', pathColor(type));
       b.innerHTML = `
         <kbd>${hotkeyFor(type)}</kbd>
-        <span class="tool-plate"><img src="${buildingThumb(type)}" alt="" /></span>
+        <span class="tool-plate"><img src="${toolThumb(type)}" alt="" /></span>
         <span class="tool-name">${bName(type)}</span>
         <span class="tool-cost">${costChips(buildCost(this.s, type))}</span>`;
       b.addEventListener('click', () => {
@@ -233,7 +258,7 @@ export class Hud {
     doze.dataset.doze = '';
     doze.innerHTML = `
       <kbd>${keyLabel('KeyX', 'X')}</kbd>
-      <span class="tool-plate"><img src="${iconUrl('bulldoze', 4)}" alt="" /></span>
+      <span class="tool-plate"><img src="${iconUrl('bulldoze', 8)}" alt="" /></span>
       <span class="tool-name">${t('b.bulldoze')}</span>
       <span class="tool-cost">${costChips({ credits: BULLDOZE_RUBBLE_COST })}</span>`;
     doze.addEventListener('click', () => {
@@ -245,6 +270,9 @@ export class Hud {
     tools.innerHTML = `<span class="group-label">${t('hud.group.tools')}</span><div class="group-tools"></div>`;
     tools.querySelector('.group-tools')!.append(doze);
     toolbar.append(tools);
+
+    this.layout.disconnect();
+    for (const el of this.root.querySelectorAll('.hud-top, .hud-top > *, [data-toolbar], [data-smog-alert]')) this.layout.observe(el);
   }
 
   private showTooltip(type: BuildingType, anchor: HTMLElement): void {
@@ -266,8 +294,10 @@ export class Hud {
     tip.hidden = false;
     const r = anchor.getBoundingClientRect();
     const tw = tip.offsetWidth;
+    // above the whole build bar, so it never covers the group labels or the cards next door
+    const top = this.el.toolbar.getBoundingClientRect().top;
     tip.style.left = `${Math.max(8, Math.min(window.innerWidth - tw - 8, r.left + r.width / 2 - tw / 2))}px`;
-    tip.style.bottom = `${window.innerHeight - r.top + 8}px`;
+    tip.style.bottom = `${window.innerHeight - top + 8}px`;
   }
 
   private hideTooltip(): void {
@@ -375,7 +405,7 @@ export class Hud {
 
     const obj = OBJECTIVES[s.objective];
     const city = cityById(s.cityId);
-    this.el.objective.hidden = !obj && !city;
+    this.el.objective.hidden = (!obj && !city) || !view.goalCard;
     if (obj) {
       set('obj-step', t('hud.goal', { n: s.objective + 1, total: OBJECTIVES.length }));
       set('obj-text', objectiveText(obj));
@@ -403,12 +433,18 @@ export class Hud {
     alert.hidden = s.smog <= 0;
     if (s.smog > 0) set('smog-alert', t('hud.smogAlert', { limit: SMOG_DANGER, n: Math.max(0, Math.ceil(SMOG_LIMIT_SECONDS - s.smog)) }));
 
+    // the goal card's next step glows on the build bar; the tutorial points at things with its own ring
+    const next = s.tutorial ? [] : objectiveTools(s);
     for (const [type, btn] of this.toolButtons) {
       const def = BUILDINGS[type];
       const affordable = canAfford(s, buildCost(s, type));
       const locked = !!def.minPop && s.pop < def.minPop;
       btn.classList.toggle('cant', !affordable || locked);
       btn.classList.toggle('active', view.build === type);
+      const glow = next.includes(type) && view.build !== type;
+      // on a window too narrow for the whole bar, a button that starts glowing scrolls into sight
+      if (glow && !btn.classList.contains('next')) btn.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+      btn.classList.toggle('next', glow);
     }
     this.root.querySelector('[data-doze]')!.classList.toggle('active', view.bulldoze);
 
@@ -464,7 +500,7 @@ export class Hud {
     panel.style.setProperty('--path', pathColor(b.type));
     panel.innerHTML = `
       <div class="insp-head">
-        <span class="tool-plate"><img src="${buildingThumb(b.type)}" alt="" /></span>
+        <span class="tool-plate"><img src="${toolThumb(b.type)}" alt="" /></span>
         <div>
           <p class="tag" style="--path:${pathColor(b.type)}">${pathLabel(def.path)}</p>
           <h3>${bName(b.type)}</h3>
