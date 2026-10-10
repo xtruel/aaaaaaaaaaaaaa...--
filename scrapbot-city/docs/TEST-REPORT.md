@@ -156,11 +156,22 @@ Tempo di disegno di un fotogramma (`render()`): mediana 1,8 ms, 90° percentile 
 Prima delle correzioni dell'audit di stabilità era 4,4 ms. La qualità adattiva resta "alta" su schermi a 30, 40 e 60 Hz
 e scende solo quando i fotogrammi sono davvero lenti.
 
-**Stabilità** (audit, 15 giorni di gioco a velocità 3 in 5 minuti reali, più 15 ingressi/uscite da città, 15 caricamenti,
-240 cambi di zoom, 60 passaggi giorno/notte, 15 cicli di demolizione e ricostruzione):
-- memoria stabile a 8,7–9,6 MB;
-- listener, canvas, nodi del DOM e callback di animazione costanti;
-- nessun errore.
+**Stabilità sulla build finale** (15 giorni di gioco a velocità 3 in 5 minuti reali, città da 121 edifici,
+138 elementi di scenografia, 84 lampioni):
+
+| Minuto | Giorni di gioco | Intervallo frame mediana / 95° perc. | Disegno mediana | Memoria | Listener | Errori |
+|---|---|---|---|---|---|---|
+| 0 | 0 | 16,7 / 33,4 ms | 2,1 ms | 9,3 MB | 28 | 0 |
+| 1 | 3 | 16,7 / 16,8 ms | 1,7 ms | 9,6 MB | 28 | 0 |
+| 3 | 8,8 | 16,7 / 16,7 ms | 1,5 ms | 9,7 MB | 28 | 0 |
+| 5 | 15 | 16,7 / 16,7 ms | 1,6 ms | 9,7 MB | 28 | 0 |
+
+I nodi del DOM restano 389–400, un solo callback di animazione per frame, la qualità resta "alta" e i testi fluttuanti
+restano entro il tetto di 48. L'audit di stabilità aveva già provato, senza errori e senza crescita di memoria:
+15 ingressi/uscite da città, 15 caricamenti, 240 cambi di zoom, 60 passaggi giorno/notte, 15 cicli di demolizione e ricostruzione.
+
+**Copertura dell'HUD**: a 1280×800, 1280×720 e 1920×1080, a ogni zoom da 1 a 5, nessuna casella resta sempre sotto la
+barra in alto o la barra degli strumenti (prima, a zoom 1 su 1280×800, 119 caselle non si potevano mai liberare).
 
 ## 9. Limiti noti
 
