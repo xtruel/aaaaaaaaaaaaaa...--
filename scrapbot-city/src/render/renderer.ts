@@ -5,6 +5,7 @@ import { placeCheck } from '../game/actions';
 import { dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
 import type { Building, FxEvent, GameState } from '../game/state';
+import { t } from '../i18n';
 import { drawPixelText, pixelTextWidth } from './pixelfont';
 import { PAL, botSprite, buildingSprite, catSprite, makeCanvas, paintTerrainTile } from './sprites';
 
@@ -147,11 +148,11 @@ export class Renderer {
         if (fx.text) this.float(fx.x, fx.y - 20, fx.text, PAL.lime);
         break;
       case 'produce':
-        if (fx.text) this.float(fx.x, fx.y, fx.text, fx.text.includes('cr') ? PAL.yellow : PAL.cyan);
+        if (fx.text) this.float(fx.x, fx.y, fx.text, fx.coins ? PAL.yellow : PAL.cyan);
         break;
       case 'clean':
         for (let k = 0; k < 10; k++) this.spawn(fx.x, fx.y, (Math.random() - 0.5) * 20, -15 - Math.random() * 20, 1, 1, PAL.cyan, 0);
-        this.float(fx.x, fx.y - 6, 'CLEAN', PAL.cyan);
+        this.float(fx.x, fx.y - 6, t('fx.clean'), PAL.cyan);
         break;
       case 'demolish':
         for (let k = 0; k < 14; k++) this.spawn(fx.x, fx.y, (Math.random() - 0.5) * 40, -Math.random() * 30, 0.8, 2, PAL.concrete, 0);
@@ -356,7 +357,7 @@ export class Renderer {
       }
       if (def.cleanRadius) this.drawRadius(ox, oy, view.build, camX, camY);
       if (!check.ok && check.reason) {
-        const text = check.reason.toUpperCase();
+        const text = check.reason;
         const w = pixelTextWidth(text);
         const lx = Math.round(ox * TILE - camX + (def.w * TILE) / 2 - w / 2);
         const ly = oy * TILE - camY - 12;

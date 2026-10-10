@@ -1,7 +1,9 @@
 // Region map of the Scrap Coast: pick a city, see its rules and stars, travel there.
 import { audio } from '../audio';
-import { allSpiresDone, isUnlocked, loadCampaign, progressOf, regionEnding, REGION_ENDINGS, saveCampaign, totalStars } from '../campaign';
-import { CITIES, TOTAL_STARS } from '../game/cities';
+import { allSpiresDone, isUnlocked, loadCampaign, progressOf, regionEnding, regionEndingText, regionEndingTitle, saveCampaign, totalStars } from '../campaign';
+import { CITIES, TOTAL_STARS, cityDesc, cityTagline, cityTraits, goalText } from '../game/cities';
+import { endingTitle } from '../game/story';
+import { t } from '../i18n';
 import type { CityDef, CityId } from '../game/cities';
 import { buildingThumb, iconUrl } from '../render/icons';
 import { paintRegion } from '../render/regionBg';
@@ -26,30 +28,7 @@ export class RegionMap {
     private handlers: RegionHandlers,
   ) {
     this.root = root;
-    root.innerHTML = `
-      <div class="region-map" data-map>
-        <canvas class="region-bg" aria-hidden="true"></canvas>
-        <div class="region-nodes" data-nodes></div>
-      </div>
-      <header class="region-top">
-        <button type="button" class="btn region-back" data-back>◀ Menu</button>
-        <div class="region-title">
-          <p class="eyebrow">Campaign</p>
-          <h1>The Scrap Coast</h1>
-        </div>
-        <div class="region-stats">
-          <span class="pill pill-star" data-total></span>
-          <span class="pill" title="Region bank: send resources between cities with the cargo blimp"><img src="${iconUrl('credits')}" alt="credits" /><b data-bank-credits></b></span>
-          <span class="pill"><img src="${iconUrl('parts')}" alt="parts" /><b data-bank-parts></b></span>
-        </div>
-      </header>
-      <aside class="region-panel" data-panel></aside>
-    `;
-    this.canvas = root.querySelector('.region-bg')!;
-    root.querySelector('[data-back]')!.addEventListener('click', () => {
-      audio.play('click');
-      this.handlers.onBack();
-    });
+    this.canvas = this.renderShell();
     window.addEventListener('resize', () => {
       if (!this.root.hidden) this.paint();
     });
@@ -59,9 +38,38 @@ export class RegionMap {
     });
   }
 
+  // Header and layout; rebuilt on every visit so a language change shows up.
+  private renderShell(): HTMLCanvasElement {
+    this.root.innerHTML = `
+      <div class="region-map" data-map>
+        <canvas class="region-bg" aria-hidden="true"></canvas>
+        <div class="region-nodes" data-nodes></div>
+      </div>
+      <header class="region-top">
+        <button type="button" class="btn region-back" data-back>◀ ${t('region.back')}</button>
+        <div class="region-title">
+          <p class="eyebrow">${t('region.eyebrow')}</p>
+          <h1>${t('region.title')}</h1>
+        </div>
+        <div class="region-stats">
+          <span class="pill pill-star" data-total></span>
+          <span class="pill" title="${t('region.bank')}"><img src="${iconUrl('credits')}" alt="${t('res.credits')}" /><b data-bank-credits></b></span>
+          <span class="pill" title="${t('region.bank')}"><img src="${iconUrl('parts')}" alt="${t('res.parts')}" /><b data-bank-parts></b></span>
+        </div>
+      </header>
+      <aside class="region-panel" data-panel></aside>
+    `;
+    this.root.querySelector('[data-back]')!.addEventListener('click', () => {
+      audio.play('click');
+      this.handlers.onBack();
+    });
+    return this.root.querySelector('.region-bg')!;
+  }
+
   show(): void {
     this.root.hidden = false;
     this.confirmRestart = false;
+    this.canvas = this.renderShell();
     const c = loadCampaign();
     // open on the most interesting city: the first unlocked one without its Spire
     const next = CITIES.find((city) => isUnlocked(c, city) && !progressOf(c, city.id).spireDone);
@@ -82,6 +90,12 @@ export class RegionMap {
     cancelAnimationFrame(this.raf);
   }
 
+  relabel(): void {
+    if (this.root.hidden) return;
+    this.canvas = this.renderShell();
+    this.render();
+  }
+
   private paint(): void {
     const map = this.root.querySelector<HTMLElement>('[data-map]')!;
     paintRegion(this.canvas, map.clientWidth, map.clientHeight, this.t);
@@ -100,7 +114,7 @@ export class RegionMap {
       const open = isUnlocked(c, city);
       const stars = prog.stars.map((st) => `<i class="${st ? 'on' : ''}">★</i>`).join('');
       return `<button type="button" class="city-node ${open ? '' : 'locked'} ${city.id === this.selected ? 'selected' : ''}" data-city="${city.id}"
-          style="left:${city.map.x}%;top:${city.map.y}%;--city:${city.color}" aria-label="${city.name}${open ? '' : ' (locked)'}">
+          style="left:${city.map.x}%;top:${city.map.y}%;--city:${city.color}" aria-label="${city.name}${open ? '' : ` (${t('region.locked')})`}">
         <span class="node-badge"><img src="${buildingThumb(city.icon)}" alt="" />${open ? '' : `<span class="node-lock"><img src="${iconUrl('lock', 2)}" alt="" />${city.starsToUnlock}★</span>`}</span>
         <span class="node-name">${city.name}</span>
         <span class="node-stars">${stars}</span>
@@ -130,22 +144,28 @@ export class RegionMap {
       <div class="panel-head">
         <span class="node-badge small"><img src="${buildingThumb(city.icon)}" alt="" /></span>
         <div>
-          <p class="eyebrow">${city.tagline}</p>
+          <p class="eyebrow">${cityTagline(city)}</p>
           <h2>${city.name}</h2>
         </div>
       </div>
-      <p class="panel-desc">${city.desc}</p>
-      <ul class="traits">${city.traits.map((t) => `<li>${t}</li>`).join('')}</ul>
-      <h3>Star goals</h3>
-      <ul class="goals">${city.goals.map((g, i) => `<li class="${prog.stars[i] ? 'got' : ''}"><span class="star">★</span>${g.text}</li>`).join('')}</ul>
-      ${meta ? `<p class="panel-save">Saved city: day ${meta.day} · ${meta.pop} citizens</p>` : ''}
-      ${prog.spireDone && prog.endingKind ? `<p class="panel-save">Spire finished · ${prog.endingKind} ending</p>` : ''}
+      <p class="panel-desc">${cityDesc(city)}</p>
+      <ul class="traits">${cityTraits(city).map((trait) => `<li>${trait}</li>`).join('')}</ul>
+      <h3>${t('region.starGoals')}</h3>
+      <ul class="goals">${city.goals.map((_, i) => `<li class="${prog.stars[i] ? 'got' : ''}"><span class="star">★</span>${goalText(city, i)}</li>`).join('')}</ul>
+      ${meta ? `<p class="panel-save">${t('region.saved', { day: meta.day, pop: meta.pop })}</p>` : ''}
+      ${prog.spireDone && prog.endingKind ? `<p class="panel-save">${t('region.spireDone', { ending: endingTitle(prog.endingKind) })}</p>` : ''}
       <div class="panel-actions">
         ${
           !open
-            ? `<p class="locked-note"><img src="${iconUrl('lock', 2)}" alt="" />Earn ${missing} more star${missing === 1 ? '' : 's'} to unlock ${city.name}.</p>`
-            : `<button type="button" class="btn btn-primary" data-play>${meta ? 'Continue' : 'Travel here'} <small>${meta ? `Day ${meta.day}` : 'New city'}</small></button>
-               ${meta ? (this.confirmRestart ? '<button type="button" class="btn tone-danger" data-restart-yes>Yes, start over <small>stars stay</small></button>' : '<button type="button" class="btn" data-restart>Restart this city</button>') : ''}`
+            ? `<p class="locked-note"><img src="${iconUrl('lock', 2)}" alt="" />${t('region.needStars', { n: missing, city: city.name })}</p>`
+            : `<button type="button" class="btn btn-primary" data-play>${meta ? t('region.continue') : t('region.travel')} <small>${meta ? t('common.day', { n: meta.day }) : t('region.newCity')}</small></button>
+               ${
+                 meta
+                   ? this.confirmRestart
+                     ? `<button type="button" class="btn tone-danger" data-restart-yes>${t('region.restartYes')} <small>${t('region.restartHint')}</small></button>`
+                     : `<button type="button" class="btn" data-restart>${t('region.restart')}</button>`
+                   : ''
+               }`
         }
       </div>`;
     panel.querySelector('[data-play]')?.addEventListener('click', () => {
@@ -166,17 +186,16 @@ export class RegionMap {
   private showFinale(): void {
     const c = loadCampaign();
     const kind = regionEnding(c);
-    const e = REGION_ENDINGS[kind];
     c.finaleSeen = true;
     saveCampaign(c);
     audio.play('event');
     openModal({
-      title: e.title,
-      eyebrow: 'The Scrap Coast is complete',
+      title: regionEndingTitle(kind),
+      eyebrow: t('region.finale.eyebrow'),
       wide: true,
       className: `modal-ending ending-${kind}`,
-      body: `<p class="story">${e.text}</p><p class="fine">You can keep playing every city to earn the stars you missed.</p>`,
-      actions: [{ label: 'Back to the coast', primary: true, onClick: closeModal }],
+      body: `<p class="story">${regionEndingText(kind)}</p><p class="fine">${t('region.finale.note')}</p>`,
+      actions: [{ label: t('region.finale.back'), primary: true, onClick: closeModal }],
     });
   }
 }

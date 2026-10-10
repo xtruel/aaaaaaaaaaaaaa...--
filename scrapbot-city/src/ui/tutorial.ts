@@ -2,6 +2,8 @@
 import { audio } from '../audio';
 import type { BuildingType } from '../game/defs';
 import type { GameState } from '../game/state';
+import { t, tk } from '../i18n';
+import { localizeKeys } from '../keys';
 import { portraitUrl } from '../render/icons';
 
 export interface TutorialCtx {
@@ -12,9 +14,8 @@ export interface TutorialCtx {
 }
 
 interface Step {
-  title: string;
-  text: string;
-  action?: string;
+  id: string; // text keys: tut.<id>.title / .text / .action
+  action?: boolean;
   target?: string;
   done?: (c: TutorialCtx) => boolean;
 }
@@ -22,82 +23,19 @@ interface Step {
 const has = (s: GameState, ...types: BuildingType[]) => s.buildings.some((b) => types.includes(b.type));
 
 const STEPS: Step[] = [
-  {
-    title: 'Hi boss!',
-    text: "I'm USA-9, lead scrapbot. This is the Training Yard: let's turn some junk into a city. I'll show you the basics in a few minutes.",
-  },
-  {
-    title: 'Look around',
-    text: 'The map is bigger than your screen. Junk piles, rubble and toxic sludge are everywhere.',
-    action: 'Drag the map, or use WASD / arrow keys. The mouse wheel zooms.',
-    done: (c) => c.cameraMoved,
-  },
-  {
-    title: 'Bots work on their own',
-    text: 'See the little white bots? They fly to junk piles and bring the scrap back to the HQ. You never have to tell them.',
-    action: 'Wait until your bots collect 10 scrap.',
-    target: '[data-res="scrap"]',
-    done: (c) => c.s.stats.scrapCollected >= 10,
-  },
-  {
-    title: 'Build a Recycler',
-    text: 'Scrap alone builds nothing. A Recycler turns it into parts, and parts build everything else.',
-    action: 'Click the Recycler (or press 2), then click an empty spot near the HQ. Green squares mean OK.',
-    target: '[data-tool="recycler"]',
-    done: (c) => has(c.s, 'recycler'),
-  },
-  {
-    title: 'Your resources',
-    text: 'Scrap, parts and credits pay for buildings. Energy, citizens and happiness keep the city alive. A red number means trouble.',
-    target: '.res-group',
-  },
-  {
-    title: 'Citizens',
-    text: 'Bot Pods bring citizens. They pay taxes every second, and they throw away junk that your bots collect again.',
-    action: 'Build Bot Pods (press 3).',
-    target: '[data-tool="pods"]',
-    done: (c) => has(c.s, 'pods'),
-  },
-  {
-    title: 'Power up',
-    text: 'Machines need energy: the number shows made / used. Without enough power everything slows down. Solar is clean but pricey, the Scrap Burner is cheap and smoky.',
-    action: 'Build a Solar Array (4) or a Scrap Burner (9).',
-    target: '[data-res="energy"]',
-    done: (c) => has(c.s, 'solar', 'burner'),
-  },
-  {
-    title: 'Green or Industry?',
-    text: 'Every building and every story choice pushes this meter. When you finish the Scrap Spire, it decides what kind of city you built.',
-    target: '.meter-path',
-  },
-  {
-    title: 'Watch the smog',
-    text: 'Industry and toxic sludge raise the smog, gardens and Purifiers lower it. Above 95% for 30 seconds the city is lost.',
-    target: '.meter-smog',
-  },
-  {
-    title: 'Time controls',
-    text: 'You can pause to plan, or speed things up when you are just waiting for money.',
-    action: 'Switch to a faster speed (or press Tab).',
-    target: '.speed',
-    done: (c) => c.speed >= 2,
-  },
-  {
-    title: 'Ask me anything',
-    text: 'Stuck? I read the whole city and tell you what to build next. Your first 3 hints in every city are free, then they cost credits.',
-    action: 'Click the light bulb.',
-    target: '[data-hint]',
-    done: (c) => c.hintUsed,
-  },
-  {
-    title: 'Follow the goals',
-    text: 'This card always shows your next goal and gives a small reward. The last goal is the Scrap Spire: it completes the city.',
-    target: '[data-objective]',
-  },
-  {
-    title: "You're ready!",
-    text: 'That is everything you need. The Scrap Coast has five cities waiting, each with its own rules and three stars to earn.',
-  },
+  { id: 'hi' },
+  { id: 'look', action: true, done: (c) => c.cameraMoved },
+  { id: 'bots', action: true, target: '[data-res="scrap"]', done: (c) => c.s.stats.scrapCollected >= 10 },
+  { id: 'recycler', action: true, target: '[data-tool="recycler"]', done: (c) => has(c.s, 'recycler') },
+  { id: 'resources', target: '.res-group' },
+  { id: 'citizens', action: true, target: '[data-tool="pods"]', done: (c) => has(c.s, 'pods') },
+  { id: 'power', action: true, target: '[data-res="energy"]', done: (c) => has(c.s, 'solar', 'burner') },
+  { id: 'path', target: '.meter-path' },
+  { id: 'smog', target: '.meter-smog' },
+  { id: 'speed', action: true, target: '.speed', done: (c) => c.speed >= 2 },
+  { id: 'hint', action: true, target: '[data-hint]', done: (c) => c.hintUsed },
+  { id: 'goals', target: '[data-objective]' },
+  { id: 'ready' },
 ];
 
 export class Tutorial {
@@ -141,6 +79,10 @@ export class Tutorial {
     this.position();
   }
 
+  relabel(): void {
+    this.rendered = -1;
+  }
+
   private next(): void {
     audio.play('click');
     this.index++;
@@ -154,15 +96,15 @@ export class Tutorial {
     this.bubble.innerHTML = `
       <img class="coach-face" src="${portraitUrl('usa')}" alt="" />
       <div class="coach-body">
-        <p class="coach-step">Tutorial · ${this.index + 1}/${STEPS.length}</p>
-        <h3>${step.title}</h3>
-        <p>${step.text}</p>
-        ${step.action ? `<p class="coach-action"><span class="dot"></span>${step.action}</p>` : ''}
+        <p class="coach-step">${t('tut.step', { n: this.index + 1, total: STEPS.length })}</p>
+        <h3>${tk(`tut.${step.id}.title`)}</h3>
+        <p>${tk(`tut.${step.id}.text`)}</p>
+        ${step.action ? `<p class="coach-action"><span class="dot"></span>${localizeKeys(tk(`tut.${step.id}.action`))}</p>` : ''}
         <div class="coach-buttons">
           ${
             last
-              ? '<button type="button" class="btn btn-primary" data-campaign>Start the campaign</button><button type="button" class="btn" data-stay>Keep playing here</button>'
-              : `${step.done ? '' : '<button type="button" class="btn btn-primary" data-next>Next</button>'}<button type="button" class="coach-skip" data-skip>Skip tutorial</button>`
+              ? `<button type="button" class="btn btn-primary" data-campaign>${t('tut.campaign')}</button><button type="button" class="btn" data-stay>${t('tut.stay')}</button>`
+              : `${step.done ? '' : `<button type="button" class="btn btn-primary" data-next>${t('common.next')}</button>`}<button type="button" class="coach-skip" data-skip>${t('tut.skip')}</button>`
           }
         </div>
       </div>`;

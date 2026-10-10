@@ -16,25 +16,37 @@ export class MenuBackground {
   private t = 0;
   private last = 0;
   private reducedMotion = false;
+  private dirty = true;
   private clouds: { x: number; y: number; w: number; speed: number }[] = [];
 
-  constructor(canvas: HTMLCanvasElement) {
+  // hold: true while something covers the scene (a dialog), so it can stop repainting
+  constructor(
+    canvas: HTMLCanvasElement,
+    private hold: () => boolean = () => false,
+  ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
   }
 
   setReducedMotion(v: boolean): void {
     this.reducedMotion = v;
+    this.dirty = true;
   }
 
   start(): void {
     this.resize();
     this.last = performance.now();
+    this.dirty = true;
     const loop = (now: number) => {
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
-      this.t += this.reducedMotion ? 0 : dt;
-      this.draw();
+      // a still picture (reduced motion, or blurred behind a dialog) is painted once, not 60 times a second
+      const still = this.reducedMotion || this.hold();
+      if (!still) this.t += dt;
+      if (!still || this.dirty) {
+        this.dirty = false;
+        this.draw();
+      }
       this.raf = requestAnimationFrame(loop);
     };
     cancelAnimationFrame(this.raf);
@@ -52,6 +64,7 @@ export class MenuBackground {
     this.canvas.width = this.w;
     this.canvas.height = this.h;
     this.ctx.imageSmoothingEnabled = false;
+    this.dirty = true;
     this.static = this.paintStatic();
     const rng = mulberry32(42);
     this.clouds = Array.from({ length: 7 }, () => ({

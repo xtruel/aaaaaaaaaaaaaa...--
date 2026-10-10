@@ -3,6 +3,7 @@ import { CITIES, TOTAL_STARS } from './game/cities';
 import type { CityDef } from './game/cities';
 import type { Resource } from './game/defs';
 import type { GameState, OutcomeKind } from './game/state';
+import { tk } from './i18n';
 import { readKey, writeKey } from './storage';
 
 export interface CityProgress {
@@ -111,17 +112,10 @@ export function regionEnding(c: Campaign): RegionEnding {
   return 'balanced';
 }
 
-export const REGION_ENDINGS: Record<RegionEnding, { title: string; text: string }> = {
-  green: {
-    title: 'The Green Coast',
-    text: 'From Rustbay to Greenvale, the Spires are covered in moss and solar petals. The Pixel Planet Initiative puts the Scrap Coast on its posters. Miso finally has a sunny roof in every city.',
-  },
-  industrial: {
-    title: 'The 2PM Coast',
-    text: 'Five Spires, five chimneys. The coast runs on 2PM money and the blimps never land. Kurogane calls it the most profitable region on the planet. Nobody remembers what the sky looked like.',
-  },
-  balanced: {
-    title: 'Different Futures, Same Coast',
-    text: 'Some cities chose gardens, some chose foundries. The cargo blimps carry parts one way and credits the other, and the coast keeps both. Small robots, big choices.',
-  },
-};
+export function regionEndingTitle(kind: RegionEnding): string {
+  return tk(`region.end.${kind}.title`);
+}
+
+export function regionEndingText(kind: RegionEnding): string {
+  return tk(`region.end.${kind}.text`);
+}

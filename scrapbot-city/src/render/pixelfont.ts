@@ -1,4 +1,5 @@
 // A 3x5 pixel font for text painted inside the game world (signs, floating numbers).
+import { lang } from '../i18n';
 
 const GLYPHS: Record<string, string> = {
   A: '010101111101101',
@@ -43,11 +44,33 @@ const GLYPHS: Record<string, string> = {
   '.': '000000000000010',
   ':': '000010000010000',
   '%': '101001010100101',
+  ',': '000000000010100',
+  '/': '001001010100100',
+  "'": '010010000000000',
+  '?': '110001010000010',
+  '(': '010100100100010',
+  ')': '010001001001010',
+  '×': '000101010101000',
   ' ': '000000000000000',
 };
 
+// Letters without their own decomposition, for Polish, Nordic and German text.
+const FOLD: Record<string, string> = { Ł: 'L', Ø: 'O', Æ: 'AE', Œ: 'OE', ẞ: 'SS', Đ: 'D', Ð: 'D', Þ: 'TH' };
+const UMLAUT: Record<string, string> = { Ä: 'AE', Ö: 'OE', Ü: 'UE' };
+
+// The font only has A–Z: accents are dropped (É → E, Ż → Z, ß → SS) so every language still reads.
+// German writes umlauts out instead (Ü → UE), the way it is done wherever they are missing.
+export function foldText(text: string): string {
+  const up = text.toUpperCase();
+  return (lang() === 'de' ? up.replace(/[ÄÖÜ]/g, (c) => UMLAUT[c]) : up)
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[ŁØÆŒẞĐÐÞ]/g, (c) => FOLD[c] ?? c);
+}
+
 export function pixelTextWidth(text: string, scale = 1): number {
-  return text.length === 0 ? 0 : (text.length * 4 - 1) * scale;
+  const n = [...foldText(text)].length;
+  return n === 0 ? 0 : (n * 4 - 1) * scale;
 }
 
 export function drawPixelText(
@@ -59,7 +82,7 @@ export function drawPixelText(
   scale = 1,
   outline?: string,
 ): void {
-  const up = text.toUpperCase();
+  const up = foldText(text);
   if (outline) {
     for (const [ox, oy] of [
       [-1, 0],

@@ -4,20 +4,30 @@ import '@fontsource/lilita-one/latin-400.css';
 import '@fontsource/nunito/latin-700.css';
 import '@fontsource/nunito/latin-900.css';
 import '@fontsource/silkscreen/latin-400.css';
+// accented letters for Polish, Portuguese and the other European languages
+import '@fontsource/bungee/latin-ext-400.css';
+import '@fontsource/lilita-one/latin-ext-400.css';
+import '@fontsource/nunito/latin-ext-700.css';
+import '@fontsource/nunito/latin-ext-900.css';
+import '@fontsource/silkscreen/latin-ext-400.css';
+import './fonts.css';
 import './style.css';
 
-import { checkCampaign, onAchievement, syncAchievements } from './achievements';
+import { achName, checkCampaign, onAchievement, syncAchievements } from './achievements';
 import { audio } from './audio';
 import { CITIES } from './game/cities';
 import type { CityDef } from './game/cities';
 import { DEFAULT_MODS } from './game/defs';
 import { createGame } from './game/state';
+import { initGamepad } from './gamepad';
+import { loadKeyboardLayout } from './keys';
 import type { GameState } from './game/state';
+import { lang, setLang, t } from './i18n';
 import { iconUrl } from './render/icons';
 import { GameSession } from './session';
-import { citySlot, clearSlot, lastPlayed, loadGame, loadSettings, slotMeta } from './storage';
+import { citySlot, clearSlot, lastPlayed, loadGame, loadSettings, migrateToFiles, saveSettings, slotMeta } from './storage';
 import type { Settings, SlotId } from './storage';
-import { openModeChooser, openSettings, openSlots } from './ui/dialogs';
+import { openLanguage, openModeChooser, openSettings, openSlots } from './ui/dialogs';
 import { esc } from './ui/escape';
 import { MainMenu } from './ui/menu';
 import { closeModal, openModal } from './ui/modal';
@@ -31,23 +41,30 @@ interface DesktopBridge {
 }
 const desktop = (window as unknown as { scrapbotDesktop?: DesktopBridge }).scrapbotDesktop;
 
+migrateToFiles();
+let settings = loadSettings();
+let session: GameSession | null = null;
+setLang(settings.lang);
+
 const app = document.getElementById('app')!;
 app.innerHTML = `
   <section class="screen menu" id="menu"></section>
   <section class="screen region" id="region" hidden></section>
   <section class="screen game" id="game" hidden></section>
-  <section class="screen quit" id="quit" hidden>
-    <p class="hand">See you tomorrow,<br />scrapper.</p>
-    <p>You can close this tab now.</p>
-    <button type="button" class="btn btn-primary" data-back>Back to the menu</button>
-  </section>
+  <section class="screen quit" id="quit" hidden></section>
   <div id="modal-root"></div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div class="crt" aria-hidden="true"></div>
 `;
 
-let settings = loadSettings();
-let session: GameSession | null = null;
+function renderQuitScreen(): void {
+  const quit = document.getElementById('quit')!;
+  quit.innerHTML = `
+    <p class="hand">${esc(t('quit.bye'))}</p>
+    <p>${esc(t('quit.closeTab'))}</p>
+    <button type="button" class="btn btn-primary" data-back>${esc(t('quit.back'))}</button>`;
+  quit.querySelector('[data-back]')!.addEventListener('click', () => backToMenu());
+}
 
 function setFullscreen(on: boolean): void {
   if (desktop) {
@@ -71,6 +88,25 @@ function applySettings(next: Settings): void {
   menu.setReducedMotion(next.reducedMotion);
   session?.applySettings(next);
   if (fullscreenChanged) setFullscreen(next.fullscreen);
+  if (next.lang !== lang()) relabel(next);
+}
+
+// Switching language rebuilds every screen's text in place: nothing is restarted or lost.
+function relabel(next: Settings): void {
+  setLang(next.lang);
+  menu.render();
+  region.relabel();
+  session?.relabel();
+  renderQuitScreen();
+}
+
+function pickLanguage(): void {
+  openLanguage((l) => {
+    closeModal();
+    const next = { ...settings, lang: l };
+    saveSettings(next);
+    applySettings(next);
+  });
 }
 
 function hideScreens(): void {
@@ -101,11 +137,13 @@ function startSession(state: GameState, intro: boolean): void {
 
 function backToMenu(): void {
   hideScreens();
+  audio.setMusic('menu');
   menu.show();
 }
 
 function showRegion(): void {
   hideScreens();
+  audio.setMusic('region');
   region.show();
 }
 
@@ -121,9 +159,9 @@ function loadSlot(slot: SlotId): void {
   const state = loadGame(slot);
   if (!state) {
     openModal({
-      title: 'Could not load',
-      body: '<p>This save is missing or was made by an older build. Start a new city or pick another slot.</p>',
-      actions: [{ label: 'OK', primary: true, onClick: closeModal }],
+      title: t('load.failed.title'),
+      body: `<p>${t('load.failed.body')}</p>`,
+      actions: [{ label: t('common.ok'), primary: true, onClick: closeModal }],
     });
     return;
   }
@@ -135,11 +173,11 @@ function freePlayDialog(): void {
   const body = document.createElement('form');
   body.className = 'newgame-form';
   body.innerHTML = `
-    <label for="ng-name">City name</label>
+    <label for="ng-name">${t('free.name')}</label>
     <input id="ng-name" type="text" maxlength="24" value="Scrapbot City" autocomplete="off" />
-    <label for="ng-seed">Map seed</label>
+    <label for="ng-seed">${t('free.seed')}</label>
     <input id="ng-seed" type="number" min="0" max="999999" value="${seed}" />
-    <p class="fine">The same seed always builds the same landfills.</p>`;
+    <p class="fine">${t('free.seedHint')}</p>`;
   const start = () => {
     const name = (body.querySelector('#ng-name') as HTMLInputElement).value.trim() || 'Scrapbot City';
     const s = Number((body.querySelector('#ng-seed') as HTMLInputElement).value) || seed;
@@ -148,11 +186,11 @@ function freePlayDialog(): void {
     const old = slotMeta('auto');
     if (!old) return go();
     openModal({
-      title: 'Replace your city?',
-      body: `<p>Your free play autosave (<b>${esc(old.city)}</b>, day ${old.day}) will be replaced by the new city. Save it to a slot first if you want to keep it.</p>`,
+      title: t('free.replace.title'),
+      body: `<p>${t('free.replace.body', { city: esc(old.city), day: old.day })}</p>`,
       actions: [
-        { label: 'Start the new city', primary: true, onClick: go },
-        { label: 'Back', onClick: () => freePlayDialog() },
+        { label: t('free.replace.go'), primary: true, onClick: go },
+        { label: t('common.back'), onClick: () => freePlayDialog() },
       ],
     });
   };
@@ -161,19 +199,19 @@ function freePlayDialog(): void {
     start();
   });
   openModal({
-    title: 'Free play',
-    eyebrow: 'Trash today, a better tomorrow',
+    title: t('free.title'),
+    eyebrow: t('free.eyebrow'),
     body,
     actions: [
-      { label: 'Start building', primary: true, onClick: start },
-      { label: 'Back', onClick: () => openModeChooser(modeHandlers) },
+      { label: t('free.start'), primary: true, onClick: start },
+      { label: t('common.back'), onClick: () => openModeChooser(modeHandlers) },
     ],
   });
 }
 
 function startTutorial(): void {
   const mods = { ...DEFAULT_MODS, startRes: { scrap: 0, parts: 60, credits: 250 } };
-  startSession(createGame({ seed: 4242, cityName: 'Training Yard', tutorial: true, mods }), false);
+  startSession(createGame({ seed: 4242, cityName: t('tut.city'), tutorial: true, mods }), false);
 }
 
 const modeHandlers = {
@@ -192,8 +230,8 @@ function showToast(title: string, text: string, icon: Parameters<typeof iconUrl>
 }
 
 function nextToast(): void {
-  const t = toastQueue.shift();
-  if (!t) {
+  const next = toastQueue.shift();
+  if (!next) {
     toastBusy = false;
     return;
   }
@@ -202,7 +240,7 @@ function nextToast(): void {
   const root = document.getElementById('toasts')!;
   const el = document.createElement('div');
   el.className = 'toast';
-  el.innerHTML = `<span class="toast-ico"><img src="${iconUrl(t.icon, 2)}" alt="" /></span><span><small>${t.title}</small><b>${t.text}</b></span>`;
+  el.innerHTML = `<span class="toast-ico"><img src="${iconUrl(next.icon, 2)}" alt="" /></span><span><small>${esc(next.title)}</small><b>${esc(next.text)}</b></span>`;
   root.append(el);
   window.setTimeout(() => el.classList.add('out'), 2400);
   window.setTimeout(() => {
@@ -219,13 +257,14 @@ const menu = new MainMenu(document.getElementById('menu')!, {
   },
   onLoadGame: () => openSlots('load', { onLoad: (slot) => loadSlot(slot) }),
   onSettings: () => openSettings((s) => applySettings(s)),
+  onLanguage: () => pickLanguage(),
   onQuit: () =>
     openModal({
-      title: 'Quit Scrapbot City?',
-      body: '<p>Your cities are saved automatically.</p>',
+      title: t('quit.title'),
+      body: `<p>${t('quit.body')}</p>`,
       actions: [
         {
-          label: 'Quit',
+          label: t('quit.quit'),
           primary: true,
           onClick: () => {
             if (desktop) {
@@ -233,10 +272,11 @@ const menu = new MainMenu(document.getElementById('menu')!, {
               return;
             }
             hideScreens();
+            audio.setMusic(null);
             document.getElementById('quit')!.hidden = false;
           },
         },
-        { label: 'Stay', onClick: closeModal },
+        { label: t('quit.stay'), onClick: closeModal },
       ],
     }),
 });
@@ -246,12 +286,19 @@ const region = new RegionMap(document.getElementById('region')!, {
   onBack: () => backToMenu(),
 });
 
-document.querySelector('#quit [data-back]')!.addEventListener('click', () => backToMenu());
+renderQuitScreen();
 
-onAchievement((a) => showToast('Achievement unlocked', a.name, a.icon));
+onAchievement((a) => showToast(t('ach.toast'), achName(a), a.icon));
+
+initGamepad({
+  target: () => session,
+  onConnect: () => showToast(t('pad.connected'), t('pad.help'), 'play'),
+  onDisconnect: () => showToast(t('pad.disconnected'), '', 'play'),
+});
 
 applySettings(settings);
 if (desktop && settings.fullscreen) desktop.setFullscreen(true);
 syncAchievements();
 checkCampaign();
+void loadKeyboardLayout();
 menu.show();

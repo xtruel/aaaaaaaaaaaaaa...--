@@ -75,6 +75,7 @@ export interface FxEvent {
   y: number;
   text?: string;
   color?: string;
+  coins?: boolean; // produce: the output includes credits (yellow text, coin sound)
 }
 
 export interface Stats {

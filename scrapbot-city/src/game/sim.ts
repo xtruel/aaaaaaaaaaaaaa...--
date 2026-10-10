@@ -12,11 +12,12 @@ import {
   T,
   TILE,
 } from './defs';
-import { addWaste, canAfford, gain, pay, setTile, spawnJunk } from './actions';
-import { updateStars, cityById } from './cities';
+import { addWaste, canAfford, costText, gain, pay, setTile, spawnJunk } from './actions';
+import { bName, t, tk } from '../i18n';
+import { cityById, goalText, updateStars } from './cities';
 import { FREE_HINTS, buildingCenter, day, findBuilding, idx, inBounds, pushMessage } from './state';
 import type { Bot, Building, GameState } from './state';
-import { ENDINGS, OBJECTIVES, endingFor, pickEvent } from './story';
+import { OBJECTIVES, endingFor, endingTitle, objectiveText, pickEvent } from './story';
 
 const SLUDGE_EMISSION = 0.002;
 // The air clears faster the dirtier it is, so every city settles at its own smog level.
@@ -66,7 +67,7 @@ export function step(s: GameState, dt: number): void {
   if (s.time >= s.nextStormAt) {
     s.nextStormAt = s.time + (160 + Math.random() * 90) * s.mods.stormEvery;
     const n = spawnJunk(s, 10 + Math.floor(Math.random() * 5), 15, 35);
-    pushMessage(s, `Junk storm! ${n} new piles landed around the city.`, 'event');
+    pushMessage(s, t('msg.storm', { n }), 'event');
     s.fx.push({ kind: 'storm', x: 0, y: 0 });
   }
 
@@ -91,7 +92,7 @@ export function step(s: GameState, dt: number): void {
     s.smog = Math.max(0, s.smog - dt * 0.5);
   }
 
-  if (day(s) !== dayBefore) pushMessage(s, `Day ${day(s)} begins.`, 'info');
+  if (day(s) !== dayBefore) pushMessage(s, t('msg.newDay', { n: day(s) }), 'info');
 }
 
 function burnFuel(s: GameState, dt: number): void {
@@ -140,14 +141,14 @@ function updateConstruction(s: GameState, b: Building, dt: number): void {
     b.status = 'ok';
     s.stats.built++;
     const c = buildingCenter(b);
-    s.fx.push({ kind: 'built', x: c.x, y: c.y, text: def.name });
+    s.fx.push({ kind: 'built', x: c.x, y: c.y, text: bName(b.type) });
     if (b.type === 'spire') {
       s.spireDone = true;
       s.endingKind = endingFor(s);
       s.outcome = { kind: s.endingKind, day: day(s) };
-      pushMessage(s, `The Scrap Spire is complete: ${ENDINGS[s.endingKind].title}.`, 'good');
+      pushMessage(s, t('msg.spireDone', { title: endingTitle(s.endingKind) }), 'good');
     } else {
-      pushMessage(s, `${def.name} is online.`, 'good');
+      pushMessage(s, t('msg.online', { name: bName(b.type) }), 'good');
     }
   }
 }
@@ -173,9 +174,9 @@ function runProcess(s: GameState, b: Building, work: number): void {
     b.lastWork = s.time;
     const c = buildingCenter(b);
     const out = Object.entries(p.output)
-      .map(([k, v]) => `+${v} ${k === 'credits' ? 'cr' : k}`)
+      .map(([k, v]) => `+${v} ${k === 'credits' ? t('fx.cr') : k === 'parts' ? t('fx.parts') : tk(`res.${k}`)}`)
       .join(' ');
-    s.fx.push({ kind: 'produce', x: c.x, y: c.y - 10, text: out });
+    s.fx.push({ kind: 'produce', x: c.x, y: c.y - 10, text: out, coins: !!p.output.credits });
   }
 }
 
@@ -269,7 +270,7 @@ function decayGrass(s: GameState, dt: number): void {
 function checkStars(s: GameState): void {
   const city = cityById(s.cityId);
   for (const i of updateStars(s)) {
-    pushMessage(s, `Star earned: ${city?.goals[i].text ?? 'city goal'}!`, 'good');
+    pushMessage(s, t('msg.star', { goal: city ? goalText(city, i) : '' }), 'good');
     s.fx.push({ kind: 'star', x: 0, y: 0, text: String(i) });
   }
 }
@@ -280,7 +281,7 @@ function rechargeHints(s: GameState): void {
   s.hints.nextFreeDay = day(s) + 5;
   if (s.hints.free < FREE_HINTS) {
     s.hints.free++;
-    pushMessage(s, 'USA-9 has a fresh free hint for you.', 'info');
+    pushMessage(s, t('msg.freeHint'), 'info');
   }
 }
 
@@ -288,14 +289,12 @@ function checkObjectives(s: GameState): void {
   const obj = OBJECTIVES[s.objective];
   if (!obj || !obj.done(s)) return;
   s.objective++;
-  let reward = '';
   if (obj.reward) {
     gain(s, obj.reward);
-    reward = Object.entries(obj.reward)
-      .map(([k, v]) => ` +${v} ${k}`)
-      .join(',');
+    pushMessage(s, t('msg.goalReward', { goal: objectiveText(obj), reward: costText(obj.reward) }), 'good');
+  } else {
+    pushMessage(s, t('msg.goal', { goal: objectiveText(obj) }), 'good');
   }
-  pushMessage(s, `Goal complete: ${obj.text}.${reward}`, 'good');
 }
 
 // ---------- bots ----------
@@ -463,7 +462,7 @@ function updateBots(s: GameState, dt: number, overtime: number): void {
           bot.timer = bot.carry > 0 ? 2 : 0.3;
           if (bot.carry > 0 && s.time - s.warnedFullAt > 45) {
             s.warnedFullAt = s.time;
-            pushMessage(s, 'Scrap storage is full! Build a Recycler, a Smelter or a Bot Dock.', 'bad');
+            pushMessage(s, t('msg.storageFull'), 'bad');
           }
         }
         break;

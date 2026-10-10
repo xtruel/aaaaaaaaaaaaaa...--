@@ -1,5 +1,6 @@
 // Player and event actions that change the city: placing, demolishing, spawning junk.
-import { ALIGN_BUILD_SHIFT, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, MAP_H, MAP_W, RESOURCE_LABEL, T, TILE } from './defs';
+import { t, tk } from '../i18n';
+import { ALIGN_BUILD_SHIFT, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, MAP_H, MAP_W, T, TILE } from './defs';
 import type { BuildingType, Cost, Resource } from './defs';
 import { addBuilding, buildingCenter, idx, inBounds, pushMessage, removeBuilding } from './state';
 import type { Building, GameState } from './state';
@@ -32,7 +33,7 @@ export function gain(s: GameState, cost: Cost): void {
 
 export function costText(cost: Cost): string {
   const parts = (Object.keys(cost) as Resource[]).filter((r) => (cost[r] ?? 0) > 0);
-  return parts.map((r) => `${cost[r]} ${RESOURCE_LABEL[r].toLowerCase()}`).join(' + ') || 'free';
+  return parts.map((r) => tk(`cost.${r}`, { n: cost[r] ?? 0 })).join(' + ') || t('common.free');
 }
 
 export function shiftAlignment(s: GameState, delta: number): void {
@@ -55,33 +56,33 @@ export interface PlaceCheck {
 
 export function placeCheck(s: GameState, type: BuildingType, x: number, y: number): PlaceCheck {
   const def = BUILDINGS[type];
-  if (def.minPop && s.pop < def.minPop) return { ok: false, reason: `Needs ${def.minPop} citizens` };
-  if (type === 'spire' && s.buildings.some((b) => b.type === 'spire')) return { ok: false, reason: 'Only one Spire per city' };
+  if (def.minPop && s.pop < def.minPop) return { ok: false, reason: t('place.needs', { n: def.minPop }) };
+  if (type === 'spire' && s.buildings.some((b) => b.type === 'spire')) return { ok: false, reason: t('place.oneSpire') };
   for (let dy = 0; dy < def.h; dy++) {
     for (let dx = 0; dx < def.w; dx++) {
       const tx = x + dx;
       const ty = y + dy;
-      if (!inBounds(tx, ty)) return { ok: false, reason: 'Out of the city limits' };
+      if (!inBounds(tx, ty)) return { ok: false, reason: t('place.outside') };
       const i = idx(tx, ty);
-      if (s.occ[i] !== -1) return { ok: false, reason: 'Something is already there' };
-      const t = s.tiles[i];
-      if (t === T.JUNK) {
+      if (s.occ[i] !== -1) return { ok: false, reason: t('place.occupied') };
+      const tile = s.tiles[i];
+      if (tile === T.JUNK) {
         const full = s.res.scrap >= s.derived.storage;
-        return { ok: false, reason: full ? 'Junk in the way, and storage is full' : 'Junk in the way: let the bots clear it' };
+        return { ok: false, reason: full ? t('place.junkFull') : t('place.junk') };
       }
-      if (t === T.SLUDGE) return { ok: false, reason: 'Toxic sludge: a Purifier can clean it' };
-      if (t === T.RUBBLE) return { ok: false, reason: 'Rubble: bulldoze it first' };
+      if (tile === T.SLUDGE) return { ok: false, reason: t('place.sludge') };
+      if (tile === T.RUBBLE) return { ok: false, reason: t('place.rubble') };
     }
   }
   const cost = buildCost(s, type);
-  if (!canAfford(s, cost)) return { ok: false, reason: `Costs ${costText(cost)}` };
+  if (!canAfford(s, cost)) return { ok: false, reason: t('place.costs', { cost: costText(cost) }) };
   return { ok: true };
 }
 
 export function placeBuilding(s: GameState, type: BuildingType, x: number, y: number): Building | null {
   const check = placeCheck(s, type, x, y);
   if (!check.ok) {
-    pushMessage(s, check.reason ?? 'Cannot build here', 'bad');
+    pushMessage(s, check.reason ?? t('place.cannot'), 'bad');
     return null;
   }
   const def = BUILDINGS[type];
@@ -105,7 +106,7 @@ export function refundFor(s: GameState, b: Building): Cost {
 
 export function demolish(s: GameState, b: Building): boolean {
   if (b.type === 'hq') {
-    pushMessage(s, 'The HQ stays. Where else would USA-9 sleep?', 'bad');
+    pushMessage(s, t('msg.hqStays'), 'bad');
     return false;
   }
   const refund = refundFor(s, b);
@@ -123,13 +124,13 @@ export function demolish(s: GameState, b: Building): boolean {
 
 export function importParts(s: GameState): boolean {
   if (s.res.credits < IMPORT_PARTS.credits) {
-    pushMessage(s, `Importing parts costs ${IMPORT_PARTS.credits} credits`, 'bad');
+    pushMessage(s, t('msg.importCost', { n: IMPORT_PARTS.credits }), 'bad');
     return false;
   }
   s.res.credits -= IMPORT_PARTS.credits;
   s.res.parts += IMPORT_PARTS.parts;
   shiftAlignment(s, -1);
-  pushMessage(s, `2PM delivered ${IMPORT_PARTS.parts} parts (-${IMPORT_PARTS.credits} credits).`, 'info');
+  pushMessage(s, t('msg.imported', { parts: IMPORT_PARTS.parts, credits: IMPORT_PARTS.credits }), 'info');
   return true;
 }
 
@@ -137,12 +138,12 @@ export function bulldozeRubble(s: GameState, x: number, y: number): boolean {
   const i = idx(x, y);
   if (s.tiles[i] !== T.RUBBLE) return false;
   if (s.res.credits < BULLDOZE_RUBBLE_COST) {
-    pushMessage(s, `Bulldozing costs ${BULLDOZE_RUBBLE_COST} credits`, 'bad');
+    pushMessage(s, t('msg.bulldozeCost', { n: BULLDOZE_RUBBLE_COST }), 'bad');
     return false;
   }
   s.res.credits -= BULLDOZE_RUBBLE_COST;
   setTile(s, i, T.GROUND);
-  s.fx.push({ kind: 'demolish', x: (x + 0.5) * TILE, y: (y + 0.5) * TILE, text: `-${BULLDOZE_RUBBLE_COST} cr` });
+  s.fx.push({ kind: 'demolish', x: (x + 0.5) * TILE, y: (y + 0.5) * TILE, text: `-${BULLDOZE_RUBBLE_COST} ${t('fx.cr')}` });
   return true;
 }
 

@@ -9,12 +9,16 @@ Questa guida va dal repository alla pagina Steam pubblicata.
 |---|---|
 | App desktop (finestra, F11 fullscreen, uscita, link esterni) | `electron/main.cjs` |
 | Ponte sicuro gioco ↔ desktop (`window.scrapbotDesktop`) | `electron/preload.cjs` |
+| **Salvataggi su file** (uno per città, scrittura atomica + copia `.bak`), pronti per Steam Cloud | `electron/main.cjs`, `src/storage.ts` |
+| **Controller** (Steam Deck, Xbox, PlayStation): menu col D-pad, cursore virtuale in città | `src/gamepad.ts`, `src/session.ts` |
+| **8 lingue**: inglese, italiano, tedesco, francese, spagnolo, portoghese, polacco, olandese | `src/i18n/` |
 | 18 achievement già nel gioco, inviati a Steam se disponibile | `src/achievements.ts` |
 | Build per Steam (cartella, non installer) | `npm run dist:win` / `dist:linux` / `dist:mac` → `release/` |
 | Prova locale dell'app desktop | `npm run desktop` |
 
 Testato: l'app si apre a 1280×800 (la risoluzione dello **Steam Deck**), il menu funziona, "Quit" chiude l'app,
-il pacchetto Linux generato da `electron-builder` si avvia.
+il pacchetto Linux generato da `electron-builder` si avvia, i salvataggi finiscono nella cartella `saves`
+e la lingua scelta resta dopo il riavvio.
 
 ## 2. Account e app su Steamworks
 
@@ -53,8 +57,51 @@ npm install steamworks.js
 | ACH_SUPERSTAR | Superstar | Tutte le 15 stelle |
 
 Le icone degli achievement (64×64, a colori e in grigio) si possono ricavare dalle icone pixel del gioco ingrandite.
+Nomi e descrizioni tradotti nelle altre 7 lingue sono già pronti in `src/i18n/<lingua>.ts` (chiavi `ach.*`):
+copiali nella localizzazione degli achievement in Steamworks.
 
-## 4. Caricare la build (SteamPipe)
+## 4. Steam Cloud (salvataggi sincronizzati)
+
+La versione desktop salva tutto in file `.sav` dentro la cartella dell'utente, sempre con lo stesso nome:
+
+| Sistema | Cartella |
+|---|---|
+| Windows | `%APPDATA%\Scrapbot City\saves` |
+| Linux / Steam Deck | `~/.config/Scrapbot City/saves` |
+| macOS | `~/Library/Application Support/Scrapbot City/saves` |
+
+In Steamworks → *Application* → *Steam Cloud* attiva **Auto-Cloud** con:
+
+- Quota: 10 MB per utente, 200 file (una città salvata pesa poche decine di KB).
+- Root path: **WinAppDataRoaming**, sottocartella `Scrapbot City/saves`, pattern `*.sav`, ricorsivo: no.
+- Root override per **Linux**: root `LinuxHome`, sottocartella `.config/Scrapbot City/saves`.
+- Root override per **macOS**: root `MacAppSupport`, sottocartella `Scrapbot City/saves`.
+
+Le copie `.sav.bak` restano solo sul computer (il pattern `*.sav` non le prende): servono se un file si rovina.
+Il pulsante **"Open the saves folder"** nelle impostazioni apre la cartella (utile per l'assistenza ai giocatori).
+Chi aveva già giocato con la 0.4 desktop non perde niente: al primo avvio i vecchi dati vengono copiati nei file.
+
+## 5. Steam Deck e controller
+
+Per il badge **Steam Deck Verified** Valve controlla queste cose; lo stato attuale:
+
+| Requisito | Stato |
+|---|---|
+| Tutto il gioco usabile col controller, senza mouse | ✔ menu, dialoghi, regione e città (cursore virtuale) |
+| Glifi dei pulsanti del controller nei testi | ✔ A, B, X, Y, LB/RB, LT/RT, Start, View, L3, R3 |
+| Risoluzione 1280×800 o 16:10 | ✔ finestra di partenza 1280×800 |
+| Testi leggibili (minimo 9 px a 1280×800) | ✔ verificato sugli screenshot, da ricontrollare nelle lingue lunghe (DE, PL) |
+| Tastiera a schermo per i campi di testo | ✔ con steamworks.js (`showFloatingGamepadTextInput`), altrimenti Steam + X |
+| Nessun launcher esterno | ✔ |
+
+Configurazione in Steamworks → *Steam Input*: imposta il supporto controller a **"Supporto completo"**
+e usa il layout predefinito **"Gamepad"** (il gioco legge il controller come un pad standard).
+
+Comandi in città: stick sinistro = cursore, stick destro = mappa, A = costruisci/seleziona, B = annulla,
+LB/RB = edificio precedente/successivo, LT/RT = zoom, X = ruspa, Y = suggerimento, Start = menu,
+D-pad = una casella alla volta, View = pausa, L3 = velocità, R3 = torna all'HQ.
+
+## 6. Caricare la build (SteamPipe)
 
 1. `npm run dist:win` (da Windows, oppure su CI) → `release/win-unpacked/`.
 2. Crea un **depot** per sistema operativo in Steamworks (Windows obbligatorio, Linux consigliato per Steam Deck).
@@ -62,7 +109,7 @@ Le icone degli achievement (64×64, a colori e in grigio) si possono ricavare da
 4. Opzioni di avvio: eseguibile `Scrapbot City.exe` (Windows), `scrapbot-city` (Linux).
 5. Prova la build dal ramo `beta` prima di renderla pubblica.
 
-## 5. Pagina del negozio (da preparare presto)
+## 7. Pagina del negozio (da preparare presto)
 
 Apri la pagina **"Coming Soon" il prima possibile**: le wishlist raccolte nei mesi prima del lancio sono il fattore che pesa di più sulle vendite.
 
@@ -76,23 +123,31 @@ Materiali richiesti:
 
 Tag consigliati: City Builder, Pixel Graphics, Cozy, Management, Choices Matter, Casual, Strategy, Cute.
 
-## 6. Prezzo e lancio (consiglio)
+**Lingue da spuntare** (colonna *Interfaccia*; *Audio* e *Sottotitoli* no, non ci sono voci): English, Italian, German,
+French, Spanish - Spain, Portuguese - Portugal, Polish, Dutch. La descrizione del negozio va tradotta a parte
+in Steamworks: i testi del gioco in `src/i18n/` possono fare da base. Il gioco sceglie da solo la lingua del sistema
+al primo avvio; si cambia dal pulsante col globo nel menu o dalle impostazioni.
+
+## 8. Prezzo e lancio (consiglio)
 
 - Prezzo indicativo per un city builder pixel indie di 6–10 ore: **9,99–12,99 €**, con sconto lancio del 10–15%.
 - Usa il **tutorial + Scrapbot City** come **demo gratuita** per lo Steam Next Fest: è già un pezzo chiuso del gioco.
-- Lingue: inglese subito, poi italiano; dopo, tedesco, francese, spagnolo, portoghese brasiliano, giapponese e cinese semplificato (i city builder vendono molto in Germania e in Asia).
+- Lingue: le 8 europee sono già nel gioco. Le prossime da valutare: portoghese brasiliano, giapponese,
+  cinese semplificato e coreano (i city builder vendono molto in Asia; servono font CJK, oggi c'è solo il katakana del logo).
 
-## 7. Cosa manca prima di vendere (onestamente)
+## 9. Cosa manca prima di vendere (onestamente)
 
-1. **Salvataggi su file** invece che in Local Storage, così funziona **Steam Cloud** in modo affidabile (via IPC in `electron/main.cjs`).
-2. **Supporto controller** per il badge "Steam Deck Verified".
-3. **Musica originale** di un compositore (ora è chiptune generata dal codice) e qualche effetto in più.
-4. **Passata grafica**: gli sprite sono disegnati dal codice; un artista pixel può sostituirli tenendo le stesse misure (caselle 16 px).
-5. **Playtest** con 10–20 persone che non conoscono il gioco: guarda dove si bloccano nel tutorial.
-6. **Localizzazione**: i testi sono già raccolti in `src/game/story.ts`, `src/game/cities.ts`, `src/game/hints.ts` e `src/ui/`.
-7. Verifica legale di nomi e marchi ("2PM", "Scrapbot City") prima di registrare la pagina.
+Fatto nella 0.5: salvataggi su file con Steam Cloud, controller e Steam Deck, 8 lingue, 4 brani di musica
+(menu, città di giorno, città di notte, mappa della regione), font giapponese per il logo.
 
-## 8. Idee per allungare la vita del gioco (aggiornamenti post-lancio)
+1. **Musica di un compositore**: i 4 brani sono chiptune scritti come note in `src/music.ts` e suonati dal codice.
+   Vanno bene per demo e playtest; per il lancio conviene un compositore (anche solo per riscriverli meglio).
+2. **Passata grafica**: gli sprite sono disegnati dal codice; un artista pixel può sostituirli tenendo le stesse misure (caselle 16 px).
+3. **Playtest** con 10–20 persone che non conoscono il gioco: vedi **[PLAYTEST.md](PLAYTEST.md)**.
+4. **Revisione delle traduzioni** da madrelingua (soprattutto eventi e finali) durante il playtest.
+5. Verifica legale di nomi e marchi ("2PM", "Scrapbot City") prima di registrare la pagina.
+
+## 10. Idee per allungare la vita del gioco (aggiornamenti post-lancio)
 
 - Albero tecnologico dei bot (velocità, capacità, droni da pulizia).
 - Sesta e settima città come aggiornamento gratuito: fa tornare i giocatori e Steam lo mostra a chi ha il gioco in wishlist.

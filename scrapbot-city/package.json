@@ -1,7 +1,7 @@
 {
   "name": "scrapbot-city",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Scrapbot City: a pixel-art city builder about junk, robots and big choices.",
   "author": "Qwerty3D Games",
   "type": "module",
@@ -15,10 +15,12 @@
     "desktop": "vite build && electron .",
     "dist:win": "vite build && electron-builder --win dir",
     "dist:linux": "vite build && electron-builder --linux dir",
-    "dist:mac": "vite build && electron-builder --mac dir"
+    "dist:mac": "vite build && electron-builder --mac dir",
+    "i18n:check": "esbuild scripts/i18n-check.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/i18n-check.mjs --log-level=warning && node node_modules/.cache/i18n-check.mjs"
   },
   "dependencies": {
     "@fontsource/bungee": "^5.3.0",
+    "@fontsource/dotgothic16": "^5.3.0",
     "@fontsource/lilita-one": "^5.3.0",
     "@fontsource/nunito": "^5.3.0",
     "@fontsource/permanent-marker": "^5.3.0",

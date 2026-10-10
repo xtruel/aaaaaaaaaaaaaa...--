@@ -163,6 +163,14 @@ kbd {
   --btn: var(--lime);
 }
 
+.btn-small {
+  justify-self: start;
+  width: auto;
+  margin-top: 6px;
+  padding: 6px 14px;
+  font-size: 15px;
+}
+
 .tone-green {
   --btn: var(--green);
 }
@@ -180,7 +188,121 @@ kbd {
   --btn-fg: #fff;
 }
 
+/* ---------- controller ---------- */
+
+/* the focus ring only shows while a controller is in use: mouse players never see it */
+body.pad-mode :focus {
+  outline: 4px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+body.pad-mode .modal:focus,
+body.pad-mode .menu-list button:focus {
+  outline: none;
+}
+
+body.pad-mode .game canvas.world {
+  cursor: none;
+}
+
+.pad-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 70;
+  width: 34px;
+  height: 34px;
+  margin: -3px 0 0 -3px;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Cpath d='M4 4 L4 27 L10 21 L14.5 30 L19 28 L14.5 19 L23 19 Z' fill='%23ffd23f' stroke='%231a1033' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat;
+  filter: drop-shadow(2px 3px 0 rgba(26, 16, 51, 0.55));
+}
+
+.pad-cursor.building {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Cpath d='M4 4 L4 27 L10 21 L14.5 30 L19 28 L14.5 19 L23 19 Z' fill='%23c6f432' stroke='%231a1033' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
 /* ---------- main menu ---------- */
+
+.menu-ui {
+  position: absolute;
+  inset: 0;
+}
+
+.lang-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 6px;
+  font-family: var(--f-display);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink);
+  background: var(--yellow);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.15s var(--pop);
+}
+
+.lang-pill .globe {
+  width: 20px;
+  height: 20px;
+}
+
+.lang-pill:hover,
+.lang-pill:focus-visible {
+  transform: translateY(-2px) rotate(-2deg);
+}
+
+.langs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lang-btn {
+  padding: 12px 14px;
+  font-family: var(--f-display);
+  font-size: 20px;
+  text-align: left;
+  color: var(--ink);
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: var(--r);
+  box-shadow: 0 4px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.15s var(--pop);
+}
+
+.lang-btn:hover,
+.lang-btn:focus-visible {
+  transform: translateY(-2px) rotate(-0.8deg);
+}
+
+.lang-btn.active {
+  background: var(--lime);
+}
+
+.lang-btn.active::after {
+  content: ' ✓';
+}
+
+select {
+  width: 100%;
+  padding: 8px 12px;
+  font-family: var(--f-display);
+  font-size: 18px;
+  color: var(--ink);
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: var(--r);
+  box-shadow: inset 0 3px 0 rgba(26, 16, 51, 0.12);
+  cursor: pointer;
+}
 
 .menu-bg {
   position: absolute;
@@ -229,6 +351,26 @@ kbd {
 .globe {
   width: 26px;
   height: 26px;
+}
+
+/* version box and language button stacked in the top-right corner */
+.corner-right {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.corner-right .corner-tr {
+  position: static;
+}
+
+.corner-right .lang-pill {
+  margin-right: 16px;
 }
 
 .corner-tr {
@@ -348,9 +490,9 @@ kbd {
 }
 
 .logo-jp {
-  font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
-  font-weight: 900;
-  font-size: clamp(12px, 1.3vw, 20px);
+  font-family: 'DotGothic16 Kana', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
+  font-weight: 400;
+  font-size: clamp(13px, 1.45vw, 22px);
   color: var(--pink);
   letter-spacing: 0.05em;
   padding-bottom: 0.6em;
@@ -1649,6 +1791,13 @@ kbd {
 #modal-root {
   position: relative;
   z-index: 40;
+}
+
+/* whatever is behind an open dialog holds still, so the blur is not recomputed every frame */
+body:has(#modal-root .modal-backdrop) .screen *,
+body:has(#modal-root .modal-backdrop) .screen *::before,
+body:has(#modal-root .modal-backdrop) .screen *::after {
+  animation-play-state: paused !important;
 }
 
 .modal-backdrop {
@@ -3009,6 +3158,10 @@ body.crt-on .crt {
 }
 
 @media (max-width: 640px) {
+  .corner-right {
+    top: 12px;
+  }
+
   .corner-tr,
   .corner-tl p,
   .menu-footer .stripes {

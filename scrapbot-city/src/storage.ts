@@ -1,12 +1,24 @@
-// localStorage helpers. Storage can be blocked (private mode, sandboxed frames), so every access is guarded.
+// Saves and settings. The desktop build keeps them as files (synced by Steam Cloud); the browser build
+// uses localStorage, which can be blocked (private mode, sandboxed frames), so every access is guarded.
 import { deserialize, day, serialize } from './game/state';
+import { detectLang, isLang } from './i18n';
+import type { Lang } from './i18n';
 import type { GameState, OutcomeKind } from './game/state';
 
 const PREFIX = 'scrapbot:';
 
+interface FileStore {
+  get(key: string): string | null;
+  set(key: string, value: string): boolean;
+  remove(key: string): void;
+}
+
+const desktop = (window as unknown as { scrapbotDesktop?: { storage?: FileStore; openSaves?: () => void } }).scrapbotDesktop;
+const files = desktop?.storage ?? null;
+
 export function readKey(key: string): string | null {
   try {
-    return window.localStorage.getItem(PREFIX + key);
+    return files ? files.get(key) : window.localStorage.getItem(PREFIX + key);
   } catch {
     return null;
   }
@@ -14,12 +26,42 @@ export function readKey(key: string): string | null {
 
 export function writeKey(key: string, value: string): boolean {
   try {
+    if (files) return files.set(key, value);
     window.localStorage.setItem(PREFIX + key, value);
     return true;
   } catch {
     return false;
   }
 }
+
+export function removeKey(key: string): void {
+  try {
+    if (files) files.remove(key);
+    else window.localStorage.removeItem(PREFIX + key);
+  } catch {
+    // storage blocked: nothing to remove
+  }
+}
+
+// Desktop builds before 0.5 kept everything in the browser storage: copy it to files once.
+export function migrateToFiles(): void {
+  if (!files || readKey('migrated') === '1') return;
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (!k?.startsWith(PREFIX)) continue;
+      const key = k.slice(PREFIX.length);
+      const value = window.localStorage.getItem(k);
+      if (value !== null && readKey(key) === null) writeKey(key, value);
+    }
+  } catch {
+    // no old storage to copy
+  }
+  writeKey('migrated', '1');
+}
+
+// Desktop only: shows the saves folder in the file manager.
+export const openSavesFolder: (() => void) | null = desktop?.openSaves ?? null;
 
 export interface Settings {
   sfx: number;
@@ -28,6 +70,7 @@ export interface Settings {
   edgeScroll: boolean;
   reducedMotion: boolean;
   fullscreen: boolean;
+  lang: Lang;
 }
 
 export function loadSettings(): Settings {
@@ -38,11 +81,14 @@ export function loadSettings(): Settings {
     edgeScroll: false,
     reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
     fullscreen: false,
+    lang: detectLang(),
   };
   const raw = readKey('settings');
   if (!raw) return defaults;
   try {
-    return { ...defaults, ...(JSON.parse(raw) as Partial<Settings>) };
+    const saved = { ...defaults, ...(JSON.parse(raw) as Partial<Settings>) };
+    if (!isLang(saved.lang)) saved.lang = defaults.lang;
+    return saved;
   } catch {
     return defaults;
   }
@@ -100,12 +146,8 @@ export function saveGame(slot: SlotId, s: GameState): boolean {
 }
 
 export function clearSlot(slot: SlotId): void {
-  try {
-    window.localStorage.removeItem(`${PREFIX}save:${slot}`);
-    window.localStorage.removeItem(`${PREFIX}meta:${slot}`);
-  } catch {
-    // storage blocked: nothing to clear
-  }
+  removeKey(`save:${slot}`);
+  removeKey(`meta:${slot}`);
 }
 
 export function slotMeta(slot: SlotId): SlotMeta | null {

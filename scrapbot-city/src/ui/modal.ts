@@ -1,5 +1,6 @@
 // One modal at a time, rendered into #modal-root. Keyboard: Esc closes when allowed.
 import { audio } from '../audio';
+import { t } from '../i18n';
 
 export interface ModalAction {
   label: string;
@@ -83,7 +84,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
     const x = document.createElement('button');
     x.className = 'modal-x';
     x.type = 'button';
-    x.setAttribute('aria-label', 'Close');
+    x.setAttribute('aria-label', t('common.close'));
     x.textContent = '×';
     x.addEventListener('click', () => {
       audio.play('click');

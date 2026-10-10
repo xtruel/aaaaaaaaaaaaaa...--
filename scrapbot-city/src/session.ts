@@ -3,14 +3,18 @@ import { checkCampaign, checkCity, checkOutcome, unlock } from './achievements';
 import { audio } from './audio';
 import { recordCity } from './campaign';
 import { bulldozeRubble, demolish, importParts, placeBuilding } from './game/actions';
-import { cityById } from './game/cities';
-import { BUILDINGS, SIM_STEP, T, TILE } from './game/defs';
+import { cityById, cityDesc, cityTagline, cityTraits, goalText } from './game/cities';
+import { BUILDINGS, BUILD_ORDER, SIM_STEP, T, TILE } from './game/defs';
 import type { BuildingType } from './game/defs';
 import { freeHintsLeft, hintPrice, suggest } from './game/hints';
-import { step } from './game/sim';
+import { dayPhase, step } from './game/sim';
 import { day, idx, inBounds, pushMessage } from './game/state';
 import type { FxEvent, GameState } from './game/state';
-import { ENDINGS, endingText, eventById } from './game/story';
+import { endingSubtitle, endingText, endingTitle, eventById } from './game/story';
+import { padMode } from './gamepad';
+import type { PadFrame, PadTarget } from './gamepad';
+import { t } from './i18n';
+import { localizeKeys } from './keys';
 import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
@@ -43,10 +47,11 @@ interface Drag {
 }
 
 const PAN_SPEED = 260; // screen px per second
+const CURSOR_SPEED = 900; // controller cursor, screen px per second at full tilt
 // WASD by physical position: ZQSD on AZERTY keyboards.
 const PAN_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 
-export class GameSession {
+export class GameSession implements PadTarget {
   readonly s: GameState;
   private root: HTMLElement;
   private renderer: Renderer;
@@ -83,13 +88,19 @@ export class GameSession {
   private endingUnlocks: string[] = [];
   private alive = false;
   private disposers: (() => void)[] = [];
+  private held = false; // the world under an open dialog is painted once, then held
+  private padCursor!: HTMLElement;
+  private padOn = false;
+  private padHover: HTMLElement | null = null;
+  private cursor = { x: 0, y: 0 };
 
   constructor(root: HTMLElement, s: GameState, settings: Settings, handlers: SessionHandlers) {
     this.root = root;
     this.s = s;
     this.settings = settings;
     this.handlers = handlers;
-    root.innerHTML = '<canvas class="world" aria-label="City map"></canvas><div class="hud"></div>';
+    root.innerHTML = `<canvas class="world" aria-label="${t('hud.map')}"></canvas><div class="hud"></div><div class="pad-cursor" aria-hidden="true" hidden></div>`;
+    this.padCursor = root.querySelector('.pad-cursor')!;
     this.renderer = new Renderer(root.querySelector('canvas')!);
     this.hud = new Hud(
       root.querySelector('.hud')!,
@@ -159,6 +170,12 @@ export class GameSession {
     this.settings = settings;
   }
 
+  relabel(): void {
+    this.root.querySelector('canvas.world')?.setAttribute('aria-label', t('hud.map'));
+    this.hud.relabel();
+    this.tutorial?.relabel();
+  }
+
   // Where this city is saved: campaign cities have their own slot, the tutorial is never saved.
   private get slot(): SlotId | null {
     if (this.s.tutorial) return null;
@@ -169,7 +186,7 @@ export class GameSession {
     const slot = this.slot;
     if (!slot || this.s.outcome?.kind === 'smog') return;
     const ok = saveGame(slot, this.s);
-    if (!ok && !this.saveFailed) pushMessage(this.s, 'Saving failed: browser storage is full or blocked. Your progress may be lost.', 'bad');
+    if (!ok && !this.saveFailed) pushMessage(this.s, t('msg.saveFailed'), 'bad');
     this.saveFailed = !ok;
     if (!ok) return;
     setLastPlayed(slot);
@@ -217,6 +234,9 @@ export class GameSession {
     if (this.checkTimer <= 0) {
       this.checkTimer = 1;
       if (!s.tutorial) checkCity(s);
+      // the soundtrack follows the clock: "Neon Hum" from 20:00 to 05:00
+      const hour = (dayPhase(s) * 24 + 6) % 24;
+      audio.setMusic(hour >= 20 || hour < 5 ? 'night' : 'day');
     }
 
     if (!modal && s.pendingEvent) this.showEvent();
@@ -225,18 +245,23 @@ export class GameSession {
 
     if (!modal) this.panCamera(dt);
     this.updateHover();
-    this.renderer.render(
-      s,
-      {
-        hover: this.hover,
-        build: this.build,
-        bulldoze: this.bulldoze,
-        selectedId: this.selectedId,
-        reducedMotion: this.settings.reducedMotion,
-      },
-      dt,
-      running,
-    );
+    // behind a dialog the world is paused and blurred: paint it once and let the GPU rest
+    const hold = modal && this.held;
+    this.held = modal;
+    if (!hold) {
+      this.renderer.render(
+        s,
+        {
+          hover: this.hover,
+          build: this.build,
+          bulldoze: this.bulldoze,
+          selectedId: this.selectedId,
+          reducedMotion: this.settings.reducedMotion,
+        },
+        dt,
+        running,
+      );
+    }
 
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
@@ -260,7 +285,7 @@ export class GameSession {
         break;
       case 'produce': {
         const now = performance.now();
-        if (fx.text?.includes('cr') && now - this.lastCoin > 1500) {
+        if (fx.coins && now - this.lastCoin > 1500) {
           this.lastCoin = now;
           audio.play('coin');
         }
@@ -280,7 +305,7 @@ export class GameSession {
         const { unlocked } = recordCity(this.s);
         for (const city of unlocked) {
           this.newlyUnlocked.push(city.name);
-          pushMessage(this.s, `New city unlocked on the Scrap Coast: ${city.name}!`, 'event');
+          pushMessage(this.s, t('msg.cityUnlocked', { city: city.name }), 'event');
         }
         checkCampaign();
         break;
@@ -332,7 +357,10 @@ export class GameSession {
 
   private bindInput(): void {
     const canvas = this.renderer.canvas;
-    this.listen(window, 'resize', () => this.renderer.resize());
+    this.listen(window, 'resize', () => {
+      this.renderer.resize();
+      this.held = false;
+    });
     this.listen(canvas, 'contextmenu', (e) => e.preventDefault());
     this.listen(canvas, 'pointerdown', (e) => {
       audio.unlock();
@@ -507,29 +535,29 @@ export class GameSession {
   private click(sx: number, sy: number): void {
     const s = this.s;
     if (s.outcome) return;
-    const t = this.renderer.screenToTile(sx, sy);
+    const tile = this.renderer.screenToTile(sx, sy);
     if (this.build) {
       const def = BUILDINGS[this.build];
-      const ox = t.x - Math.floor((def.w - 1) / 2);
-      const oy = t.y - Math.floor((def.h - 1) / 2);
+      const ox = tile.x - Math.floor((def.w - 1) / 2);
+      const oy = tile.y - Math.floor((def.h - 1) / 2);
       const b = placeBuilding(s, this.build, ox, oy);
       if (!b) audio.play('error');
       else if (this.build === 'spire') this.build = null;
       return;
     }
-    if (!inBounds(t.x, t.y)) {
+    if (!inBounds(tile.x, tile.y)) {
       this.selectedId = -1;
       return;
     }
-    const i = idx(t.x, t.y);
+    const i = idx(tile.x, tile.y);
     if (this.bulldoze) {
       if (s.tiles[i] === T.RUBBLE) {
-        if (!bulldozeRubble(s, t.x, t.y)) audio.play('error');
+        if (!bulldozeRubble(s, tile.x, tile.y)) audio.play('error');
       } else if (s.occ[i] !== -1) {
         this.selectedId = s.occ[i];
         audio.play('click');
       } else {
-        pushMessage(s, 'Bulldoze clears rubble. Bots handle junk, Purifiers handle sludge.', 'info');
+        pushMessage(s, t('msg.bulldozeHelp'), 'info');
       }
       return;
     }
@@ -542,13 +570,13 @@ export class GameSession {
     if (Math.hypot(w.x - s.cat.x, w.y - (s.cat.y - 4)) < 8) {
       s.happyMod = Math.min(s.happyMod + 1, 15);
       s.stats.catPets++;
-      pushMessage(s, ['Miso: mrrp.', 'Miso purrs. Citizens feel a bit better.', 'Miso ignores you, as cats do.'][Math.floor(Math.random() * 3)], 'good');
+      pushMessage(s, t((['msg.miso1', 'msg.miso2', 'msg.miso3'] as const)[Math.floor(Math.random() * 3)]), 'good');
       return;
     }
     this.selectedId = -1;
-    if (s.tiles[i] === T.JUNK) pushMessage(s, `Junk pile: ${s.amount[i]} scrap. Your bots will get to it.`, 'info');
-    else if (s.tiles[i] === T.SLUDGE) pushMessage(s, 'Toxic sludge: it slowly raises the smog. A Purifier nearby cleans it.', 'info');
-    else if (s.tiles[i] === T.RUBBLE) pushMessage(s, 'Rubble: use Bulldoze (X) to clear it.', 'info');
+    if (s.tiles[i] === T.JUNK) pushMessage(s, t(s.res.scrap >= s.derived.storage ? 'msg.junkInfoFull' : 'msg.junkInfo', { n: s.amount[i] }), 'info');
+    else if (s.tiles[i] === T.SLUDGE) pushMessage(s, t('msg.sludgeInfo'), 'info');
+    else if (s.tiles[i] === T.RUBBLE) pushMessage(s, t('msg.rubbleInfo'), 'info');
   }
 
   private selectBuild(type: BuildingType | null): void {
@@ -579,6 +607,112 @@ export class GameSession {
     if (b && demolish(this.s, b)) this.selectedId = -1;
   }
 
+  // ---------- controller ----------
+
+  // A virtual cursor stands in for the mouse. Returns false while a dialog has the pad.
+  padFrame(f: PadFrame): boolean {
+    if (!this.alive || this.root.hidden || isModalOpen()) {
+      this.padCursor.hidden = true;
+      return false;
+    }
+    if (!padMode()) {
+      this.padCursor.hidden = true;
+      this.padOn = false;
+      return true;
+    }
+    const r = this.renderer;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const c = this.cursor;
+    if (!this.padOn) {
+      this.padOn = true;
+      c.x = this.pointer.inside ? this.pointer.x : w / 2;
+      c.y = this.pointer.inside ? this.pointer.y : h / 2;
+    }
+
+    // left stick moves the cursor (faster the further it is pushed); pushing against an edge scrolls
+    const mag = Math.hypot(f.lx, f.ly);
+    c.x += f.lx * mag * CURSOR_SPEED * f.dt;
+    c.y += f.ly * mag * CURSOR_SPEED * f.dt;
+    let px = f.rx;
+    let py = f.ry;
+    if ((c.x < 1 && f.lx < 0) || (c.x > w - 2 && f.lx > 0)) px += f.lx;
+    if ((c.y < 1 && f.ly < 0) || (c.y > h - 2 && f.ly > 0)) py += f.ly;
+    c.x = Math.max(0, Math.min(w - 1, c.x));
+    c.y = Math.max(0, Math.min(h - 1, c.y));
+    if (px || py) {
+      r.cam.x += (px * PAN_SPEED * 1.5 * f.dt) / r.pxZoom;
+      r.cam.y += (py * PAN_SPEED * 1.5 * f.dt) / r.pxZoom;
+      r.clampCam();
+      this.cameraMoved = true;
+    }
+
+    // D-pad: one tile at a time, for precise placing; the map scrolls when the cursor nears the HUD
+    for (const [dir, dx, dy] of [
+      ['up', 0, -1],
+      ['down', 0, 1],
+      ['left', -1, 0],
+      ['right', 1, 0],
+    ] as const) {
+      if (!f.pressed.has(dir)) continue;
+      const tile = r.screenToTile(c.x, c.y);
+      const toScreen = () => ({ x: ((tile.x + dx + 0.5) * TILE - r.cam.x) * r.pxZoom, y: ((tile.y + dy + 0.5) * TILE - r.cam.y) * r.pxZoom });
+      let p = toScreen();
+      if (p.x < w * 0.15 || p.x > w * 0.85 || p.y < h * 0.18 || p.y > h * 0.75) {
+        r.cam.x += dx * TILE;
+        r.cam.y += dy * TILE;
+        r.clampCam();
+        this.cameraMoved = true;
+        p = toScreen();
+      }
+      c.x = Math.max(0, Math.min(w - 1, p.x));
+      c.y = Math.max(0, Math.min(h - 1, p.y));
+    }
+
+    const el = document.elementFromPoint(c.x, c.y) as HTMLElement | null;
+    const overMap = el === r.canvas;
+    this.pointer = { x: c.x, y: c.y, inside: overMap };
+    // over the HUD the cursor focuses buttons, which also shows the build tooltips
+    const btn = overMap ? null : (el?.closest<HTMLElement>('button') ?? null);
+    if (btn !== this.padHover) {
+      if (this.padHover && document.activeElement === this.padHover) this.padHover.blur();
+      this.padHover = btn;
+      btn?.focus({ preventScroll: true });
+    }
+    this.padCursor.hidden = false;
+    this.padCursor.classList.toggle('building', !!this.build || this.bulldoze);
+    this.padCursor.style.transform = `translate(${Math.round(c.x)}px, ${Math.round(c.y)}px)`;
+
+    const p = f.pressed;
+    if (p.has('a')) {
+      audio.unlock();
+      if (overMap) this.click(c.x, c.y);
+      else (btn ?? el)?.click();
+    }
+    if (p.has('b') && (this.build || this.bulldoze || this.selectedId >= 0)) this.cancelTool();
+    if (p.has('x')) this.toggleBulldoze();
+    if (p.has('y')) this.askHint();
+    if (p.has('lb') || p.has('rb')) {
+      const dir = p.has('rb') ? 1 : -1;
+      const n = BUILD_ORDER.length;
+      const i = this.build ? BUILD_ORDER.indexOf(this.build) : dir > 0 ? -1 : n;
+      this.selectBuild(BUILD_ORDER[(i + dir + n) % n]);
+      audio.play('click');
+    }
+    if (p.has('lt') || p.has('rt')) {
+      r.setZoom(r.zoom + (p.has('rt') ? 1 : -1), c.x, c.y);
+      this.cameraMoved = true;
+    }
+    if (p.has('back')) this.setSpeed(this.speed === 0 ? this.lastSpeed || 1 : 0);
+    if (p.has('ls')) this.setSpeed((this.speed % 3) + 1);
+    if (p.has('rs')) {
+      const hq = this.s.buildings.find((b) => b.type === 'hq');
+      if (hq) r.centerOn((hq.x + 1.5) * TILE, (hq.y + 1.5) * TILE);
+    }
+    if (p.has('start')) this.openPause();
+    return true;
+  }
+
   // ---------- hints ----------
 
   private askHint(): void {
@@ -588,7 +722,7 @@ export class GameSession {
     unlock('hint');
     if (freeHintsLeft(s) > 0) {
       s.hints.free--;
-      this.showHint(s.hints.free > 0 ? `Free hints left in this city: ${s.hints.free}.` : 'That was your last free hint for now. A new one comes back every 5 days.');
+      this.showHint(s.hints.free > 0 ? t('hint.freeLeft', { n: s.hints.free }) : t('hint.lastFree'));
       return;
     }
     const price = hintPrice(s);
@@ -596,7 +730,7 @@ export class GameSession {
     openHintPay(price, s.res.credits >= price, () => {
       s.res.credits -= price;
       s.hints.paid++;
-      this.showHint(`Paid ${price} credits. The next hint costs ${hintPrice(s)}.`);
+      this.showHint(t('hint.paid', { n: price, next: hintPrice(s) }));
     });
   }
 
@@ -629,7 +763,7 @@ export class GameSession {
       this.handlers.onTutorialDone(true);
       return;
     }
-    pushMessage(s, finished ? 'Tutorial complete! This city is yours now: it saves like any free play city.' : 'Tutorial skipped. The light bulb (Q) asks USA-9 for advice.', 'good');
+    pushMessage(s, finished ? t('msg.tutorialDone') : localizeKeys(t('msg.tutorialSkipped')), 'good');
     this.save();
   }
 
@@ -641,27 +775,27 @@ export class GameSession {
     if (city) {
       openModal({
         title: city.name,
-        eyebrow: city.tagline,
+        eyebrow: cityTagline(city),
         portrait: portraitUrl('usa'),
         className: 'modal-story speaker-usa',
         body: `
-          <p class="story">${city.desc}</p>
-          <ul class="traits">${city.traits.map((t) => `<li>${t}</li>`).join('')}</ul>
-          <ul class="goals">${city.goals.map((g, i) => `<li class="${s.stars[i] ? 'got' : ''}"><span class="star">★</span>${g.text}</li>`).join('')}</ul>`,
-        actions: [{ label: "Let's build", primary: true, onClick: closeModal }],
+          <p class="story">${cityDesc(city)}</p>
+          <ul class="traits">${cityTraits(city).map((trait) => `<li>${trait}</li>`).join('')}</ul>
+          <ul class="goals">${city.goals.map((_, i) => `<li class="${s.stars[i] ? 'got' : ''}"><span class="star">★</span>${goalText(city, i)}</li>`).join('')}</ul>`,
+        actions: [{ label: t('intro.build'), primary: true, onClick: closeModal }],
       });
       return;
     }
     openModal({
-      title: `Welcome to ${s.cityName}`,
-      eyebrow: 'USA-9 · Lead scrapbot',
+      title: t('intro.title', { city: s.cityName }),
+      eyebrow: t('intro.eyebrow'),
       portrait: portraitUrl('usa'),
       className: 'modal-story speaker-usa',
       body: `
-        <p class="story">Hi boss! I'm USA-9. My bots fly out and collect junk on their own. You decide what we turn it into.</p>
-        <p class="story">Recycle it for a <b class="g">green</b> future, or smelt it for quick <b class="i">profit</b>. Just keep the smog meter low.</p>
-        <p class="story">Finish the <b>Scrap Spire</b> and the whole city will follow the path you picked. Stuck? Click the light bulb. Miso says hi.</p>`,
-      actions: [{ label: "Let's go", primary: true, onClick: closeModal }],
+        <p class="story">${t('intro.p1')}</p>
+        <p class="story">${t('intro.p2')}</p>
+        <p class="story">${t('intro.p3')}</p>`,
+      actions: [{ label: t('intro.go'), primary: true, onClick: closeModal }],
     });
   }
 
@@ -684,7 +818,6 @@ export class GameSession {
     const s = this.s;
     if (!s.outcome) return;
     const kind = s.outcome.kind;
-    const e = ENDINGS[kind];
     const city = cityById(s.cityId);
     if (!this.endingShown) {
       // results are recorded once, even if the dialog is shown again
@@ -700,11 +833,11 @@ export class GameSession {
       }
       audio.play(kind === 'smog' ? 'alert' : 'event');
     }
-    const unlockedNote = this.endingUnlocks.length ? `<p class="unlock-note">New on the Scrap Coast: <b>${this.endingUnlocks.join(', ')}</b></p>` : '';
+    const unlockedNote = this.endingUnlocks.length ? `<p class="unlock-note">${t('end.unlocked', { cities: this.endingUnlocks.join(', ') })}</p>` : '';
     // A lost city keeps its last autosave (from the start of the day), so the player can retry from there.
     const retrySlot = kind === 'smog' && this.slot && slotMeta(this.slot) ? this.slot : null;
     const stars = city
-      ? `<ul class="goals">${city.goals.map((g, i) => `<li class="${s.stars[i] ? 'got' : ''}"><span class="star">★</span>${g.text}</li>`).join('')}</ul>`
+      ? `<ul class="goals">${city.goals.map((_, i) => `<li class="${s.stars[i] ? 'got' : ''}"><span class="star">★</span>${goalText(city, i)}</li>`).join('')}</ul>`
       : '';
     // After a Spire ending the city can keep going; clearing the outcome lets the sim run again.
     const keepBuilding = () => {
@@ -722,34 +855,34 @@ export class GameSession {
     let actions: ModalAction[];
     if (kind === 'smog') {
       const retry: ModalAction[] = retrySlot
-        ? [{ label: 'Load the last autosave', primary: true, hint: 'start of the day', onClick: () => this.handlers.onLoadSlot(retrySlot) }]
+        ? [{ label: t('end.loadAutosave'), primary: true, hint: t('end.loadAutosave.hint'), onClick: () => this.handlers.onLoadSlot(retrySlot) }]
         : [];
       actions = s.cityId
         ? [
             ...retry,
-            { label: 'Restart this city', primary: !retrySlot, hint: 'stars stay', onClick: () => this.handlers.onRestartCity() },
-            { label: 'Region map', onClick: () => this.handlers.onRegionMap() },
+            { label: t('end.restart'), primary: !retrySlot, hint: t('end.restart.hint'), onClick: () => this.handlers.onRestartCity() },
+            { label: t('end.regionMap'), onClick: () => this.handlers.onRegionMap() },
           ]
         : [
             ...retry,
-            { label: 'New city', primary: !retrySlot, onClick: () => this.handlers.onNewGame() },
-            { label: 'Main menu', onClick: () => this.handlers.onExitToMenu() },
+            { label: t('end.newCity'), primary: !retrySlot, onClick: () => this.handlers.onNewGame() },
+            { label: t('end.mainMenu'), onClick: () => this.handlers.onExitToMenu() },
           ];
     } else if (s.cityId) {
       actions = [
-        { label: 'Region map', primary: true, onClick: leave(() => this.handlers.onRegionMap()) },
-        { label: 'Keep building here', hint: 'earn the stars you missed', onClick: keepBuilding },
+        { label: t('end.regionMap'), primary: true, onClick: leave(() => this.handlers.onRegionMap()) },
+        { label: t('end.keepHere'), hint: t('end.keepHere.hint'), onClick: keepBuilding },
       ];
     } else {
       actions = [
-        { label: 'Keep building', primary: true, onClick: keepBuilding },
-        { label: 'New city', onClick: leave(() => this.handlers.onNewGame()) },
-        { label: 'Main menu', onClick: leave(() => this.handlers.onExitToMenu()) },
+        { label: t('end.keep'), primary: true, onClick: keepBuilding },
+        { label: t('end.newCity'), onClick: leave(() => this.handlers.onNewGame()) },
+        { label: t('end.mainMenu'), onClick: leave(() => this.handlers.onExitToMenu()) },
       ];
     }
     openModal({
-      title: e.title,
-      eyebrow: `${s.cityName} · ${e.subtitle}`,
+      title: endingTitle(kind),
+      eyebrow: `${s.cityName} · ${endingSubtitle(kind)}`,
       wide: true,
       dismissable: false,
       className: `modal-ending ending-${kind}`,
@@ -758,14 +891,14 @@ export class GameSession {
         ${stars}
         ${unlockedNote}
         <dl class="stats">
-          <dt>Days</dt><dd>${s.outcome.day}</dd>
-          <dt>Citizens</dt><dd>${Math.floor(s.pop)}</dd>
-          <dt>Scrap collected</dt><dd>${Math.floor(s.stats.scrapCollected)}</dd>
-          <dt>Buildings</dt><dd>${s.stats.built}</dd>
-          <dt>Sludge cleaned</dt><dd>${s.stats.cleaned}</dd>
-          <dt>Credits earned</dt><dd>${Math.floor(s.stats.creditsEarned)}</dd>
-          <dt>Path</dt><dd>${s.alignment >= 0 ? `${Math.round(s.alignment)} green` : `${Math.round(-s.alignment)} industrial`}</dd>
-          <dt>Final smog</dt><dd>${Math.round(s.pollution)}%</dd>
+          <dt>${t('end.days')}</dt><dd>${s.outcome.day}</dd>
+          <dt>${t('end.citizens')}</dt><dd>${Math.floor(s.pop)}</dd>
+          <dt>${t('end.scrap')}</dt><dd>${Math.floor(s.stats.scrapCollected)}</dd>
+          <dt>${t('end.buildings')}</dt><dd>${s.stats.built}</dd>
+          <dt>${t('end.sludge')}</dt><dd>${s.stats.cleaned}</dd>
+          <dt>${t('end.credits')}</dt><dd>${Math.floor(s.stats.creditsEarned)}</dd>
+          <dt>${t('end.path')}</dt><dd>${s.alignment >= 0 ? t('end.pathGreen', { n: Math.round(s.alignment) }) : t('end.pathIndustrial', { n: Math.round(-s.alignment) })}</dd>
+          <dt>${t('end.smog')}</dt><dd>${Math.round(s.pollution)}%</dd>
         </dl>`,
       actions,
     });
@@ -774,7 +907,7 @@ export class GameSession {
   private openPause(): void {
     const s = this.s;
     const settings = {
-      label: 'Settings',
+      label: t('menu.settings'),
       onClick: () =>
         openSettings(
           (set) => this.handlers.onSettingsChanged(set),
@@ -784,24 +917,24 @@ export class GameSession {
     let actions: ModalAction[];
     if (s.tutorial) {
       actions = [
-        { label: 'Resume', primary: true, onClick: closeModal },
+        { label: t('pause.resume'), primary: true, onClick: closeModal },
         settings,
         {
-          label: 'Skip the tutorial',
+          label: t('pause.skipTutorial'),
           onClick: () => {
             closeModal();
             this.tutorial?.dispose();
             this.endTutorial(false, false);
           },
         },
-        { label: 'Main menu', hint: 'the tutorial is not saved', onClick: () => this.handlers.onExitToMenu() },
+        { label: t('pause.mainMenu'), hint: t('pause.tutorialNotSaved'), onClick: () => this.handlers.onExitToMenu() },
       ];
     } else if (s.cityId) {
       actions = [
-        { label: 'Resume', primary: true, onClick: closeModal },
+        { label: t('pause.resume'), primary: true, onClick: closeModal },
         {
-          label: 'Region map',
-          hint: 'this city is saved',
+          label: t('pause.region'),
+          hint: t('pause.saved'),
           onClick: () => {
             this.save();
             this.handlers.onRegionMap();
@@ -809,8 +942,8 @@ export class GameSession {
         },
         settings,
         {
-          label: 'Main menu',
-          hint: 'this city is saved',
+          label: t('pause.mainMenu'),
+          hint: t('pause.saved'),
           onClick: () => {
             this.save();
             this.handlers.onExitToMenu();
@@ -819,12 +952,12 @@ export class GameSession {
       ];
     } else {
       actions = [
-        { label: 'Resume', primary: true, onClick: closeModal },
-        { label: 'Save game', onClick: () => openSlots('save', { state: s, onBack: () => this.openPause() }) },
-        { label: 'Load game', onClick: () => openSlots('load', { onLoad: (slot) => this.handlers.onLoadSlot(slot), onBack: () => this.openPause() }) },
+        { label: t('pause.resume'), primary: true, onClick: closeModal },
+        { label: t('pause.save'), onClick: () => openSlots('save', { state: s, onBack: () => this.openPause() }) },
+        { label: t('pause.load'), onClick: () => openSlots('load', { onLoad: (slot) => this.handlers.onLoadSlot(slot), onBack: () => this.openPause() }) },
         settings,
         {
-          label: 'Save & main menu',
+          label: t('pause.saveMenu'),
           onClick: () => {
             this.save();
             this.handlers.onExitToMenu();
@@ -833,9 +966,9 @@ export class GameSession {
       ];
     }
     openModal({
-      title: 'Paused',
-      eyebrow: `${s.cityName} · Day ${day(s)}`,
-      body: `<p class="pause-tip">Tip: <kbd>Q</kbd> asks USA-9 for a hint, <kbd>H</kbd> jumps back to the HQ, <kbd>Tab</kbd> changes speed.</p>`,
+      title: t('pause.title'),
+      eyebrow: t('pause.eyebrow', { city: s.cityName, day: day(s) }),
+      body: `<p class="pause-tip">${localizeKeys(t('pause.tip'))}</p>`,
       actions,
     });
   }

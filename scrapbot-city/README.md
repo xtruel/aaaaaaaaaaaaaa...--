@@ -1,4 +1,4 @@
-# Scrapbot City — build 0.4
+# Scrapbot City — build 0.5
 
 City builder in pixel art: piccoli robot raccolgono spazzatura, tu decidi cosa diventa.
 **Recycle × Build × Expand × Survive.** Un pianeta pulito o un profitto più grande?
@@ -13,11 +13,13 @@ npm install
 npm run dev          # gioco nel browser: http://localhost:3001
 npm run build        # dist/index.html: un unico file con codice, CSS e font
 npm run balance      # partite automatiche su tutte le città per controllare il bilanciamento
+npm run i18n:check   # controlla che le 7 traduzioni abbiano tutte le chiavi, i {segnaposto} e i tag dell'inglese
 npm run desktop      # app desktop (Electron)
 npm run dist:win     # build per Steam in release/ (anche dist:linux, dist:mac)
 ```
 
-Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, upload, pagina del negozio, prezzo.
+Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, Steam Cloud, Steam Deck, upload,
+pagina del negozio, prezzo. Per i test con giocatori veri c'è **[docs/PLAYTEST.md](docs/PLAYTEST.md)**.
 
 ## Modalità di gioco
 
@@ -45,6 +47,12 @@ Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achie
 - **Finali**: Garden City, 2PM Megacity, Different Futures, Smog Over. Dopo la Guglia si può continuare a costruire
   per prendere le stelle mancanti; se la città soffoca si riparte dall'ultimo salvataggio automatico.
 - **Salvataggi** automatici a ogni nuovo giorno, alla chiusura e quando la finestra viene nascosta. In free play ci sono anche 3 slot manuali.
+  Nella versione desktop sono file `.sav` nella cartella dell'utente, sincronizzabili con **Steam Cloud**.
+- **8 lingue**: English, Italiano, Deutsch, Français, Español, Português, Polski, Nederlands. Al primo avvio il gioco
+  usa la lingua del sistema; si cambia al volo dal globo nel menu o dalle impostazioni, anche a partita in corso.
+- **Controller e Steam Deck**: menu e dialoghi col D-pad, in città un cursore virtuale (vedi Comandi).
+- **Musica**: 4 brani chiptune sintetizzati dal codice — *Trash Today* (menu), *Rust & Sunshine* (città di giorno),
+  *Neon Hum* (città di notte), *Road Trip* (mappa della regione) — con dissolvenza da uno all'altro.
 - **Interfaccia**: chip colorate, guadagno al minuto di crediti e pezzi, pausa automatica quando la finestra è nascosta,
   pixel art nitida anche con lo schermo scalato al 125–150%.
 
@@ -60,7 +68,8 @@ Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achie
 
 ## Comandi
 
-Le scorciatoie usano la posizione fisica dei tasti, quindi funzionano anche su tastiere AZERTY e simili.
+Le scorciatoie usano la posizione fisica dei tasti, quindi funzionano anche su tastiere AZERTY e simili;
+i testi di aiuto mostrano i nomi dei tasti della tastiera del giocatore (per esempio ZQSD su AZERTY).
 
 | Azione | Tasti |
 |---|---|
@@ -74,6 +83,10 @@ Le scorciatoie usano la posizione fisica dei tasti, quindi funzionano anche su t
 | Tornare all'HQ | `H` |
 | Schermo intero (desktop) | `F11` |
 
+Con il **controller**: stick sinistro = cursore, stick destro = mappa, `A` costruisce o seleziona, `B` annulla,
+`LB`/`RB` scelgono l'edificio, `LT`/`RT` zoom, `X` ruspa, `Y` suggerimento, `Start` menu,
+D-pad = una casella alla volta, `View` pausa, `L3` velocità, `R3` torna all'HQ. Nei menu: D-pad o stick, `A` conferma, `B` indietro.
+
 ## Struttura
 
 ```
@@ -82,8 +95,12 @@ src/
   session.ts           partita in corso: loop, input, camera, dialoghi, finali
   campaign.ts          stelle, sblocchi, banca regionale, finale della regione
   achievements.ts      achievement locali e ponte verso Steam
-  storage.ts           impostazioni e slot di salvataggio
-  audio.ts             effetti e musica chiptune sintetizzati
+  storage.ts           impostazioni e slot di salvataggio (file su desktop, localStorage nel browser)
+  audio.ts             effetti sonori e lettore dei brani
+  music.ts             i 4 brani, scritti come note in battute da 16 step
+  gamepad.ts           controller: navigazione dei menu e cursore virtuale
+  keys.ts              nomi dei tasti secondo la tastiera del giocatore
+  i18n/                dizionari: en.ts è la fonte, poi it, de, fr, es, pt, pl, nl
   game/                logica pura, senza DOM (testabile in Node)
     defs.ts            edifici, costi, energia, smog, modificatori delle città
     cities.ts          le 5 città della campagna e i loro obiettivi a stelle
@@ -95,11 +112,12 @@ src/
   ui/                  menu, HUD, tutorial, regione, finestre di dialogo
 electron/              app desktop per Steam
 scripts/balance.ts     pilota automatico per il bilanciamento
+scripts/i18n-check.ts  controllo delle traduzioni
 docs/STEAM.md          guida alla pubblicazione su Steam
+docs/PLAYTEST.md       come organizzare un playtest e cosa osservare
 ```
 
 ## Ancora da fare
 
-- Salvataggi su file per Steam Cloud, supporto controller (Steam Deck), musica originale, localizzazione.
-- Font giapponese incluso nel gioco per la scritta スクラップボットシティ: ora usa i font di sistema, che su Linux e Steam Deck possono mancare.
-- Dettagli in [docs/STEAM.md](docs/STEAM.md), sezione 7.
+- Musica di un compositore, passata grafica di un artista pixel, playtest con persone nuove, revisione madrelingua delle traduzioni.
+- Dettagli in [docs/STEAM.md](docs/STEAM.md), sezione 9.

@@ -1,14 +1,16 @@
 // Dialogs shared by the main menu and the in-game pause menu.
-import { ACHIEVEMENTS, unlockedAchievements } from '../achievements';
+import { ACHIEVEMENTS, achDesc, achName, unlockedAchievements } from '../achievements';
 import { audio } from '../audio';
 import { BANK_FEE, loadCampaign, sendToBank, withdrawFromBank } from '../campaign';
-import { BUILDINGS, PATH_LABEL } from '../game/defs';
 import type { Hint } from '../game/hints';
 import type { GameState, OutcomeKind } from '../game/state';
-import { ENDINGS, SPEAKERS, endingText } from '../game/story';
+import { choiceLabel, endingSubtitle, endingText, endingTitle, eventText, eventTitle, speakerName, speakerRole } from '../game/story';
 import type { StoryEvent } from '../game/story';
+import { LANGS, bName, lang, t } from '../i18n';
+import { localizeKeys } from '../keys';
+import type { Key, Lang } from '../i18n';
 import { buildingThumb, iconUrl, portraitUrl } from '../render/icons';
-import { SLOTS, isTutorialDone, loadSettings, saveGame, saveSettings, slotMeta, unlockedEndings } from '../storage';
+import { isTutorialDone, loadSettings, openSavesFolder, saveGame, saveSettings, slotMeta, SLOTS, unlockedEndings } from '../storage';
 import type { Settings, SlotId } from '../storage';
 import { esc } from './escape';
 import { closeModal, openModal } from './modal';
@@ -21,24 +23,31 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, html?: 
 }
 
 function pathName(alignment: number): string {
-  if (alignment >= 35) return 'Green';
-  if (alignment <= -35) return 'Industrial';
-  return 'Balanced';
+  if (alignment >= 35) return t('path.green');
+  if (alignment <= -35) return t('path.industrial');
+  return t('path.balanced');
 }
 
 export function openSettings(onChange: (s: Settings) => void, onBack?: () => void): void {
   const settings = loadSettings();
   const body = el('form', 'settings-form');
   body.innerHTML = `
-    <label for="set-sfx">Sound effects <output data-out="sfx"></output></label>
+    <label for="set-lang">${t('settings.language')}</label>
+    <select id="set-lang">${LANGS.map((l) => `<option value="${l.id}" ${l.id === lang() ? 'selected' : ''}>${l.name}</option>`).join('')}</select>
+    <label for="set-sfx">${t('settings.sfx')} <output data-out="sfx"></output></label>
     <input id="set-sfx" type="range" min="0" max="1" step="0.05" value="${settings.sfx}" />
-    <label for="set-music">Music <output data-out="music"></output></label>
+    <label for="set-music">${t('settings.music')} <output data-out="music"></output></label>
     <input id="set-music" type="range" min="0" max="1" step="0.05" value="${settings.music}" />
-    <label class="check" for="set-crt"><input id="set-crt" type="checkbox" ${settings.crt ? 'checked' : ''} /> CRT scanlines</label>
-    <label class="check" for="set-edge"><input id="set-edge" type="checkbox" ${settings.edgeScroll ? 'checked' : ''} /> Scroll the map at screen edges</label>
-    <label class="check" for="set-motion"><input id="set-motion" type="checkbox" ${settings.reducedMotion ? 'checked' : ''} /> Reduce motion</label>
-    <label class="check" for="set-full"><input id="set-full" type="checkbox" ${settings.fullscreen ? 'checked' : ''} /> Fullscreen (F11)</label>
+    <label class="check" for="set-crt"><input id="set-crt" type="checkbox" ${settings.crt ? 'checked' : ''} /> ${t('settings.crt')}</label>
+    <label class="check" for="set-edge"><input id="set-edge" type="checkbox" ${settings.edgeScroll ? 'checked' : ''} /> ${t('settings.edge')}</label>
+    <label class="check" for="set-motion"><input id="set-motion" type="checkbox" ${settings.reducedMotion ? 'checked' : ''} /> ${t('settings.motion')}</label>
+    <label class="check" for="set-full"><input id="set-full" type="checkbox" ${settings.fullscreen ? 'checked' : ''} /> ${t('settings.fullscreen')}</label>
+    ${openSavesFolder ? `<button type="button" class="btn btn-small" data-saves>${t('settings.openSaves')}</button>` : ''}
   `;
+  body.querySelector('[data-saves]')?.addEventListener('click', () => {
+    audio.play('click');
+    openSavesFolder?.();
+  });
   const read = (): Settings => ({
     sfx: Number((body.querySelector('#set-sfx') as HTMLInputElement).value),
     music: Number((body.querySelector('#set-music') as HTMLInputElement).value),
@@ -46,24 +55,43 @@ export function openSettings(onChange: (s: Settings) => void, onBack?: () => voi
     edgeScroll: (body.querySelector('#set-edge') as HTMLInputElement).checked,
     reducedMotion: (body.querySelector('#set-motion') as HTMLInputElement).checked,
     fullscreen: (body.querySelector('#set-full') as HTMLInputElement).checked,
+    lang: (body.querySelector('#set-lang') as HTMLSelectElement).value as Lang,
   });
   const sync = () => {
     const s = read();
     body.querySelector('[data-out="sfx"]')!.textContent = `${Math.round(s.sfx * 100)}%`;
     body.querySelector('[data-out="music"]')!.textContent = `${Math.round(s.music * 100)}%`;
     saveSettings(s);
+    const relabel = s.lang !== lang();
     onChange(s);
+    // reopen in the new language, with the picker still focused
+    if (relabel) {
+      openSettings(onChange, onBack);
+      document.getElementById('set-lang')?.focus();
+    }
   };
   body.addEventListener('input', sync);
   body.addEventListener('change', () => audio.play('click'));
   body.addEventListener('submit', (e) => e.preventDefault());
   openModal({
-    title: 'Settings',
-    eyebrow: 'Options',
+    title: t('settings.title'),
+    eyebrow: t('settings.eyebrow'),
     body,
-    actions: [{ label: 'Done', primary: true, onClick: () => (onBack ? onBack() : closeModal()) }],
+    actions: [{ label: t('common.done'), primary: true, onClick: () => (onBack ? onBack() : closeModal()) }],
   });
   sync();
+}
+
+export function openLanguage(onPick: (l: Lang) => void): void {
+  const body = el('div', 'langs');
+  body.innerHTML = LANGS.map((l) => `<button type="button" class="lang-btn ${l.id === lang() ? 'active' : ''}" data-lang="${l.id}" lang="${l.id}">${l.name}</button>`).join('');
+  body.querySelectorAll<HTMLButtonElement>('[data-lang]').forEach((b) =>
+    b.addEventListener('click', () => {
+      audio.play('click');
+      onPick(b.dataset.lang as Lang);
+    }),
+  );
+  openModal({ title: t('menu.language'), eyebrow: 'Language · Sprache · Langue · Idioma · Lingua · Język · Taal', body });
 }
 
 export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLoad?: (slot: SlotId) => void; onBack?: () => void }): void {
@@ -74,11 +102,11 @@ export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLo
       if (mode === 'save' && slot === 'auto') continue;
       const meta = slotMeta(slot);
       const row = el('div', 'slot');
-      const label = slot === 'auto' ? 'Autosave' : `Slot ${slot}`;
+      const label = slot === 'auto' ? t('slots.auto') : t('slots.slot', { n: slot });
       row.innerHTML = meta
-        ? `<div><b>${label}</b><span>${esc(meta.city)} · Day ${meta.day} · ${meta.pop} citizens · ${pathName(meta.alignment)} path</span><small>${new Date(meta.savedAt).toLocaleString()}</small></div>`
-        : `<div><b>${label}</b><span class="empty">Empty</span></div>`;
-      const btn = el('button', 'btn btn-primary', mode === 'save' ? (meta ? 'Overwrite' : 'Save') : 'Load');
+        ? `<div><b>${label}</b><span>${t('slots.meta', { city: esc(meta.city), day: meta.day, pop: meta.pop, path: pathName(meta.alignment) })}</span><small>${new Date(meta.savedAt).toLocaleString(lang())}</small></div>`
+        : `<div><b>${label}</b><span class="empty">${t('slots.empty')}</span></div>`;
+      const btn = el('button', 'btn btn-primary', mode === 'save' ? (meta ? t('slots.overwrite') : t('slots.doSave')) : t('slots.doLoad'));
       btn.type = 'button';
       btn.disabled = mode === 'load' && !meta;
       btn.addEventListener('click', () => {
@@ -86,7 +114,7 @@ export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLo
         if (mode === 'save' && opts.state) {
           const ok = saveGame(slot, opts.state);
           audio.play(ok ? 'done' : 'error');
-          if (!ok) row.querySelector('span')!.textContent = 'Saving failed: browser storage is blocked or full.';
+          if (!ok) row.querySelector('span')!.textContent = t('slots.failed');
           else render();
         } else if (mode === 'load') {
           opts.onLoad?.(slot);
@@ -98,27 +126,27 @@ export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLo
   };
   render();
   openModal({
-    title: mode === 'save' ? 'Save game' : 'Load game',
-    eyebrow: 'Memory cards',
+    title: mode === 'save' ? t('slots.save') : t('slots.load'),
+    eyebrow: t('slots.eyebrow'),
     body,
-    actions: opts.onBack ? [{ label: 'Back', onClick: opts.onBack }] : undefined,
+    actions: opts.onBack ? [{ label: t('common.back'), onClick: opts.onBack }] : undefined,
   });
 }
 
 export function openCredits(): void {
   openModal({
-    title: 'Credits',
+    title: t('credits.title'),
     eyebrow: 'Qwerty3D Games',
     body: `
       <dl class="credits">
-        <dt>Game design &amp; art direction</dt><dd>Qwerty3D Games</dd>
-        <dt>Prototype build</dt><dd>Version 0.4 · Pixel Planet Initiative</dd>
-        <dt>Music &amp; sound</dt><dd>Procedural chiptune, synthesized live</dd>
-        <dt>Fonts</dt><dd>Bungee, Lilita One, Nunito, Silkscreen, Permanent Marker (SIL Open Font License)</dd>
-        <dt>Head of morale</dt><dd>Miso the cat</dd>
+        <dt>${t('credits.design')}</dt><dd>Qwerty3D Games</dd>
+        <dt>${t('credits.build')}</dt><dd>0.5 · Pixel Planet Initiative</dd>
+        <dt>${t('credits.music')}</dt><dd>${t('credits.musicValue')}</dd>
+        <dt>${t('credits.fonts')}</dt><dd>Bungee, Lilita One, Nunito, Silkscreen, Permanent Marker, DotGothic16 (SIL Open Font License)</dd>
+        <dt>${t('credits.morale')}</dt><dd>${t('credits.moraleValue')}</dd>
       </dl>
-      <p class="fine">© 2026 Qwerty3D. All rights reserved.</p>`,
-    actions: [{ label: 'Back', primary: true, onClick: closeModal }],
+      <p class="fine">${t('credits.rights')}</p>`,
+    actions: [{ label: t('common.back'), primary: true, onClick: closeModal }],
   });
 }
 
@@ -127,12 +155,11 @@ export function openExtras(): void {
   const kinds: OutcomeKind[] = ['green', 'balanced', 'industrial', 'smog'];
   const cards = kinds
     .map((k) => {
-      const e = ENDINGS[k];
       const open = unlocked.includes(k);
       return `<div class="ending-card ${open ? 'open' : 'locked'} ending-${k}">
-        <small>${e.subtitle}</small>
-        <b>${open ? e.title : '???'}</b>
-        <p>${open ? endingText(k, 'your city') : 'Finish a city to unlock this ending.'}</p>
+        <small>${endingSubtitle(k)}</small>
+        <b>${open ? endingTitle(k) : '???'}</b>
+        <p>${open ? endingText(k, t('end.yourCity')) : t('extras.locked')}</p>
       </div>`;
     })
     .join('');
@@ -140,67 +167,55 @@ export function openExtras(): void {
   const achievements = ACHIEVEMENTS.map(
     (a) => `<li class="ach ${got.includes(a.id) ? 'got' : ''}">
       <span class="ach-ico"><img src="${iconUrl(a.icon, 2)}" alt="" /></span>
-      <span><b>${a.name}</b><small>${a.desc}</small></span>
+      <span><b>${achName(a)}</b><small>${achDesc(a)}</small></span>
     </li>`,
   ).join('');
+  const list = (prefix: string, n: number) =>
+    Array.from({ length: n }, (_, i) => `<li>${t(`${prefix}.${i + 1}` as Key)}</li>`).join('');
   openModal({
-    title: 'Extras',
-    eyebrow: `Endings ${unlocked.length}/4 · Achievements ${got.length}/${ACHIEVEMENTS.length}`,
+    title: t('extras.title'),
+    eyebrow: t('extras.eyebrow', { e: unlocked.length, a: got.length, total: ACHIEVEMENTS.length }),
     wide: true,
     body: `
       <div class="ending-grid">${cards}</div>
-      <h3 class="extras-h">Achievements</h3>
+      <h3 class="extras-h">${t('extras.achievements')}</h3>
       <ul class="ach-grid">${achievements}</ul>
-      <h3 class="extras-h">How to play</h3>
-      <ul class="howto">
-        <li>Scrap bots collect junk on their own and bring it to the HQ or a Bot Dock.</li>
-        <li>Turn scrap into <b>parts</b> (Recycler) or <b>credits</b> (Smelter). Spend both to build.</li>
-        <li>Bot Pods bring citizens: they pay taxes and throw away junk, which your bots collect again.</li>
-        <li>Industrial buildings pay more but raise the smog. Above 95% smog for 30 seconds the city is lost.</li>
-        <li>Short on parts? The <b>+</b> next to parts imports them from 2PM for credits.</li>
-        <li>Every build and every choice moves you along the path meter. Finish the Scrap Spire to see where it leads.</li>
-        <li>Stuck? The light bulb asks USA-9 what to do next. Three hints per city are free.</li>
-      </ul>
-      <h3 class="extras-h">Controls</h3>
-      <ul class="howto keys">
-        <li><kbd>WASD</kbd> / arrows / drag: move the camera</li>
-        <li>Mouse wheel, pinch or <kbd>+</kbd> / <kbd>-</kbd>: zoom · <kbd>H</kbd>: back to the HQ</li>
-        <li><kbd>1</kbd>–<kbd>0</kbd>: pick a building · <kbd>M</kbd>: Scrap Spire · <kbd>X</kbd>: bulldoze · right click: cancel</li>
-        <li><kbd>Space</kbd>: pause · <kbd>Tab</kbd>: change speed · <kbd>Q</kbd>: hint · <kbd>Esc</kbd>: menu</li>
-      </ul>`,
-    actions: [{ label: 'Back', primary: true, onClick: closeModal }],
+      <h3 class="extras-h">${t('extras.howto')}</h3>
+      <ul class="howto">${list('extras.howto', 7)}</ul>
+      <h3 class="extras-h">${t('extras.controls')}</h3>
+      <ul class="howto keys">${localizeKeys(list('extras.controls', 4))}<li>${t('extras.controls.pad')}</li><li>${t('extras.controls.pad2')}</li></ul>`,
+    actions: [{ label: t('common.back'), primary: true, onClick: closeModal }],
   });
 }
 
 export function openPathInfo(): void {
   openModal({
-    title: 'Different futures, same city',
-    eyebrow: 'Your choices',
+    title: t('paths.title'),
+    eyebrow: t('paths.eyebrow'),
     wide: true,
     body: `
       <div class="paths">
-        <div class="path-col path-green"><b>${PATH_LABEL.green} path</b><p>Recycler, Solar Array, Pixel Garden, Fix-It Lab, Purifier. Slower money, cleaner air, happier citizens. Say no to 2PM's offers.</p></div>
-        <div class="path-col path-industrial"><b>${PATH_LABEL.industrial} path</b><p>Smelter, Scrap Burner, 2PM Factory. Fast credits and cheap power, paid for in smog. Say yes to 2PM.</p></div>
+        <div class="path-col path-green"><b>${t('paths.green')}</b><p>${t('paths.green.desc')}</p></div>
+        <div class="path-col path-industrial"><b>${t('paths.industrial')}</b><p>${t('paths.industrial.desc')}</p></div>
       </div>
-      <p>Every building and every story choice moves the path meter. When the Scrap Spire is finished, the meter decides which city you built: Green, Industrial, or something in between.</p>`,
-    actions: [{ label: 'Got it', primary: true, onClick: closeModal }],
+      <p>${t('paths.footer')}</p>`,
+    actions: [{ label: t('paths.ok'), primary: true, onClick: closeModal }],
   });
 }
 
 export function openStoryEvent(ev: StoryEvent, s: GameState, onDone: (result: string) => void): void {
-  const sp = SPEAKERS[ev.speaker];
   openModal({
-    title: ev.title,
-    eyebrow: `${sp.name} · ${sp.role}`,
+    title: eventTitle(ev),
+    eyebrow: `${speakerName(ev.speaker)} · ${speakerRole(ev.speaker)}`,
     portrait: portraitUrl(ev.speaker),
-    body: `<p class="story">${ev.text}</p>`,
+    body: `<p class="story">${eventText(ev)}</p>`,
     dismissable: false,
     className: `modal-story speaker-${ev.speaker}`,
-    actions: ev.choices.map((c) => ({
-      label: c.label,
+    actions: ev.choices.map((c, i) => ({
+      label: choiceLabel(ev, i),
       tone: c.path,
       disabled: c.available ? !c.available(s) : false,
-      hint: c.path === 'neutral' ? undefined : `${PATH_LABEL[c.path]} choice`,
+      hint: c.path === 'green' ? t('path.choice.green') : c.path === 'industrial' ? t('path.choice.industrial') : undefined,
       onClick: () => onDone(c.apply(s)),
     })),
   });
@@ -218,16 +233,16 @@ export function openModeChooser(h: ModeHandlers): void {
   body.innerHTML = `
     <button type="button" class="mode mode-campaign" data-mode="campaign">
       <span class="mode-art"><img src="${buildingThumb('spire')}" alt="" /></span>
-      <span class="mode-text"><b>Campaign</b><small>Five cities on the Scrap Coast, each with its own rules. 15 stars to earn.</small></span>
+      <span class="mode-text"><b>${t('modes.campaign')}</b><small>${t('modes.campaign.desc')}</small></span>
     </button>
     <button type="button" class="mode mode-free" data-mode="free">
       <span class="mode-art"><img src="${buildingThumb('pods')}" alt="" /></span>
-      <span class="mode-text"><b>Free play</b><small>One city, your name, any map seed. Build at your own pace.</small></span>
+      <span class="mode-text"><b>${t('modes.free')}</b><small>${t('modes.free.desc')}</small></span>
     </button>
     <button type="button" class="mode mode-tutorial" data-mode="tutorial">
-      ${learn ? '<span class="mode-badge">Start here</span>' : ''}
+      ${learn ? `<span class="mode-badge">${t('modes.startHere')}</span>` : ''}
       <span class="mode-art"><img src="${portraitUrl('usa')}" alt="" /></span>
-      <span class="mode-text"><b>Tutorial</b><small>USA-9 shows you the ropes in about five minutes.</small></span>
+      <span class="mode-text"><b>${t('modes.tutorial')}</b><small>${t('modes.tutorial.desc')}</small></span>
     </button>`;
   body.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -238,33 +253,33 @@ export function openModeChooser(h: ModeHandlers): void {
       else h.onTutorial();
     }),
   );
-  openModal({ title: 'New game', eyebrow: 'Pick how to play', body, wide: true });
+  openModal({ title: t('modes.title'), eyebrow: t('modes.eyebrow'), body, wide: true });
 }
 
 export function openHint(hint: Hint, footer: string, onShow?: () => void): void {
   openModal({
     title: hint.title,
-    eyebrow: 'USA-9 · Hint',
+    eyebrow: t('hint.eyebrow'),
     portrait: portraitUrl('usa'),
     className: 'modal-story speaker-usa',
     body: `<p class="story">${hint.text}</p><p class="fine">${footer}</p>`,
     actions: [
-      ...(hint.build && onShow ? [{ label: `Build ${BUILDINGS[hint.build].name}`, primary: true, onClick: onShow }] : []),
-      { label: 'Thanks!', primary: !hint.build, onClick: closeModal },
+      ...(hint.build && onShow ? [{ label: t('hint.build', { name: bName(hint.build) }), primary: true, onClick: onShow }] : []),
+      { label: t('common.thanks'), primary: !hint.build, onClick: closeModal },
     ],
   });
 }
 
 export function openHintPay(price: number, canPay: boolean, onPay: () => void): void {
   openModal({
-    title: 'Out of free hints',
-    eyebrow: 'USA-9 · Hint',
+    title: t('hint.pay.title'),
+    eyebrow: t('hint.eyebrow'),
     portrait: portraitUrl('usa'),
     className: 'modal-story speaker-usa',
-    body: `<p class="story">My free advice is used up for now. A fresh free hint comes back every 5 days. Or you can pay for some overtime: <b>${price} credits</b>, and the price goes up each time.</p>`,
+    body: `<p class="story">${t('hint.pay.text', { n: price })}</p>`,
     actions: [
-      { label: canPay ? `Pay ${price} credits` : `Need ${price} credits`, primary: true, disabled: !canPay, onClick: onPay },
-      { label: 'Not now', onClick: closeModal },
+      { label: canPay ? t('hint.pay.button', { n: price }) : t('hint.pay.need', { n: price }), primary: true, disabled: !canPay, onClick: onPay },
+      { label: t('common.notNow'), onClick: closeModal },
     ],
   });
 }
@@ -275,16 +290,16 @@ export function openTrade(s: GameState, onChange: () => void): void {
     const c = loadCampaign();
     const row = (res: 'credits' | 'parts', amounts: number[]) => `
       <div class="trade-row">
-        <span class="trade-res"><img src="${iconUrl(res)}" alt="" />${res === 'credits' ? 'Credits' : 'Parts'}</span>
-        <span class="trade-have">City <b>${Math.floor(s.res[res])}</b></span>
-        <span class="trade-have">Bank <b>${Math.floor(c.bank[res])}</b></span>
+        <span class="trade-res"><img src="${iconUrl(res)}" alt="" />${res === 'credits' ? t('res.credits') : t('res.parts')}</span>
+        <span class="trade-have">${t('trade.city')} <b>${Math.floor(s.res[res])}</b></span>
+        <span class="trade-have">${t('trade.bank')} <b>${Math.floor(c.bank[res])}</b></span>
         <span class="trade-btns">
-          ${amounts.map((a) => `<button type="button" class="btn" data-send="${res}:${a}" ${s.res[res] < a ? 'disabled' : ''}>Send ${a}</button>`).join('')}
-          ${amounts.map((a) => `<button type="button" class="btn tone-neutral" data-take="${res}:${a}" ${c.bank[res] < 1 ? 'disabled' : ''}>Take ${a}</button>`).join('')}
+          ${amounts.map((a) => `<button type="button" class="btn" data-send="${res}:${a}" ${s.res[res] < a ? 'disabled' : ''}>${t('trade.send', { n: a })}</button>`).join('')}
+          ${amounts.map((a) => `<button type="button" class="btn tone-neutral" data-take="${res}:${a}" ${c.bank[res] < 1 ? 'disabled' : ''}>${t('trade.take', { n: a })}</button>`).join('')}
         </span>
       </div>`;
     body.innerHTML = `
-      <p>The cargo blimp carries credits and parts between the cities of the Scrap Coast. It keeps ${Math.round(BANK_FEE * 100)}% of what you send as fuel.</p>
+      <p>${t('trade.intro', { fee: Math.round(BANK_FEE * 100) })}</p>
       ${row('credits', [100, 500])}
       ${row('parts', [20, 100])}`;
     body.querySelectorAll<HTMLButtonElement>('[data-send]').forEach((b) =>
@@ -308,10 +323,10 @@ export function openTrade(s: GameState, onChange: () => void): void {
   };
   render();
   openModal({
-    title: 'Cargo blimp',
-    eyebrow: 'Region bank',
+    title: t('trade.title'),
+    eyebrow: t('trade.eyebrow'),
     wide: true,
     body,
-    actions: [{ label: 'Done', primary: true, onClick: closeModal }],
+    actions: [{ label: t('common.done'), primary: true, onClick: closeModal }],
   });
 }
