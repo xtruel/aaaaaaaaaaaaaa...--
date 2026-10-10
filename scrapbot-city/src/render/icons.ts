@@ -86,6 +86,37 @@ export function buildingThumb(type: BuildingType): string {
   return url;
 }
 
+// Build bar and inspector pictures: a 2x close-up of a 32x32 window of the sprite. Whole sprites are up to
+// 140 px tall, and shrinking them to fit drops pixels; a whole-number zoom keeps the pixel art crisp.
+const THUMB_WINDOW = 32;
+// Where the window sits on each drawing, from its top (0) to its base (1): its most telling part.
+// Doors, signs and furnaces sit low (the default); the Fix-It Lab's wrench and the Spire's crown sit high.
+const THUMB_FOCUS: Partial<Record<BuildingType, number>> = { pods: 0.5, fixlab: 0, purifier: 0.75, burner: 0.75, spire: 0 };
+
+function firstOpaqueRow(c: HTMLCanvasElement): number {
+  const data = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+  for (let i = 3; i < data.length; i += 4) if (data[i] > 0) return Math.floor((i - 3) / 4 / c.width);
+  return 0;
+}
+
+export function toolThumb(type: BuildingType): string {
+  const key = `tool:${type}`;
+  const cached = urlCache.get(key);
+  if (cached) return cached;
+  const sp = buildingSprite(type).canvas;
+  const top = firstOpaqueRow(sp);
+  const sw = Math.min(THUMB_WINDOW, sp.width);
+  const sh = Math.min(THUMB_WINDOW, sp.height - top);
+  const sx = Math.floor((sp.width - sw) / 2);
+  const sy = top + Math.round((sp.height - top - sh) * (THUMB_FOCUS[type] ?? 1));
+  const size = THUMB_WINDOW * 2;
+  const [c, ctx] = makeCanvas(size, size);
+  ctx.drawImage(sp, sx, sy, sw, sh, (size - sw * 2) / 2, size - sh * 2, sw * 2, sh * 2);
+  const url = c.toDataURL();
+  urlCache.set(key, url);
+  return url;
+}
+
 export function portraitUrl(speaker: Speaker): string {
   const key = `portrait:${speaker}`;
   const cached = urlCache.get(key);

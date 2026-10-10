@@ -995,6 +995,12 @@ select {
   height: 16px;
 }
 
+.res-num {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
 .res b {
   font-family: var(--f-display);
   font-weight: 400;
@@ -1280,9 +1286,11 @@ select {
   transform: translateY(-2px) rotate(-3deg);
 }
 
+/* --top-l/c/r: how far down the top bar reaches over each third of the screen; --dock: the build bar's
+   distance from the bottom. Both are measured by the HUD, so panels in between never cover either bar. */
 .objective {
   position: absolute;
-  top: 74px;
+  top: calc(var(--top-l, 60px) + 14px);
   left: 10px;
   display: flex;
   gap: 10px;
@@ -1335,7 +1343,7 @@ select {
 .feed {
   position: absolute;
   left: 10px;
-  bottom: 200px;
+  bottom: calc(var(--dock, 186px) + 14px);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -1397,12 +1405,14 @@ select {
   }
 }
 
+/* between the goal card and the inspector (320 and 280 px wide): long translations wrap instead of covering them */
 .smog-alert {
   position: absolute;
-  top: 78px;
+  top: calc(var(--top-c, 64px) + 14px);
   left: 50%;
-  max-width: calc(100% - 20px);
+  max-width: max(280px, calc(100% - 700px));
   padding: 8px 18px;
+  text-align: center;
   font-family: var(--f-display);
   font-size: 15px;
   letter-spacing: 0.03em;
@@ -1426,9 +1436,9 @@ select {
   --path: var(--muted);
   position: absolute;
   right: 10px;
-  top: 78px;
+  top: calc(var(--top-r, 64px) + 14px);
   width: 280px;
-  max-height: calc(100% - 240px);
+  max-height: calc(100% - var(--top-r, 64px) - var(--dock, 186px) - 28px);
   overflow-y: auto;
   padding: 0 0 12px;
 }
@@ -1568,7 +1578,7 @@ select {
   right: 10px;
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   display: flex;
-  gap: 14px;
+  gap: 10px;
   padding: 8px 10px 10px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -1586,10 +1596,10 @@ select {
 
 .group-label {
   align-self: flex-start;
-  padding: 1px 10px;
+  padding: 1px 8px;
   font-family: var(--f-display);
   font-size: 12px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink);
   background: var(--g);
@@ -1631,7 +1641,7 @@ select {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 6px 4px 6px;
+  padding: 5px 3px 6px;
   background: var(--tile);
   border: 3px solid var(--ink);
   border-radius: 14px;
@@ -1649,8 +1659,10 @@ select {
   --tile: #7a3d24;
 }
 
+/* the Spire's price has four digits: a wider card keeps it on one line */
 .group-monument .tool {
   --tile: #6a5214;
+  width: 104px;
 }
 
 .tool:hover {
@@ -1674,20 +1686,21 @@ select {
   min-width: 20px;
 }
 
+/* pictures are 2x close-ups (64 px): shown at their own size, or at exactly half on small windows */
 .tool-plate {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 68px;
+  height: 68px;
   flex: none;
   background: rgba(255, 255, 255, 0.12);
   border: 2px solid rgba(26, 16, 51, 0.6);
-  border-radius: 12px;
+  border-radius: 14px;
 }
 
 .tool-plate img {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
 }
 
 .tool-name {
@@ -1698,18 +1711,20 @@ select {
   letter-spacing: 0.02em;
 }
 
+/* prices line up at the bottom even when a long name takes two lines */
 .tool-cost {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 3px;
+  margin-top: auto;
 }
 
 .cost {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 0 5px 0 2px;
+  gap: 1px;
+  padding: 0 4px 0 1px;
   font-size: 12px;
   font-weight: 900;
   background: rgba(18, 11, 41, 0.6);
@@ -1733,6 +1748,25 @@ select {
 .tool.cant {
   filter: saturate(0.4);
   opacity: 0.6;
+}
+
+/* the goal card's next step: a soft ring that breathes until the goal is done (a still ring with reduced motion) */
+.tool.next::after {
+  content: '';
+  position: absolute;
+  inset: -4px -4px -8px;
+  border: 3px solid var(--yellow);
+  border-radius: 17px;
+  box-shadow: 0 0 10px 1px rgba(255, 210, 63, 0.5);
+  pointer-events: none;
+  animation: next-ring 1.8s ease-in-out infinite;
+}
+
+@keyframes next-ring {
+  50% {
+    opacity: 0.35;
+    transform: scale(1.03);
+  }
 }
 
 .tool.cant .cost {
@@ -2555,9 +2589,10 @@ input[type='number'] {
 
 /* ---------- toasts (achievements) ---------- */
 
+/* in a city the HUD sets --toast-top just below its top bar and smog alarm */
 .toasts {
   position: fixed;
-  top: 70px;
+  top: var(--toast-top, 70px);
   left: 50%;
   z-index: 50;
   display: flex;
@@ -3164,6 +3199,69 @@ body.crt-on .crt {
 
 /* ---------- small screens ---------- */
 
+/* Below 1600 px the top bar would wrap to a second row and push the panels under it down: chips put their
+   limit or income rate under the number, the clock stacks day over time and the meters get shorter bars,
+   so it stays one row down to 1280 px, income rates included. */
+@media (max-width: 1599px) {
+  .res {
+    padding-right: 9px;
+  }
+
+  .res-num {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+  }
+
+  .res b {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .res small {
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  .res small:empty {
+    display: none;
+  }
+
+  .bar {
+    width: 104px;
+  }
+
+  .track {
+    width: 96px;
+  }
+
+  .clock {
+    gap: 8px;
+  }
+
+  .clock-time {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .clock-time b {
+    padding: 1px 8px 0;
+    font-size: 13px;
+  }
+
+  .clock-time small {
+    padding-left: 2px;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  .speed button {
+    min-width: 30px;
+    padding: 0 6px;
+  }
+}
+
 @media (max-width: 1100px) {
   .ticker {
     display: none;
@@ -3232,7 +3330,7 @@ body.crt-on .crt {
 
   .objective {
     top: auto;
-    bottom: 208px;
+    bottom: calc(var(--dock, 186px) + 14px);
     max-width: calc(100% - 20px);
   }
 
@@ -3242,14 +3340,14 @@ body.crt-on .crt {
   }
 
   .feed {
-    bottom: 290px;
+    bottom: calc(var(--dock, 186px) + 96px);
   }
 
   .inspector {
     top: auto;
     left: 10px;
     right: 10px;
-    bottom: 208px;
+    bottom: calc(var(--dock, 186px) + 14px);
     width: auto;
     max-height: 45%;
   }
@@ -3354,6 +3452,28 @@ body.crt-on .crt {
   .menu-list .chip {
     width: 30px;
     height: 30px;
+  }
+}
+
+/* short windows: build pictures at exactly half size (the plain 1x sprite, still crisp) leave room for the map */
+@media (max-height: 600px) {
+  .toolbar {
+    padding-block: 6px 8px;
+  }
+
+  .tool-group {
+    gap: 4px;
+  }
+
+  .tool-plate {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .tool-plate img {
+    width: 32px;
+    height: 32px;
   }
 }
 

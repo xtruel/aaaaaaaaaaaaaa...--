@@ -83,7 +83,6 @@ export class GameSession implements PadTarget {
   private endingShown = false;
   private smogWarned = false;
   private cameraMoved = false;
-  private hintUsed = false;
   private pausedByHide = false;
   private newlyUnlocked: string[] = [];
   private endingUnlocks: string[] = [];
@@ -163,6 +162,7 @@ export class GameSession implements PadTarget {
     this.alive = false;
     cancelAnimationFrame(this.raf);
     for (const d of this.disposers) d();
+    this.hud.dispose();
     this.tutorial?.dispose();
     this.root.innerHTML = '';
     this.root.hidden = true;
@@ -269,7 +269,7 @@ export class GameSession implements PadTarget {
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.1;
       this.hud.update(s, { speed: this.speed, build: this.build, bulldoze: this.bulldoze, selectedId: this.selectedId });
-      this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hintUsed: this.hintUsed, hq: this.hqBox() });
+      this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hq: this.hqBox() });
     }
   }
 
@@ -749,7 +749,6 @@ export class GameSession implements PadTarget {
   private askHint(): void {
     if (isModalOpen()) return;
     const s = this.s;
-    this.hintUsed = true;
     unlock('hint');
     // asking twice for the same thing on the same day, or being told to wait, costs nothing
     const next = suggest(s);
