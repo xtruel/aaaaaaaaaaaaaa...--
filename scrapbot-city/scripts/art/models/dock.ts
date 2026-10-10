@@ -7,7 +7,7 @@ import type { BuildingArt } from './common';
 export const dock: BuildingArt = {
   frames: 4,
   fps: 4,
-  model(frame) {
+  model(frame, working) {
     const v = footprint(2, 2, 34);
     plate(v);
     // hangar
@@ -19,7 +19,7 @@ export const dock: BuildingArt = {
     for (let z = 3; z < 12; z++) v.box(6, 29, z, 18, 30, z + 1, z % 2 ? M.steel : M.steelL);
     hazardBand(v, 5, 29, 12, 19, 30, 13);
     // windows on the right wall
-    windowsX(v, 28, 6, 26, 8, 13, 5, 5, 3, 3, () => M.cyanLit);
+    windowsX(v, 28, 6, 26, 8, 13, 5, 5, 3, 3, () => (working ? M.cyanLit : M.window));
     // landing pad on the roof
     v.box(13, 11, 16, 29, 29, 17, M.dark);
     v.cylZ(21, 20, 7.6, 17, 18, M.hazardY, 6.4);
@@ -32,13 +32,14 @@ export const dock: BuildingArt = {
       [27, 27],
       [14, 27],
     ];
-    ring.forEach(([x, y], i) => v.box(x, y, 17, x + 2, y + 2, 18, i === frame % 4 ? M.limeLit : M.limeD));
+    ring.forEach(([x, y], i) => v.box(x, y, 17, x + 2, y + 2, 18, working && i === frame % 4 ? M.limeLit : M.limeD));
     // control tower with the bot face
     v.box(4, 4, 16, 12, 12, 27, M.white);
     v.box(3, 3, 27, 13, 13, 28, M.pink);
-    botFaceY(v, 12, 5, 11, 18, 25, frame === 3);
+    if (working) botFaceY(v, 12, 5, 11, 18, 25, frame === 3);
+    else v.box(5, 12, 18, 11, 13, 25, M.ink);
     v.box(7, 7, 28, 8, 8, 33, M.steelL);
-    v.box(6, 6, 32, 9, 9, 34, M.redLit);
+    v.box(6, 6, 32, 9, 9, 34, working ? M.redLit : M.red);
     v.point('light', 7.5, 7.5, 34);
     v.point('pad', 21, 20, 18);
     return v;

@@ -80,3 +80,25 @@ export function rubbleModel(variant: number): Vox {
   for (let k = 0; k < 6; k++) v.set(Math.floor(r(k + 70) * 15), Math.floor(r(k + 80) * 15), 0, M.concreteL);
   return v;
 }
+
+// Street lamps on the curbs of the old streets ('x' = street along x, lamp on its front curb; 'y' = along y).
+// They stand on buildable tiles: the game hides one as soon as a building covers its tile.
+export function lampModel(axis: 'x' | 'y'): Vox {
+  const v = new Vox(16, 16, 24);
+  const [px, py] = axis === 'x' ? [3, 14] : [14, 3];
+  v.box(px - 1, py - 1, 0, px + 2, py + 2, 1, M.steelD); // foot
+  v.box(px, py, 1, px + 1, py + 1, 20, M.steel);
+  // arm over the street and the lamp head
+  if (axis === 'x') {
+    v.box(px, py - 4, 19, px + 1, py, 20, M.steel);
+    v.box(px - 1, py - 6, 18, px + 2, py - 3, 19, M.steelD);
+    v.box(px, py - 5, 17, px + 1, py - 4, 18, M.yellowLit);
+  } else {
+    v.box(px - 4, py, 19, px, py + 1, 20, M.steel);
+    v.box(px - 6, py - 1, 18, px - 3, py + 2, 19, M.steelD);
+    v.box(px - 5, py, 17, px - 4, py + 1, 18, M.yellowLit);
+  }
+  // a pink 2PM banner on every lamp
+  v.box(axis === 'x' ? px + 1 : px, axis === 'x' ? py : py + 1, 10, axis === 'x' ? px + 2 : px + 1, axis === 'x' ? py + 1 : py + 2, 15, M.pink);
+  return v;
+}

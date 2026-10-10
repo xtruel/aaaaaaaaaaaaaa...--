@@ -7,8 +7,10 @@ import type { BuildingArt } from './common';
 export const hq: BuildingArt = {
   frames: 4,
   fps: 2,
-  model(frame) {
+  model(frame, working) {
     const v = footprint(3, 3, 64);
+    // without power the windows, screens and beacon go dark
+    const on = (m: number) => (working ? m : M.window);
     plate(v);
     bollards(v, 3);
     // ground floor: dark block with a lighter plinth
@@ -20,13 +22,14 @@ export const hq: BuildingArt = {
     // entrance porch on the front-left wall
     v.box(18, 40, 3, 30, 43, 15, M.steel);
     v.box(20, 41, 3, 28, 43, 12, M.ink);
-    v.box(21, 42, 3, 27, 43, 11, M.cyanLit);
+    v.box(21, 42, 3, 27, 43, 11, on(M.cyanLit));
     v.box(23, 42, 3, 25, 43, 11, M.screen);
     v.box(17, 40, 15, 31, 44, 16, M.steelL); // canopy
     // big screen with the bot face over the entrance
-    botFaceY(v, 41, 15, 33, 16, 24, frame === 2);
+    if (working) botFaceY(v, 41, 15, 33, 16, 24, frame === 2);
+    else v.box(15, 41, 16, 33, 42, 24, M.ink);
     // windows either side
-    const lit = (i: number, j: number) => (hash(i, j, 3) > 0.35 ? M.yellowLit : M.window);
+    const lit = (i: number, j: number) => (working && hash(i, j, 3) > 0.35 ? M.yellowLit : M.window);
     windowsY(v, 40, 7, 15, 8, 23, 4, 6, 2, 3, lit);
     windowsY(v, 40, 34, 42, 8, 23, 4, 6, 2, 3, (i, j) => lit(i + 5, j));
     // right wall: 2PM sign panel
@@ -38,8 +41,8 @@ export const hq: BuildingArt = {
     // upper floor: white with a pink band and a strip of cyan windows
     v.box(9, 8, 26, 39, 37, 39, M.white);
     v.paint(9, 8, 35, 39, 37, 37, M.pink);
-    for (let x = 11; x < 37; x += 3) v.box(x, 36, 29, x + 2, 37, 33, M.cyanLit);
-    for (let y = 10; y < 35; y += 3) v.box(38, y, 29, 39, y + 2, 33, M.cyanLit);
+    for (let x = 11; x < 37; x += 3) v.box(x, 36, 29, x + 2, 37, 33, on(M.cyanLit));
+    for (let y = 10; y < 35; y += 3) v.box(38, y, 29, 39, y + 2, 33, on(M.cyanLit));
     v.box(8, 7, 39, 40, 38, 40, M.steelL); // roof slab
     v.box(10, 9, 40, 38, 36, 41, M.steel);
     // the ears: pink outside, white inside, like USA-9
@@ -60,7 +63,7 @@ export const hq: BuildingArt = {
     for (let k = -4; k <= 4; k++) v.box(35 + dx * k, 11 + dy * k, 46, 36 + dx * k, 12 + dy * k, 47, M.white);
     // antenna with a red light
     v.box(11, 10, 41, 12, 11, 62, M.steelL);
-    v.box(10, 9, 61, 13, 12, 64, M.redLit);
+    v.box(10, 9, 61, 13, 12, 64, working ? M.redLit : M.red);
     v.point('light', 11.5, 10.5, 63);
     // pipes down the back-right corner
     v.cylZ(43.5, 7.5, 1.5, 3, 26, M.steelL);

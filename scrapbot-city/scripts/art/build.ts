@@ -20,7 +20,7 @@ import { ART } from './models/index';
 import { BOT_FRAMES, DIRS, botModel, facing } from './models/bot';
 import type { BotPose } from './models/bot';
 import { edgeTiles, grassTiles, groundStyles, groundTiles, outerTiles, roadTiles, sludgeTiles, waterTiles } from './models/terrain';
-import { junkModel, rubbleModel } from './models/props';
+import { junkModel, lampModel, rubbleModel } from './models/props';
 import { CAT_FRAMES, CITIZEN_FRAMES, CITIZEN_VARIANTS, catModel, citizenModel } from './models/characters';
 import type { CatPose } from './models/characters';
 import { DECOR } from './models/decor';
@@ -176,6 +176,7 @@ for (let size = 0; size < 3; size++)
     addRendered(`p/junk/${size}/${k}`, r);
   }
 for (let k = 0; k < 4; k++) addRendered(`p/rubble/${k}`, render(rubbleModel(k)));
+for (const axis of ['x', 'y'] as const) addRendered(`p/lamp/${axis}`, render(lampModel(axis)));
 
 // ---------- hand-made overrides ----------
 const safe = (name: string) => name.replace(/\//g, '_');

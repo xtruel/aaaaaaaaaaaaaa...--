@@ -5,6 +5,28 @@ foglio di riferimento v0.6) **senza toccare la simulazione**. La griglia, le imp
 regole di piazzamento, l'economia, gli eventi, i salvataggi e l'interfaccia restano come sono: cambia
 solo il modo in cui il mondo viene disegnato e come un punto dello schermo diventa una casella.
 
+## 0. Valutazione del renderer originale (build 0.5.x)
+
+Nella build minificata pubblicata (0.5.x, vista dall'alto) le funzioni citate nel brief corrispondono a:
+
+| Nome minificato | Sorgente | Cosa faceva |
+|---|---|---|
+| `Vo` | `builders` in `src/render/sprites.ts` | disegno procedurale di ogni edificio visto di fronte/dall'alto (rettangoli `px()`, `box()` "finto 3D") |
+| `Te` | `buildingSprite()` in `src/render/sprites.ts` | canvas per tipo, cache `Map`, spostamento verticale `EXTRA[type]` |
+| `La` | `paintTerrainTile()` | una casella 16×16 nella cache del terreno (erba, melma, macerie, rottami) |
+| `is` | `paintGround()` | terreno di base e la griglia delle vecchie strade (`ty % 11 === 4`, `tx % 14 === 6`) |
+| `os` | `paintJunk()` | mucchio di rottami come macchia piatta con pezzi colorati |
+
+Coordinate e interazione nella 0.5.x: mondo in unità di 16 per casella, camera = angolo in alto a sinistra in unità
+mondo, `screen = (world − cam) · pxZoom` (zoom intero sui pixel del dispositivo), `screenToTile = floor(world / 16)`.
+L'impronta di un edificio (x, y, w, h) era anche il suo rettangolo di clic (`s.occ`), e gli sprite sporgevano solo
+verso l'alto di `EXTRA` pixel. L'ordine di disegno era per riga (`y` della base), corretto solo perché tutto stava sulla
+stessa griglia ortogonale. Bot e gatto erano sprite laterali 8×9.
+
+Limiti che hanno portato alla migrazione: nessun volume reale (i lati erano rettangoli colorati), un'unica faccia
+visibile, ombre come rettangoli, e i clic non potevano colpire ciò che si vede sopra altre caselle. La simulazione invece
+era già separata dal disegno (stato puro in `src/game/`), quindi si è potuto cambiare solo il disegno.
+
 ## 1. Architettura attuale (cosa c'è e cosa cambia)
 
 | Parte | File | Cosa fa oggi | Con l'isometrico |

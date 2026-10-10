@@ -52,6 +52,7 @@ export interface ViewState {
 
 interface BotVis {
   z: number;
+  carry: number; // last carried amount, to notice an unload
   lx: number;
   ly: number;
   dir: number; // 0 sw, 1 se, 2 ne, 3 nw
@@ -80,6 +81,8 @@ const K_BOT = 2;
 const K_CAT = 3;
 const K_WALKER = 4;
 const K_DECOR = 5;
+const K_LAMP = 6;
+const POOL = [4, 8, 10, 8, 4]; // half-widths of a lamp's light pool, row by row
 
 
 function valueNoise(x: number, y: number, salt: number): number {
@@ -115,6 +118,16 @@ export class Renderer {
   private floaters: Floater[] = [];
   private blimp = { x: 0, y: 0, active: false, timer: 20 };
   private shake = 0; // seconds of camera shake left (demolition, storms)
+  private lamps: { tx: number; ty: number; axis: 'x' | 'y' }[] = [];
+  // short flashes on buildings: a production cycle ends, construction completes
+  private pulses: { x: number; y: number; id: number; t: number; dur: number; kind: 'produce' | 'built' }[] = [];
+  // the area being placed or hovered: buildings in front of it are drawn see-through
+  private focus: { x0: number; x1: number; y0: number; y1: number; sx0: number; sy0: number; sx1: number; sy1: number } | null = null;
+  // adaptive quality: drops the costliest extras when frames get slow, restores them when it is fast again
+  quality: 'high' | 'low' = 'high';
+  private frameAvg = 16;
+  private slowFor = 0;
+  private fastFor = 0;
   private walkers = new Walkers();
   private scenery: SceneryItem[] = [];
   private sceneryTaken = new Set<number>();
@@ -284,6 +297,16 @@ export class Renderer {
     const sc = placeScenery(s.seed, RING, decorArt);
     this.scenery = sc.items;
     this.sceneryTaken = sc.taken;
+    // street lamps every third tile on the curbs of the old streets (not on crossings, not on the canal)
+    this.lamps = [];
+    for (let ty = -RING; ty < MAP_H + RING; ty++)
+      for (let tx = -RING; tx < MAP_W + RING; tx++) {
+        const row = isRoadRow(ty);
+        const col = isRoadCol(tx);
+        if (row === col || isCanal(tx, ty)) continue;
+        if (row && ((tx % 3) + 3) % 3 === 1) this.lamps.push({ tx, ty, axis: 'x' });
+        if (col && ((ty % 3) + 3) % 3 === 1) this.lamps.push({ tx, ty, axis: 'y' });
+      }
     const ctx = this.tctx;
     ctx.clearRect(0, 0, this.terrain.width, this.terrain.height);
     const tx0 = -RING;
@@ -445,12 +468,16 @@ export class Renderer {
         break;
       case 'built':
       case 'placed':
+        if (fx.kind === 'built') this.pulses.push({ x: fx.x, y: fx.y, id: -1, t: 0, dur: 0.7, kind: 'built' });
         for (let k = 0; k < 22; k++) this.spawn(X + (Math.random() - 0.5) * 30, Y - Math.random() * 10, (Math.random() - 0.5) * 50, -Math.random() * 45, 0.9, 1, k % 3 === 0 ? PAL.white : k % 3 === 1 ? PAL.lime : PAL.sky, 0);
         for (let k = 0; k < 8; k++) this.spawn(X + (Math.random() - 0.5) * 36, Y + 4, (Math.random() - 0.5) * 20, -4 - Math.random() * 6, 1.4, 3, '#8f8a9e', 2.5);
         if (fx.text) this.float(X, Y - 40, fx.text, PAL.lime);
         break;
       case 'produce':
         if (fx.text) this.float(X, Y - 28, fx.text, fx.coins ? PAL.yellow : PAL.cyan);
+        // the sim reports the centre 10 units up: the building is the one under (x, y + 10)
+        this.pulses.push({ x: fx.x, y: fx.y + 10, id: -1, t: 0, dur: 0.3, kind: 'produce' });
+        for (let k = 0; k < 5; k++) this.spawn(X + (Math.random() - 0.5) * 14, Y - 20, (Math.random() - 0.5) * 10, -18 - Math.random() * 14, 0.7, 1, fx.coins ? PAL.yellow : PAL.cyan, 0);
         break;
       case 'clean':
         for (let k = 0; k < 10; k++) this.spawn(X, Y, (Math.random() - 0.5) * 20, -15 - Math.random() * 20, 1, 1, PAL.cyan, 0);
@@ -499,9 +526,19 @@ export class Renderer {
       }
     }
     this.trackRemovals(s, view.reducedMotion);
+    this.adaptQuality(dt);
+    this.updateFocus(view);
+    this.resolvePulses(s, dt);
 
-    ctx.drawImage(this.terrain, this.tox - camX, this.toy - camY);
-    if (!view.reducedMotion) {
+    // only the visible part of the terrain cache is copied
+    {
+      const sx = Math.max(0, camX - this.tox);
+      const sy = Math.max(0, camY - this.toy);
+      const sw = Math.min(this.terrain.width - sx, this.viewW - Math.max(0, this.tox - camX));
+      const sh = Math.min(this.terrain.height - sy, this.viewH - Math.max(0, this.toy - camY));
+      if (sw > 0 && sh > 0) ctx.drawImage(this.terrain, sx, sy, sw, sh, Math.max(0, this.tox - camX), Math.max(0, this.toy - camY), sw, sh);
+    }
+    if (!view.reducedMotion && this.quality === 'high') {
       this.drawSludgeBubbles(s, camX, camY);
       this.drawWaterGlints(camX, camY);
     }
@@ -511,7 +548,7 @@ export class Renderer {
     if (simRunning) this.walkers.update(s, dt, Math.max(1, citizenVariants()));
     this.updateBlimp(s, dt, simRunning && !view.reducedMotion);
     this.collect(s, view, camX, camY);
-    this.drawShadows(s, camX, camY);
+    if (this.quality === 'high') this.drawShadows(s, camX, camY);
     this.drawGroundMarks(s, view, camX, camY);
     this.drawObjects(s, view, camX, camY, img);
     this.drawCollapsing(dt, camX, camY, img);
@@ -525,6 +562,91 @@ export class Renderer {
     this.drawLighting(s, camX, camY, img);
     this.drawSmog(s, view.reducedMotion);
     this.drawFloaters(dt, camX, camY);
+  }
+
+  // Average frame time decides the quality: below ~40 fps for 2 s the shadow layer, water glints and
+  // ambient particles go; above ~55 fps for 6 s they come back.
+  private adaptQuality(dt: number): void {
+    if (dt <= 0) return;
+    this.frameAvg += (dt * 1000 - this.frameAvg) * 0.05;
+    if (this.frameAvg > 25) {
+      this.slowFor += dt;
+      this.fastFor = 0;
+      if (this.slowFor > 2) this.quality = 'low';
+    } else if (this.frameAvg < 18) {
+      this.fastFor += dt;
+      this.slowFor = 0;
+      if (this.fastFor > 6) this.quality = 'high';
+    }
+  }
+
+  private updateFocus(view: ViewState): void {
+    const h = view.hover;
+    if (!h || !(view.build || view.bulldoze || (view.hoverId ?? -1) < 0)) {
+      this.focus = null;
+      if (!h) return;
+    }
+    let x0 = h.x;
+    let y0 = h.y;
+    let w = 1;
+    let d = 1;
+    if (view.build) {
+      const def = BUILDINGS[view.build];
+      w = def.w;
+      d = def.h;
+      x0 = h.x - Math.floor((def.w - 1) / 2);
+      y0 = h.y - Math.floor((def.h - 1) / 2);
+    } else if (!view.bulldoze) {
+      this.focus = null; // plain hovering: no see-through, buildings stay solid
+      return;
+    }
+    const height = view.build ? (buildingArt[view.build]?.height ?? 20) : 4;
+    this.focus = {
+      x0: x0 * TILE,
+      x1: (x0 + w) * TILE,
+      y0: y0 * TILE,
+      y1: (y0 + d) * TILE,
+      sx0: (x0 - (y0 + d)) * TILE,
+      sx1: (x0 + w - y0) * TILE,
+      sy0: ((x0 + y0) * TILE) / 2 - height,
+      sy1: ((x0 + w + y0 + d) * TILE) / 2,
+    };
+  }
+
+  // Is this building in front of the area being placed, and covering it on screen?
+  private coversFocus(b: Building, sx: number, sy: number, w: number, h: number): boolean {
+    const f = this.focus;
+    if (!f) return false;
+    if (sx >= f.sx1 || sy >= f.sy1 || sx + w <= f.sx0 || sy + h <= f.sy0) return false;
+    const def = BUILDINGS[b.type];
+    const bx0 = b.x * TILE;
+    const by0 = b.y * TILE;
+    const bx1 = (b.x + def.w) * TILE;
+    const by1 = (b.y + def.h) * TILE;
+    const focusBehind = f.x1 <= bx0 || f.y1 <= by0;
+    const buildingBehind = bx1 <= f.x0 || by1 <= f.y0;
+    return focusBehind && !buildingBehind;
+  }
+
+  private resolvePulses(s: GameState, dt: number): void {
+    let w = 0;
+    for (let i = 0; i < this.pulses.length; i++) {
+      const p = this.pulses[i];
+      if (p.id < 0) {
+        const tx = Math.floor(p.x / TILE);
+        const ty = Math.floor(p.y / TILE);
+        p.id = inBounds(tx, ty) ? s.occ[idx(tx, ty)] : -1;
+        if (p.id < 0) continue;
+      }
+      p.t += dt;
+      if (p.t < p.dur) this.pulses[w++] = p;
+    }
+    this.pulses.length = w;
+  }
+
+  private pulseOf(id: number): { t: number; dur: number; kind: 'produce' | 'built' } | null {
+    for (const p of this.pulses) if (p.id === id) return p;
+    return null;
   }
 
   private updateTileHeights(s: GameState): void {
@@ -668,12 +790,36 @@ export class Renderer {
       it.kind = K_DECOR;
       it.ref = k;
     }
+    // street lamps, only where no building stands
+    for (let k = 0; k < this.lamps.length; k++) {
+      const l = this.lamps[k];
+      if (inBounds(l.tx, l.ty) && (s.occ[idx(l.tx, l.ty)] !== -1 || s.tiles[idx(l.tx, l.ty)] !== T.GROUND)) continue;
+      const f = frame(`p/lamp/${l.axis}`);
+      if (!f) break;
+      const top = tileTop(l.tx, l.ty);
+      const sx = top.X - f.ax;
+      const sy = top.Y - f.ay;
+      if (sx > vx1 || sy > vy1 || sx + f.w < vx0 || sy + f.h < vy0) continue;
+      const it = sorter.add();
+      it.x0 = l.tx * TILE + (l.axis === 'x' ? 2 : 13);
+      it.x1 = it.x0 + 3;
+      it.y0 = l.ty * TILE + (l.axis === 'x' ? 13 : 2);
+      it.y1 = it.y0 + 3;
+      it.z0 = 0;
+      it.z1 = 20;
+      it.sx0 = sx;
+      it.sy0 = sy;
+      it.sx1 = sx + f.w;
+      it.sy1 = sy + f.h;
+      it.kind = K_LAMP;
+      it.ref = k;
+    }
   }
 
   private botVis(s: GameState, bot: Bot, now: number, reduced: boolean): BotVis {
     let v = this.bots.get(bot.id);
     if (!v) {
-      v = { z: 16, lx: bot.x, ly: bot.y, dir: 0, seen: now };
+      v = { z: 16, lx: bot.x, ly: bot.y, dir: 0, seen: now, carry: bot.carry };
       this.bots.set(bot.id, v);
     }
     const dt = Math.min(0.1, Math.max(0, now - v.seen));
@@ -683,6 +829,13 @@ export class Renderer {
     if (Math.abs(mx) + Math.abs(my) > 0.05) v.dir = Math.abs(mx) > Math.abs(my) ? (mx > 0 ? 1 : 3) : my > 0 ? 0 : 2;
     v.lx = bot.x;
     v.ly = bot.y;
+    if (v.carry > 0 && bot.carry < v.carry && bot.state !== 'collect' && !reduced) {
+      // dropped its load into a hopper: a little burst of scrap falling into the roof
+      const X = bot.x - bot.y;
+      const Y = (bot.x + bot.y) / 2 - v.z + 2;
+      for (let k = 0; k < 6; k++) this.spawn(X + (Math.random() - 0.5) * 6, Y, (Math.random() - 0.5) * 16, 6 + Math.random() * 14, 0.45, 1, k % 2 ? PAL.rust : PAL.steelLL, 0);
+    }
+    v.carry = bot.carry;
     const under = this.heightNear(bot.x, bot.y);
     let target = Math.max(16, under + 6);
     if (bot.state === 'collect') target = 4;
@@ -705,7 +858,8 @@ export class Renderer {
     const art = buildingArt[b.type];
     if (b.built < 1) return `b/${b.type}/c${Math.min(3, Math.floor(b.built * 4))}`;
     if (!art) return `b/${b.type}/off`;
-    const animate = ALWAYS_ANIMATED.has(b.type) ? !b.paused : isWorking(s, b);
+    // always-animated buildings (radar, lights, elevators) still go dark without power or when paused
+    const animate = ALWAYS_ANIMATED.has(b.type) ? !b.paused && b.status !== 'noPower' : isWorking(s, b);
     if (!animate) return `b/${b.type}/off`;
     const f = Math.floor(this.clock * art.fps + b.id * 0.37) % art.frames;
     return `b/${b.type}/w${f}`;
@@ -815,6 +969,18 @@ export class Renderer {
     this.footprintRows(tx * TILE, ty * TILE, (tx + w) * TILE, (ty + h) * TILE, camX, camY, (y, l, r) => ctx.fillRect(l, y, r - l + 1, 1));
   }
 
+  private outlineWorldRect(x0: number, y0: number, x1: number, y1: number, color: string, camX: number, camY: number): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = color;
+    this.footprintRows(x0, y0, x1, y1, camX, camY, (y, l, r, first, last) => {
+      if (first || last) ctx.fillRect(l, y, r - l + 1, 1);
+      else {
+        ctx.fillRect(l, y, 2, 1);
+        ctx.fillRect(r - 1, y, 2, 1);
+      }
+    });
+  }
+
   private outlineFootprint(tx: number, ty: number, w: number, h: number, color: string, camX: number, camY: number): void {
     const ctx = this.ctx;
     ctx.fillStyle = color;
@@ -862,6 +1028,12 @@ export class Renderer {
         const sx = Math.round(w.x - w.y) - f.ax;
         const sy = Math.round((w.x + w.y) / 2) - f.ay;
         ctx.drawImage(img, f.x, f.y, f.w, f.h, sx - camX, sy - camY, f.w, f.h);
+      } else if (it.kind === K_LAMP) {
+        const l = this.lamps[it.ref];
+        const f = frame(`p/lamp/${l.axis}`);
+        if (!f) continue;
+        const top = tileTop(l.tx, l.ty);
+        ctx.drawImage(img, f.x, f.y, f.w, f.h, top.X - f.ax - camX, top.Y - f.ay - camY, f.w, f.h);
       } else if (it.kind === K_DECOR) {
         this.drawScenery(this.scenery[it.ref], camX, camY, img, view.reducedMotion);
       }
@@ -988,8 +1160,27 @@ export class Renderer {
     const sy = top.Y - f.ay;
     const x = sx - camX;
     const y = sy - camY;
+    // a building standing in front of the spot being built on turns see-through, so the spot stays readable
+    const seeThrough = this.coversFocus(b, sx, sy, f.w, f.h);
+    if (seeThrough) ctx.globalAlpha = 0.35;
     ctx.drawImage(img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
+    if (seeThrough) ctx.globalAlpha = 1;
     this.pushDrawn(K_BUILDING, b.id, idxOf, f, sx, sy, f.w, f.h);
+    // a short flash when a production cycle ends, a longer one (and a ring on the ground) when it is finished
+    const pulse = this.pulseOf(b.id);
+    if (pulse && !view.reducedMotion) {
+      const k = 1 - pulse.t / pulse.dur;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = (pulse.kind === 'built' ? 0.55 : 0.22) * k;
+      ctx.drawImage(img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      if (pulse.kind === 'built') {
+        const def = BUILDINGS[b.type];
+        const grow = Math.round((1 - k) * 10);
+        this.outlineWorldRect(b.x * TILE - grow, b.y * TILE - grow, (b.x + def.w) * TILE + grow, (b.y + def.h) * TILE + grow, k > 0.5 ? PAL.lime : PAL.white, camX, camY);
+      }
+    }
     if (b.built < 1) {
       // scaffolding frames come from the art; add the progress bar and a welding bot on the cut
       const def = BUILDINGS[b.type];
@@ -1139,6 +1330,25 @@ export class Renderer {
   }
 
   private emitAmbient(s: GameState, dt: number): void {
+    if (this.quality === 'high') {
+      const dark = darkness(dayPhase(s));
+      const vx = Math.round(this.cam.x);
+      const vy = Math.round(this.cam.y);
+      // scraps of paper and leaves blown along the streets (more of them in a dirty city)
+      if (Math.random() < dt * (0.8 + s.pollution / 50)) {
+        const X = vx + Math.random() * this.viewW;
+        const Y = vy + this.viewH * (0.2 + Math.random() * 0.7);
+        const col = s.pollution > 50 ? '#8a7f6a' : Math.random() < 0.5 ? '#b9b4cc' : PAL.greenL;
+        this.spawn(X, Y, 14 + Math.random() * 10, -2 + Math.random() * 3, 2.2, 1, col, 0);
+      }
+      // fireflies over the gardens at night
+      if (dark > 0.35)
+        for (const b of s.buildings) {
+          if (b.type !== 'garden' || b.built < 1 || Math.random() > dt * 0.8) continue;
+          const top = tileTop(b.x, b.y);
+          this.spawn(top.X + (Math.random() - 0.5) * 20, top.Y + 4 + Math.random() * 8, (Math.random() - 0.5) * 6, -3 - Math.random() * 4, 1.6, 1, PAL.lime, 0);
+        }
+    }
     for (const b of s.buildings) {
       if (b.built < 1) continue;
       const art = buildingArt[b.type];
@@ -1259,6 +1469,27 @@ export class Renderer {
           ctx.drawImage(img, f.x, f.y, f.w, f.h, top.X - f.ax - camX, top.Y - f.ay - camY, f.w, f.h);
         }
       ctx.globalAlpha = prev;
+    }
+    // street lamps: the lamp head glows and throws a pool of light on the street
+    {
+      const lf = frame('p/lamp/x/g');
+      const lg = frame('p/lamp/y/g');
+      for (const l of this.lamps) {
+        if (inBounds(l.tx, l.ty) && (s.occ[idx(l.tx, l.ty)] !== -1 || s.tiles[idx(l.tx, l.ty)] !== T.GROUND)) continue;
+        const top = tileTop(l.tx, l.ty);
+        const x = top.X - camX;
+        const y = top.Y - camY;
+        if (x < -40 || x > this.viewW + 40 || y < -40 || y > this.viewH + 40) continue;
+        const g = l.axis === 'x' ? lf : lg;
+        if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, top.X - g.ax - camX, top.Y - g.ay - camY, g.w, g.h);
+        // the pool: a small diamond of warm light under the head
+        const cx = l.axis === 'x' ? 3 : 9;
+        const cy = l.axis === 'x' ? 9 : 3;
+        const px = Math.round(top.X + cx - cy) - camX;
+        const py = Math.round(top.Y + (cx + cy) / 2) - camY;
+        ctx.fillStyle = 'rgba(255,212,64,0.12)';
+        for (let r = 0; r < POOL.length; r++) ctx.fillRect(px - POOL[r], py - 2 + r, POOL[r] * 2, 1);
+      }
     }
     for (const d of this.scenery) {
       const fr = d.frames > 1 ? Math.floor(this.clock * d.fps + d.tx * 0.37 + d.ty * 0.61) % d.frames : 0;

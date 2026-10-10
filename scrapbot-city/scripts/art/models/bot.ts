@@ -48,12 +48,16 @@ export function botModel(pose: BotPose, frame: number): Vox {
   }
   // a cube of scrap held under the body
   if (pose === 'carry') {
+    // the load hangs under the body and swings; two small side thrusters keep the bot up
     v.clear(3, 3, 0, 7, 7, z0);
-    v.box(3, 3, 0, 7, 7, 3, M.rust);
-    v.box(4, 3, 2, 6, 5, 3, M.steelL);
-    v.box(3, 6, 0, 5, 7, 2, M.rustD);
+    const sw = frame % 2;
+    v.box(3 + sw, 3, 0, 7 + sw, 7, 3, M.rust);
+    v.box(4 + sw, 3, 2, 6 + sw, 5, 3, M.steelL);
+    v.box(3 + sw, 6, 0, 5 + sw, 7, 2, M.rustD);
     v.box(2, 4, 1, 3, 6, 4, M.steelL);
     v.box(7, 4, 1, 8, 6, 4, M.steelL);
+    v.box(0, 4, z0 - 1 - sw, 1, 6, z0 + 1, M.cyanLit);
+    v.box(9, 4, z0 - 2 + sw, 10, 6, z0 + 1, M.cyanLit);
   }
   return v;
 }
