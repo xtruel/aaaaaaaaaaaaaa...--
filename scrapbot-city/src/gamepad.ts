@@ -72,9 +72,14 @@ function current(list: HTMLElement[]): HTMLElement | null {
   return active && list.includes(active) ? active : null;
 }
 
-// Where the focus starts when nothing in the dialog has it yet.
+// Where the focus starts when nothing in the dialog has it yet (never on the × that closes it).
 function start(list: HTMLElement[]): HTMLElement {
-  return list.find((el) => el.classList.contains('selected')) ?? list.find((el) => el.classList.contains('btn-primary')) ?? list[0];
+  return (
+    list.find((el) => el.classList.contains('selected')) ??
+    list.find((el) => el.classList.contains('btn-primary')) ??
+    list.find((el) => !el.classList.contains('modal-x')) ??
+    list[0]
+  );
 }
 
 function nudgeValue(el: HTMLElement, dir: 1 | -1): boolean {

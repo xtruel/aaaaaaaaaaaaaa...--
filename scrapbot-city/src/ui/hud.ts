@@ -1,9 +1,9 @@
 // In-game DOM interface: resource bar, meters, goal, toolbar, inspector and message feed.
 import { audio } from '../audio';
-import { buildCost, canAfford, costText, refundFor } from '../game/actions';
+import { buildCost, canAfford, costText, partsReserve, refundFor } from '../game/actions';
 import { cityById, goalText } from '../game/cities';
 import { freeHintsLeft, hintPrice } from '../game/hints';
-import { BUILDINGS, BUILD_ORDER, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, SMOG_DANGER, SMOG_LIMIT_SECONDS } from '../game/defs';
+import { BUILD_ORDER, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, PARTS_RESERVE, SMOG_DANGER, SMOG_LIMIT_SECONDS } from '../game/defs';
 import type { BuildingType, Cost } from '../game/defs';
 import { dayPhase } from '../game/sim';
 import { day } from '../game/state';
@@ -35,11 +35,12 @@ export interface HudView {
   selectedId: number;
 }
 
-function statusText(b: Building): string {
+function statusText(s: GameState, b: Building): string {
   const def = BUILDINGS[b.type];
   if (b.status === 'noInput' && def.process) {
     return t('status.waiting', { what: costText(def.process.input) });
   }
+  if (b.status === 'reserve') return t('status.reserve', { n: partsReserve(s) });
   return tk(`status.${b.status satisfies BuildingStatus}`);
 }
 
@@ -358,6 +359,8 @@ export class Hud {
     this.root.querySelector('[data-res="scrap"]')!.classList.toggle('warn', s.res.scrap >= d.storage);
     this.root.querySelector('[data-res="happy"]')!.classList.toggle('warn', d.happiness < 35);
     this.root.querySelector('[data-import]')!.classList.toggle('cant', s.res.credits < IMPORT_PARTS.credits);
+    // out of parts with credits to spare: the import button asks to be noticed
+    this.root.querySelector('[data-import]')!.classList.toggle('nudge', s.res.parts < PARTS_RESERVE && s.res.credits >= IMPORT_PARTS.credits * 2);
 
     const pol = Math.round(s.pollution);
     set('smog', `${pol}%${d.pollutionRate > 0.01 ? ' ▲' : d.pollutionRate < -0.01 ? ' ▼' : ''}`);
@@ -432,7 +435,7 @@ export class Hud {
     const def = BUILDINGS[b.type];
     const status = panel.querySelector<HTMLElement>('[data-status]');
     if (status) {
-      const text = statusText(b);
+      const text = statusText(s, b);
       if (status.textContent !== text) status.textContent = text;
       status.className = `insp-status status-${b.status}`;
     }
@@ -468,7 +471,7 @@ export class Hud {
         </div>
         <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
       </div>
-      <p class="insp-status status-${b.status}" data-status>${statusText(b)}</p>
+      <p class="insp-status status-${b.status}" data-status>${statusText(s, b)}</p>
       <div class="progress"><span data-progress></span></div>
       <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
       <p class="insp-desc">${esc(bDesc(b.type))}</p>

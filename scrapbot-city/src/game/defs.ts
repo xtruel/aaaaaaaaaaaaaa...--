@@ -116,7 +116,8 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     type: 'recycler',
     w: 2,
     h: 2,
-    cost: { credits: 40, parts: 10 },
+    // credits only: the one building that makes parts must never be out of reach for lack of parts
+    cost: { credits: 50 },
     path: 'neutral',
     energy: -2,
     pollution: 0,
@@ -140,7 +141,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     type: 'solar',
     w: 2,
     h: 2,
-    cost: { credits: 60, parts: 20 },
+    cost: { credits: 40, parts: 35 },
     path: 'green',
     energy: 5,
     pollution: 0,
@@ -199,7 +200,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     type: 'fixlab',
     w: 2,
     h: 2,
-    cost: { credits: 90, parts: 40 },
+    cost: { credits: 50, parts: 70 },
     path: 'green',
     energy: -2,
     pollution: 0,
@@ -212,7 +213,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     type: 'purifier',
     w: 2,
     h: 2,
-    cost: { credits: 100, parts: 30 },
+    cost: { credits: 70, parts: 50 },
     path: 'green',
     energy: -3,
     pollution: -0.08,
@@ -253,6 +254,8 @@ export const SMOG_LIMIT_SECONDS = 30; // seconds above SMOG_DANGER before game o
 export const SMOG_DANGER = 95;
 // 2PM sells parts. Priced above what a Factory earns per part, so importing never prints money.
 export const IMPORT_PARTS = { parts: 10, credits: 160 };
+// Factories and Fix-It Labs never use the last parts: there is always enough left to build with.
+export const PARTS_RESERVE = 20;
 export const BULLDOZE_RUBBLE_COST = 15;
 export const BOT_SPEED = 30; // px per second
 export const BOT_CARRY = 5;

@@ -1,6 +1,6 @@
 // Player and event actions that change the city: placing, demolishing, spawning junk.
 import { t, tk } from '../i18n';
-import { ALIGN_BUILD_SHIFT, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, MAP_H, MAP_W, T, TILE } from './defs';
+import { ALIGN_BUILD_SHIFT, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, MAP_H, MAP_W, PARTS_RESERVE, T, TILE } from './defs';
 import type { BuildingType, Cost, Resource } from './defs';
 import { addBuilding, buildingCenter, idx, inBounds, pushMessage, removeBuilding } from './state';
 import type { Building, GameState } from './state';
@@ -52,6 +52,7 @@ export function buildCost(s: GameState, type: BuildingType): Cost {
 export interface PlaceCheck {
   ok: boolean;
   reason?: string;
+  costOnly?: boolean; // the spot is fine, only the price is not
 }
 
 export function placeCheck(s: GameState, type: BuildingType, x: number, y: number): PlaceCheck {
@@ -75,7 +76,7 @@ export function placeCheck(s: GameState, type: BuildingType, x: number, y: numbe
     }
   }
   const cost = buildCost(s, type);
-  if (!canAfford(s, cost)) return { ok: false, reason: t('place.costs', { cost: costText(cost) }) };
+  if (!canAfford(s, cost)) return { ok: false, reason: t('place.costs', { cost: costText(cost) }), costOnly: true };
   return { ok: true };
 }
 
@@ -122,16 +123,37 @@ export function demolish(s: GameState, b: Building): boolean {
   return true;
 }
 
-export function importParts(s: GameState): boolean {
-  if (s.res.credits < IMPORT_PARTS.credits) {
-    pushMessage(s, t('msg.importCost', { n: IMPORT_PARTS.credits }), 'bad');
+// Buys parts from 2PM in packs of IMPORT_PARTS.parts; every pack nudges the city toward Industry.
+export function importParts(s: GameState, packs = 1): boolean {
+  const credits = IMPORT_PARTS.credits * packs;
+  if (packs < 1 || s.res.credits < credits) {
+    pushMessage(s, t('msg.importCost', { n: credits }), 'bad');
     return false;
   }
-  s.res.credits -= IMPORT_PARTS.credits;
-  s.res.parts += IMPORT_PARTS.parts;
-  shiftAlignment(s, -1);
-  pushMessage(s, t('msg.imported', { parts: IMPORT_PARTS.parts, credits: IMPORT_PARTS.credits }), 'info');
+  s.res.credits -= credits;
+  s.res.parts += IMPORT_PARTS.parts * packs;
+  shiftAlignment(s, -packs);
+  pushMessage(s, t('msg.imported', { parts: IMPORT_PARTS.parts * packs, credits }), 'info');
   return true;
+}
+
+// Parts that Factories and Fix-It Labs leave alone. Normally a small reserve for building; once the city
+// has 30 citizens and the credits for the Spire, they save up the Spire's parts too, so it can be built.
+export function partsReserve(s: GameState): number {
+  if (s.pop >= 30 && !s.buildings.some((b) => b.type === 'spire')) {
+    const cost = buildCost(s, 'spire');
+    if (s.res.credits >= (cost.credits ?? 0)) return Math.max(PARTS_RESERVE, cost.parts ?? 0);
+  }
+  return PARTS_RESERVE;
+}
+
+// Packs of parts needed to build `type` when parts are the only thing missing and the credits cover them; else 0.
+export function packsToBuild(s: GameState, type: BuildingType): number {
+  const cost = buildCost(s, type);
+  const short = Math.max(0, (cost.parts ?? 0) - Math.floor(s.res.parts));
+  if (short === 0 || s.res.scrap < (cost.scrap ?? 0)) return 0;
+  const packs = Math.ceil(short / IMPORT_PARTS.parts);
+  return s.res.credits >= (cost.credits ?? 0) + packs * IMPORT_PARTS.credits ? packs : 0;
 }
 
 export function bulldozeRubble(s: GameState, x: number, y: number): boolean {

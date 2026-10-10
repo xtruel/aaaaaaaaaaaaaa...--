@@ -1,4 +1,4 @@
-# Scrapbot City — build 0.5
+# Scrapbot City — build 0.5.1
 
 City builder in pixel art: piccoli robot raccolgono spazzatura, tu decidi cosa diventa.
 **Recycle × Build × Expand × Survive.** Un pianeta pulito o un profitto più grande?

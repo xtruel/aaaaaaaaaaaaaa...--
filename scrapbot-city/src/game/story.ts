@@ -270,8 +270,12 @@ export const EVENTS: StoryEvent[] = [
   },
 ];
 
+// A repeatable event waits at least this long (game seconds, 4 days) before it can come back.
+const RERUN_GAP = 240;
+
 export function pickEvent(s: GameState): StoryEvent | null {
-  const pool = EVENTS.filter((e) => (e.repeatable || !s.eventsSeen.includes(e.id)) && e.when(s));
+  const recent = (e: StoryEvent) => s.time - (s.eventLast[e.id] ?? -Infinity) < RERUN_GAP;
+  const pool = EVENTS.filter((e) => (e.repeatable ? !recent(e) : !s.eventsSeen.includes(e.id)) && e.when(s));
   if (pool.length === 0) return null;
   // Prefer events the player has not seen yet.
   const fresh = pool.filter((e) => !s.eventsSeen.includes(e.id));

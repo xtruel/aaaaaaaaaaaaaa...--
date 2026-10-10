@@ -75,6 +75,7 @@ export class RegionMap {
     const next = CITIES.find((city) => isUnlocked(c, city) && !progressOf(c, city.id).spireDone);
     this.selected = next?.id ?? this.selected;
     this.render();
+    if (document.body.classList.contains('pad-mode')) this.root.querySelector<HTMLElement>('[data-play]')?.focus();
     const loop = (now: number) => {
       this.t = now / 1000;
       this.paint();
@@ -126,6 +127,10 @@ export class RegionMap {
         this.selected = b.dataset.city as CityId;
         this.confirmRestart = false;
         this.render();
+        // with a controller, jump straight to "Travel here" (a locked city keeps the focus on its node)
+        if (document.body.classList.contains('pad-mode')) {
+          (this.root.querySelector<HTMLElement>('[data-play]') ?? this.root.querySelector<HTMLElement>(`[data-city="${this.selected}"]`))?.focus();
+        }
       }),
     );
     this.renderPanel();

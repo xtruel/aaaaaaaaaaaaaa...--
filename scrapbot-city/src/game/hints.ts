@@ -1,7 +1,7 @@
 // USA-9's advice: reads the city and recommends the single most useful next step.
-import { t } from '../i18n';
+import { bName, t } from '../i18n';
 import { buildCost, canAfford, costText } from './actions';
-import { BUILDINGS, SMOG_DANGER, T } from './defs';
+import { BUILDINGS, IMPORT_PARTS, PARTS_RESERVE, SMOG_DANGER, T } from './defs';
 import type { BuildingType } from './defs';
 import { FREE_HINTS } from './state';
 import type { GameState } from './state';
@@ -10,6 +10,7 @@ export interface Hint {
   title: string;
   text: string;
   build?: BuildingType;
+  free?: boolean; // "wait for it" and rescue advice (empty or broke city) never cost a hint
 }
 
 export const HINT_BASE_PRICE = 40;
@@ -29,10 +30,26 @@ const has = (s: GameState, type: BuildingType) => count(s, type) > 0;
 
 function afford(s: GameState, type: BuildingType): string {
   const cost = buildCost(s, type);
-  return canAfford(s, cost) ? t('hint.afford.yes', { cost: costText(cost) }) : t('hint.afford.no', { cost: costText(cost) });
+  if (canAfford(s, cost)) return t('hint.afford.yes', { cost: costText(cost) });
+  // only parts missing, and credits to spare: saving up is the wrong advice, importing is the right one
+  const partsShort = Math.max(0, (cost.parts ?? 0) - Math.floor(s.res.parts));
+  const importCost = Math.ceil(partsShort / IMPORT_PARTS.parts) * IMPORT_PARTS.credits;
+  if (partsShort > 0 && s.res.credits >= (cost.credits ?? 0) + importCost && s.res.scrap >= (cost.scrap ?? 0)) {
+    return t('hint.afford.import', { cost: costText(cost) });
+  }
+  return t('hint.afford.no', { cost: costText(cost) });
 }
 
+// USA-9 never asks for a building that is already going up: it says to wait for it instead.
 export function suggest(s: GameState): Hint {
+  const hint = pick(s);
+  if (hint.build && s.buildings.some((b) => b.type === hint.build && b.built < 1)) {
+    return { title: t('hint.wait.title'), text: t('hint.wait.text', { name: bName(hint.build) }), free: true };
+  }
+  return hint;
+}
+
+function pick(s: GameState): Hint {
   const d = s.derived;
   const leansGreen = s.alignment >= 0;
   const industry = s.buildings.filter((b) => BUILDINGS[b.type].path === 'industrial' && !b.paused);
@@ -48,8 +65,25 @@ export function suggest(s: GameState): Hint {
     return { title: t('hint.clearAir.title'), text: t('hint.clearAir.text', { n: smog, afford: afford(s, 'purifier') }), build: 'purifier' };
   }
 
+  // a city that has emptied out, or spent everything: the way back is demolishing and pausing
+  if (s.pop < 1 && d.housing > 0 && d.happiness < 35) {
+    return { title: t('hint.ghost.title'), text: t('hint.ghost.text', { happy: Math.round(d.happiness), smog }), free: true };
+  }
+  // (with citizens around, taxes refill the coffers on their own: no need to tear anything down)
+  if (s.res.credits < 30 && s.res.parts < 10 && s.pop < 3 && s.buildings.length > 3) {
+    return { title: t('hint.broke.title'), text: t('hint.broke.text', { credits: Math.floor(s.res.credits), parts: Math.floor(s.res.parts) }), free: true };
+  }
+
   if (!has(s, 'recycler')) {
     return { title: t('hint.parts.title'), text: t('hint.parts.text', { afford: afford(s, 'recycler') }), build: 'recycler' };
+  }
+
+  // rich in credits but out of parts (the industrial trap): import, don't wait
+  if (s.res.parts < PARTS_RESERVE + 5 && s.res.credits >= IMPORT_PARTS.credits * 3) {
+    return {
+      title: t('hint.import.title'),
+      text: t('hint.import.text', { n: Math.floor(s.res.parts), parts: IMPORT_PARTS.parts, credits: IMPORT_PARTS.credits, reserve: PARTS_RESERVE }),
+    };
   }
 
   if (d.efficiency < 1) {
@@ -67,7 +101,18 @@ export function suggest(s: GameState): Hint {
     };
   }
 
-  if (s.res.scrap >= d.storage * 0.9) {
+  // a pile of parts and few credits: more Recyclers would only make it worse, a converter helps
+  const converter: BuildingType = leansGreen ? 'fixlab' : 'factory';
+  if (s.res.parts > 150 && s.res.credits < 400 && count(s, converter) < 4) {
+    return {
+      title: t('hint.convert.title'),
+      text: t(leansGreen ? 'hint.convert.fixlab' : 'hint.convert.factory', { n: Math.floor(s.res.parts), afford: afford(s, converter) }),
+      build: converter,
+    };
+  }
+
+  // full storage only matters while parts are short; with a pile of parts it is fine
+  if (s.res.scrap >= d.storage * 0.9 && s.res.parts < 150) {
     const pick: BuildingType = count(s, 'recycler') <= 1 ? 'recycler' : 'dock';
     return {
       title: t('hint.storage.title'),
@@ -84,39 +129,21 @@ export function suggest(s: GameState): Hint {
     return { title: t('hint.pods.title'), text: t('hint.pods.text', { afford: afford(s, 'pods') }), build: 'pods' };
   }
 
-  if (d.happiness < 40) {
-    return { title: t('hint.happy.title'), text: t('hint.happy.text', { n: Math.round(d.happiness) }), build: 'garden' };
-  }
-
-  if (s.pop >= d.housing - 1) {
+  // same order as the goal card: power comes right after the first pods
+  if (!has(s, 'solar') && !has(s, 'burner')) {
+    const pick: BuildingType = leansGreen ? 'solar' : 'burner';
     return {
-      title: t('hint.full.title'),
-      text: t('hint.full.text', { pop: Math.floor(s.pop), homes: d.housing, afford: afford(s, 'pods') }),
-      build: 'pods',
-    };
-  }
-
-  if (sludge > 0 && !has(s, 'purifier') && s.res.credits >= 60) {
-    return { title: t('hint.sludge.title'), text: t('hint.sludge.text', { n: sludge, afford: afford(s, 'purifier') }), build: 'purifier' };
-  }
-
-  if (!has(s, 'fixlab') && !has(s, 'smelter') && !has(s, 'factory')) {
-    const pick: BuildingType = leansGreen ? 'fixlab' : 'smelter';
-    return {
-      title: t('hint.money.title'),
-      text: pick === 'fixlab' ? t('hint.money.fixlab', { afford: afford(s, 'fixlab') }) : t('hint.money.smelter', { afford: afford(s, 'smelter') }),
+      title: t('hint.addPower.title'),
+      text: t('hint.addPower.text', { what: pick === 'solar' ? t('hint.power.solar') : t('hint.power.burner'), afford: afford(s, pick) }),
       build: pick,
     };
   }
 
-  if (junk > 300 && s.bots.length < 5 + s.pop / 4) {
-    return { title: t('hint.hands.title'), text: t('hint.hands.text', { junk, bots: s.bots.length, afford: afford(s, 'dock') }), build: 'dock' };
+  if (d.happiness < 40) {
+    return { title: t('hint.happy.title'), text: t('hint.happy.text', { n: Math.round(d.happiness) }), build: 'garden' };
   }
 
-  if (s.res.parts < 25 && count(s, 'recycler') < 3) {
-    return { title: t('hint.partsShort.title'), text: t('hint.partsShort.text', { n: Math.floor(s.res.parts), afford: afford(s, 'recycler') }), build: 'recycler' };
-  }
-
+  // the goals come first: 30 citizens means the Spire, 10 citizens means a money maker
   const spire = s.buildings.find((b) => b.type === 'spire');
   if (!spire && s.pop >= 30) {
     const cost = buildCost(s, 'spire');
@@ -127,7 +154,42 @@ export function suggest(s: GameState): Hint {
     if (missing.credits === 0 && missing.parts === 0) {
       return { title: t('hint.spireReady.title'), text: t('hint.spireReady.text'), build: 'spire' };
     }
-    return { title: t('hint.spireSave.title'), text: t('hint.spireSave.text', { cost: costText(missing) }) };
+    const partsMakersOn = s.buildings.some((b) => (b.type === 'factory' || b.type === 'fixlab') && !b.paused);
+    let extra = missing.parts > 0 && partsMakersOn ? ` ${t('hint.spireSave.parts')}` : '';
+    if (missing.credits > 0 && s.res.parts > 150) extra += ` ${t('hint.spireSave.credits')}`;
+    // waiting on parts with a full scrap store: a second Recycler doubles the pace
+    if (missing.parts > 0 && s.res.scrap >= d.storage * 0.9) extra += ` ${t('hint.storage.recycler')}`;
+    return { title: t('hint.spireSave.title'), text: t('hint.spireSave.text', { cost: costText(missing) }) + extra };
+  }
+
+  if (s.pop >= 10 && !has(s, 'fixlab') && !has(s, 'smelter') && !has(s, 'factory')) {
+    const pick: BuildingType = leansGreen ? 'fixlab' : 'smelter';
+    return {
+      title: t('hint.money.title'),
+      text: pick === 'fixlab' ? t('hint.money.fixlab', { afford: afford(s, 'fixlab') }) : t('hint.money.smelter', { afford: afford(s, 'smelter') }),
+      build: pick,
+    };
+  }
+
+  if (s.pop >= d.housing - 1) {
+    return {
+      title: t('hint.full.title'),
+      text: t('hint.full.text', { pop: Math.floor(s.pop), homes: d.housing, afford: afford(s, 'pods') }),
+      build: 'pods',
+    };
+  }
+
+  // sludge can wait until the city stands on its feet and the Purifier is affordable
+  if (sludge > 0 && !has(s, 'purifier') && s.pop >= 10 && canAfford(s, buildCost(s, 'purifier'))) {
+    return { title: t('hint.sludge.title'), text: t('hint.sludge.text', { n: sludge, afford: afford(s, 'purifier') }), build: 'purifier' };
+  }
+
+  if (junk > 300 && s.pop >= 6 && s.bots.length < 5 + s.pop / 4) {
+    return { title: t('hint.hands.title'), text: t('hint.hands.text', { junk, bots: s.bots.length, afford: afford(s, 'dock') }), build: 'dock' };
+  }
+
+  if (s.res.parts < 25 && count(s, 'recycler') < 3) {
+    return { title: t('hint.partsShort.title'), text: t('hint.partsShort.text', { n: Math.floor(s.res.parts), afford: afford(s, 'recycler') }), build: 'recycler' };
   }
 
   if (spire && spire.built < 1) {

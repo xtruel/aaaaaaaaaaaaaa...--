@@ -12,7 +12,7 @@ import {
   T,
   TILE,
 } from './defs';
-import { addWaste, canAfford, costText, gain, pay, setTile, spawnJunk } from './actions';
+import { addWaste, canAfford, costText, gain, partsReserve, pay, setTile, spawnJunk } from './actions';
 import { bName, t, tk } from '../i18n';
 import { cityById, goalText, updateStars } from './cities';
 import { FREE_HINTS, buildingCenter, day, findBuilding, idx, inBounds, pushMessage } from './state';
@@ -24,6 +24,8 @@ const SLUDGE_EMISSION = 0.002;
 const DECAY_BASE = 0.03;
 const DECAY_PER_POINT = 0.0015;
 const TAX_PER_CITIZEN = 0.05;
+// The HQ's small city grant: even a city with no citizens and no money can always climb back.
+const BASE_INCOME = 0.25;
 const WASTE_PER_CITIZEN = 0.012;
 const WASTE_CHUNK = 6;
 
@@ -34,29 +36,11 @@ export function step(s: GameState, dt: number): void {
 
   burnFuel(s, dt);
   computeDerived(s);
-  const d = s.derived;
   const overtime = s.time < s.overtimeUntil ? 1.5 : 1;
 
-  for (const b of s.buildings) {
-    const def = BUILDINGS[b.type];
-    if (b.built < 1) {
-      updateConstruction(s, b, dt);
-      continue;
-    }
-    if (b.paused) {
-      b.status = 'idle';
-    } else if (def.process) {
-      runProcess(s, b, dt * d.efficiency * overtime);
-    } else if (def.fuel) {
-      b.status = b.fuel > 0 ? 'ok' : 'noFuel';
-    } else if (def.energy < 0 && d.efficiency <= 0) {
-      b.status = 'noPower';
-    } else {
-      b.status = 'ok';
-    }
-    if (def.cleanRadius && !b.paused) cleanSludge(s, b, dt * d.efficiency);
-    if (b.type === 'garden') growGrass(s, b, dt);
-  }
+  // Recyclers go first: parts are what everything is built with, so they get the scrap before Smelters do.
+  for (const b of s.buildings) if (b.type === 'recycler') tickBuilding(s, b, dt, overtime);
+  for (const b of s.buildings) if (b.type !== 'recycler') tickBuilding(s, b, dt, overtime);
 
   updatePollution(s, dt, overtime);
   updateCitizens(s, dt);
@@ -72,10 +56,13 @@ export function step(s: GameState, dt: number): void {
   }
 
   if (s.time >= s.nextEventAt) {
-    s.nextEventAt = s.time + (80 + Math.random() * 50) * s.mods.eventEvery;
     const ev = pickEvent(s);
+    // once every story has been told, the reruns come less often
+    const fresh = ev && !s.eventsSeen.includes(ev.id);
+    s.nextEventAt = s.time + (80 + Math.random() * 50) * s.mods.eventEvery * (fresh ? 1 : 2);
     if (ev) {
       s.pendingEvent = ev.id;
+      s.eventLast[ev.id] = s.time;
       if (!s.eventsSeen.includes(ev.id)) s.eventsSeen.push(ev.id);
     }
   }
@@ -131,6 +118,28 @@ export function computeDerived(s: GameState): void {
   d.happiness = clamp(55 - s.pollution * 0.5 + Math.min(25, happy) + s.happyMod + s.mods.happiness - shortage, 0, 100);
 }
 
+function tickBuilding(s: GameState, b: Building, dt: number, overtime: number): void {
+  const def = BUILDINGS[b.type];
+  const d = s.derived;
+  if (b.built < 1) {
+    updateConstruction(s, b, dt);
+    return;
+  }
+  if (b.paused) {
+    b.status = 'idle';
+  } else if (def.process) {
+    runProcess(s, b, dt * d.efficiency * overtime);
+  } else if (def.fuel) {
+    b.status = b.fuel > 0 ? 'ok' : 'noFuel';
+  } else if (def.energy < 0 && d.efficiency <= 0) {
+    b.status = 'noPower';
+  } else {
+    b.status = 'ok';
+  }
+  if (def.cleanRadius && !b.paused) cleanSludge(s, b, dt * d.efficiency);
+  if (b.type === 'garden') growGrass(s, b, dt);
+}
+
 function updateConstruction(s: GameState, b: Building, dt: number): void {
   const def = BUILDINGS[b.type];
   b.status = 'building';
@@ -159,9 +168,10 @@ function runProcess(s: GameState, b: Building, work: number): void {
     b.status = 'noPower';
     return;
   }
-  if (!canAfford(s, p.input)) {
-    // Hold the finished cycle until inputs show up.
-    b.status = 'noInput';
+  const keep = p.input.parts ? partsReserve(s) : 0;
+  if (!canAfford(s, p.input) || s.res.parts - (p.input.parts ?? 0) < keep) {
+    // Hold the finished cycle until inputs show up (parts makers leave a reserve for building).
+    b.status = canAfford(s, p.input) ? 'reserve' : 'noInput';
     b.timer = Math.min(b.timer + work, p.time);
     return;
   }
@@ -212,8 +222,13 @@ function updateCitizens(s: GameState, dt: number): void {
     s.pop = Math.min(d.housing, s.pop + dt * 0.25 * (d.happiness / 100));
   } else if (d.happiness < 25) {
     s.pop = Math.max(0, s.pop - dt * 0.06);
+    // the city has emptied: say so (once a day) and point at USA-9, who knows the way back
+    if (s.pop < 1 && d.housing > 0 && s.time - s.warnedEmptyAt > DAY_LENGTH) {
+      s.warnedEmptyAt = s.time;
+      pushMessage(s, t('msg.ghost'), 'bad');
+    }
   }
-  const taxes = s.pop * TAX_PER_CITIZEN * dt;
+  const taxes = (s.pop * TAX_PER_CITIZEN + BASE_INCOME) * dt;
   s.res.credits += taxes;
   s.stats.creditsEarned += taxes;
   s.waste += s.pop * WASTE_PER_CITIZEN * dt;
@@ -286,6 +301,12 @@ function rechargeHints(s: GameState): void {
 }
 
 function checkObjectives(s: GameState): void {
+  // A goal the player went past (30 citizens without ever building a money maker) is skipped,
+  // so the goal card never stays stuck on step 6 while the city is already finished.
+  // The early teaching goals are never skipped: they complete on their own within seconds.
+  const milestone = OBJECTIVES.findIndex((o) => o.id === 'pop30');
+  const passed = () => OBJECTIVES.some((o, i) => i > s.objective && i >= milestone && o.done(s));
+  while (s.objective < OBJECTIVES.length - 1 && !OBJECTIVES[s.objective].done(s) && passed()) s.objective++;
   const obj = OBJECTIVES[s.objective];
   if (!obj || !obj.done(s)) return;
   s.objective++;

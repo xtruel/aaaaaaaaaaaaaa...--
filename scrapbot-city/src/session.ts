@@ -2,7 +2,7 @@
 import { checkCampaign, checkCity, checkOutcome, unlock } from './achievements';
 import { audio } from './audio';
 import { recordCity } from './campaign';
-import { bulldozeRubble, demolish, importParts, placeBuilding } from './game/actions';
+import { bulldozeRubble, demolish, packsToBuild, placeBuilding, placeCheck } from './game/actions';
 import { cityById, cityDesc, cityTagline, cityTraits, goalText } from './game/cities';
 import { BUILDINGS, BUILD_ORDER, SIM_STEP, T, TILE } from './game/defs';
 import type { BuildingType } from './game/defs';
@@ -19,12 +19,13 @@ import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
-import { openHint, openHintPay, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
+import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
 import type { ModalAction } from './ui/modal';
 import { Tutorial } from './ui/tutorial';
+import type { Box } from './ui/tutorial';
 
 export interface SessionHandlers {
   onExitToMenu(): void;
@@ -89,6 +90,7 @@ export class GameSession implements PadTarget {
   private alive = false;
   private disposers: (() => void)[] = [];
   private held = false; // the world under an open dialog is painted once, then held
+  private lastHint = { title: '', day: 0 };
   private padCursor!: HTMLElement;
   private padOn = false;
   private padHover: HTMLElement | null = null;
@@ -107,7 +109,7 @@ export class GameSession implements PadTarget {
       {
         onBuild: (t) => this.selectBuild(t),
         onBulldoze: () => this.toggleBulldoze(),
-        onImport: () => audio.play(importParts(this.s) ? 'coin' : 'error'),
+        onImport: () => openImport(this.s, {}),
         onSpeed: (v) => this.setSpeed(v),
         onMenu: () => this.openPause(),
         onDemolish: (id) => this.demolishById(id),
@@ -267,7 +269,7 @@ export class GameSession implements PadTarget {
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.1;
       this.hud.update(s, { speed: this.speed, build: this.build, bulldoze: this.bulldoze, selectedId: this.selectedId });
-      this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hintUsed: this.hintUsed });
+      this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hintUsed: this.hintUsed, hq: this.hqBox() });
     }
   }
 
@@ -537,12 +539,26 @@ export class GameSession implements PadTarget {
     if (s.outcome) return;
     const tile = this.renderer.screenToTile(sx, sy);
     if (this.build) {
-      const def = BUILDINGS[this.build];
+      const type = this.build;
+      const def = BUILDINGS[type];
       const ox = tile.x - Math.floor((def.w - 1) / 2);
       const oy = tile.y - Math.floor((def.h - 1) / 2);
-      const b = placeBuilding(s, this.build, ox, oy);
+      // only parts missing, and credits to cover them: offer to buy them from 2PM and build right here
+      const packs = packsToBuild(s, type);
+      if (packs > 0 && placeCheck(s, type, ox, oy).costOnly) {
+        openImport(s, {
+          need: {
+            packs,
+            onBuild: () => {
+              if (placeBuilding(s, type, ox, oy) && type === 'spire') this.build = null;
+            },
+          },
+        });
+        return;
+      }
+      const b = placeBuilding(s, type, ox, oy);
       if (!b) audio.play('error');
-      else if (this.build === 'spire') this.build = null;
+      else if (type === 'spire') this.build = null;
       return;
     }
     if (!inBounds(tile.x, tile.y)) {
@@ -605,6 +621,21 @@ export class GameSession implements PadTarget {
   private demolishById(id: number): void {
     const b = this.s.buildings.find((o) => o.id === id);
     if (b && demolish(this.s, b)) this.selectedId = -1;
+  }
+
+  // The HQ and two tiles around it, in screen pixels (the tutorial keeps its bubble off this area).
+  private hqBox(): Box | null {
+    const hq = this.s.buildings.find((b) => b.type === 'hq');
+    if (!hq) return null;
+    const r = this.renderer;
+    const def = BUILDINGS.hq;
+    const m = 2 * TILE;
+    return {
+      left: (hq.x * TILE - m - r.cam.x) * r.pxZoom,
+      top: (hq.y * TILE - m - r.cam.y) * r.pxZoom,
+      right: ((hq.x + def.w) * TILE + m - r.cam.x) * r.pxZoom,
+      bottom: ((hq.y + def.h) * TILE + m - r.cam.y) * r.pxZoom,
+    };
   }
 
   // ---------- controller ----------
@@ -720,6 +751,14 @@ export class GameSession implements PadTarget {
     const s = this.s;
     this.hintUsed = true;
     unlock('hint');
+    // asking twice for the same thing on the same day, or being told to wait, costs nothing
+    const next = suggest(s);
+    const title = next.title;
+    if (next.free || (title === this.lastHint.title && day(s) === this.lastHint.day)) {
+      this.showHint(t('hint.repeat'));
+      return;
+    }
+    this.lastHint = { title, day: day(s) };
     if (freeHintsLeft(s) > 0) {
       s.hints.free--;
       this.showHint(s.hints.free > 0 ? t('hint.freeLeft', { n: s.hints.free }) : t('hint.lastFree'));

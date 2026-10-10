@@ -1071,6 +1071,23 @@ select {
   opacity: 0.4;
 }
 
+/* out of parts with credits to spare: the + pulses until it is noticed */
+.import.nudge {
+  animation: import-nudge 1.1s ease-in-out infinite;
+}
+
+@keyframes import-nudge {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 210, 63, 0.9);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(255, 210, 63, 0);
+    transform: scale(1.18);
+  }
+}
+
 .meters {
   display: flex;
   flex-direction: column;
@@ -2366,9 +2383,17 @@ input[type='number'] {
   background: var(--cream);
 }
 
+/* a little coin: hints cost in-game credits, never real money */
 .hint-badge.paid::before {
-  content: '¢';
-  margin-right: 1px;
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  vertical-align: 0;
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
 }
 
 .obj-stars {

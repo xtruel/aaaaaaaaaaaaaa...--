@@ -6,12 +6,23 @@ import { t, tk } from '../i18n';
 import { localizeKeys } from '../keys';
 import { portraitUrl } from '../render/icons';
 
+export interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 export interface TutorialCtx {
   s: GameState;
   cameraMoved: boolean;
   speed: number;
   hintUsed: boolean;
+  hq: Box | null; // the HQ and the ground around it, in screen pixels: where the player builds
 }
+
+const overlap = (a: Box, b: Box) =>
+  Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
 
 interface Step {
   id: string; // text keys: tut.<id>.title / .text / .action
@@ -43,6 +54,7 @@ export class Tutorial {
   private bubble: HTMLElement;
   private ring: HTMLElement;
   private rendered = -1;
+  private spot = -1; // which of the candidate places the bubble sits in
 
   constructor(
     root: HTMLElement,
@@ -76,7 +88,7 @@ export class Tutorial {
       if (!this.active) return;
     }
     if (this.rendered !== this.index) this.render();
-    this.position();
+    this.position(ctx);
   }
 
   relabel(): void {
@@ -91,6 +103,7 @@ export class Tutorial {
 
   private render(): void {
     this.rendered = this.index;
+    this.spot = -1;
     const step = STEPS[this.index];
     const last = this.index === STEPS.length - 1;
     this.bubble.innerHTML = `
@@ -126,7 +139,9 @@ export class Tutorial {
     });
   }
 
-  private position(): void {
+  // The bubble goes where it hides the least of what the player needs: the thing it points at,
+  // the ground around the HQ (where they are asked to build), the goal card and the build bar.
+  private position(ctx: TutorialCtx): void {
     const step = STEPS[this.index];
     const target = step.target ? document.querySelector<HTMLElement>(`.game ${step.target}`) : null;
     const b = this.bubble;
@@ -134,26 +149,47 @@ export class Tutorial {
     const vh = window.innerHeight;
     const bw = Math.min(360, vw - 24);
     b.style.width = `${bw}px`;
-    if (!target || target.offsetParent === null) {
-      this.ring.hidden = true;
-      b.style.left = `${(vw - bw) / 2}px`;
-      b.style.top = `${Math.max(80, vh * 0.2)}px`;
-      b.style.bottom = '';
-      return;
+    b.style.bottom = '';
+    const bh = b.offsetHeight;
+    const avoid: { box: Box; weight: number }[] = [];
+    const add = (el: Element | null, weight: number) => {
+      if (el && (el as HTMLElement).offsetParent !== null) avoid.push({ box: el.getBoundingClientRect(), weight });
+    };
+    add(document.querySelector('.game [data-objective]'), 1);
+    add(document.querySelector('.game [data-toolbar]'), 0.6);
+    add(document.querySelector('.game .hud-top'), 0.3);
+    add(document.querySelector('.game [data-feed]'), 0.5);
+    if (ctx.hq) avoid.push({ box: ctx.hq, weight: step.action ? 3 : 1 });
+
+    const shown = !!target && target.offsetParent !== null;
+    this.ring.hidden = !shown;
+    const r = shown ? target!.getBoundingClientRect() : null;
+    if (r) {
+      this.ring.style.left = `${r.left - 6}px`;
+      this.ring.style.top = `${r.top - 6}px`;
+      this.ring.style.width = `${r.width + 12}px`;
+      this.ring.style.height = `${r.height + 12}px`;
+      avoid.push({ box: { left: r.left - 8, top: r.top - 8, right: r.right + 8, bottom: r.bottom + 8 }, weight: 4 });
     }
-    const r = target.getBoundingClientRect();
-    this.ring.hidden = false;
-    this.ring.style.left = `${r.left - 6}px`;
-    this.ring.style.top = `${r.top - 6}px`;
-    this.ring.style.width = `${r.width + 12}px`;
-    this.ring.style.height = `${r.height + 12}px`;
-    b.style.left = `${Math.max(12, Math.min(vw - bw - 12, r.left + r.width / 2 - bw / 2))}px`;
-    if (r.top + r.height / 2 < vh * 0.5) {
-      b.style.top = `${Math.min(vh - b.offsetHeight - 12, r.bottom + 18)}px`;
-      b.style.bottom = '';
-    } else {
-      b.style.top = '';
-      b.style.bottom = `${Math.min(vh - b.offsetHeight - 12, vh - r.top + 18)}px`;
+    const at = (left: number, top: number): Box => {
+      const l = Math.max(12, Math.min(vw - bw - 12, left));
+      const t = Math.max(8, Math.min(vh - bh - 8, top));
+      return { left: l, top: t, right: l + bw, bottom: t + bh };
+    };
+    const toolbarTop = document.querySelector('.game [data-toolbar]')?.getBoundingClientRect().top ?? vh;
+    const spots: Box[] = [];
+    if (r) {
+      const cx = r.left + r.width / 2 - bw / 2;
+      spots.push(at(cx, r.bottom + 18), at(cx, r.top - 18 - bh), at(r.right + 18, r.top), at(r.left - 18 - bw, r.top));
     }
+    spots.push(at(12, toolbarTop - bh - 14), at(vw - bw - 12, toolbarTop - bh - 14), at((vw - bw) / 2, Math.max(80, vh * 0.2)));
+    const cost = (c: Box) => avoid.reduce((sum, a) => sum + overlap(c, a.box) * a.weight, 0);
+    let best = 0;
+    for (let i = 1; i < spots.length; i++) if (cost(spots[i]) < cost(spots[best])) best = i;
+    // stay put unless the new place is clearly better, so the bubble does not hop while the map scrolls
+    if (this.spot >= 0 && this.spot < spots.length && cost(spots[this.spot]) <= cost(spots[best]) + bw * 40) best = this.spot;
+    this.spot = best;
+    b.style.left = `${spots[best].left}px`;
+    b.style.top = `${spots[best].top}px`;
   }
 }

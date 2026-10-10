@@ -72,3 +72,29 @@ usalo dopo ogni modifica ai numeri in `src/game/defs.ts`, e il playtest per tutt
 - [ ] Steam Deck o controller: menu → campagna → costruire → pausa → salvataggio, senza toccare il mouse.
 - [ ] Chiudere e riaprire il gioco: la città e la lingua devono tornare uguali.
 - [ ] Finestra piccola (1280×720) e grande (2560×1440): niente testi tagliati.
+
+## 8. Playtest automatico della 0.5.1: cosa è emerso e cosa è stato corretto
+
+Prima dei playtest con persone vere, quattro "giocatori" automatici hanno giocato attraverso l'interfaccia vera
+(clic sulla barra, clic sulla mappa, scelte negli eventi, controller): uno verde prudente, uno industriale,
+uno che fa solo quello che dice USA-9, uno "sbadato" che costruisce solo industria. Più il tutorial passo passo,
+una partita col solo controller e i casi limite (sconfitta per smog, banca, demolizione, slot, finale della regione).
+
+| Problema trovato | Correzione |
+|---|---|
+| Nel tutorial il fumetto copriva l'HQ (dove si chiede di costruire) e la carta obiettivi | Il fumetto sceglie la posizione che copre meno HQ, obiettivi, barra e messaggi |
+| Strada industriale bloccata: 13.000 crediti, 0 pezzi, 0 rottami, nessun modo evidente di uscirne | Fabbriche e Lab lasciano sempre una scorta di pezzi; i Riciclatori hanno la precedenza sui rottami; il "+" pulsa e apre un acquisto da 10/50/100 pezzi; costruendo senza pezzi il gioco offre "compra i pezzi mancanti e costruisci" |
+| Strada verde: 300+ pezzi, zero crediti e giorni di attesa per la Guglia | Solare, Lab Riparatutto e Purificatore costano più pezzi e meno crediti; USA-9 consiglia di convertire i pezzi; con 30 cittadini e i crediti pronti, i Lab mettono da parte i pezzi per la Guglia |
+| USA-9 consigliava doppioni già in cantiere ("pods full: 0 cittadini, 0 case"), un Purificatore da 100 crediti al giorno 1, "risparmia" a chi aveva 13.000 crediti | Consigli in ordine con la carta obiettivi, "aspetta il cantiere" gratuito, consigli ripetuti gratuiti, consiglio di importare quando mancano solo i pezzi |
+| Città fantasma: 0 abitanti, felicità 5%, nessuna spiegazione | Avviso nel feed e consiglio gratuito: mettere in pausa o demolire l'industria (rimborso del 50%), poi giardini e Purificatore |
+| La carta obiettivi restava ferma su "6/9 Costruisci una fonte di crediti" a città finita | Gli obiettivi superati dai progressi successivi vengono saltati |
+| Lo stesso evento ("Spring cleaning") tornava 4 volte di fila | Un evento ripetibile aspetta almeno 4 giorni; finiti gli eventi nuovi, quelli vecchi arrivano più di rado |
+| Sul pulsante dei suggerimenti a pagamento compariva "¢160", che sembra un prezzo in euro | Una monetina disegnata: si paga in crediti del gioco |
+| Primo acquisto sbagliato (un pannello solare o una Fabbrica per primi) lasciava senza pezzi né crediti per il Riciclatore | Il Riciclatore costa solo crediti, e l'HQ dà una piccola rendita fissa (15 crediti al giorno): provate tutte le 20 "prime mosse sbagliate", nessuna blocca più la partita |
+| Controller: focus sulla "×" dei dialoghi, due pressioni di A per ogni dialogo, "Travel" da cercare a mano | Focus sul primo pulsante utile, dialoghi semplici già pronti per A, focus automatico su "Travel here" |
+
+Tempi misurati (velocità normale): tutorial circa 5 minuti di lettura; una città completa con 3 stelle in 12–20 minuti
+di gioco per un giocatore deciso. Le 5 città della campagna durano quindi 1,5–3 ore: sotto la soglia delle 2 ore
+del rimborso Steam per chi gioca veloce. Servono più contenuti prima della vendita (vedi STEAM.md).
+
+Prestazioni: 121 edifici e 35 bot a 60 fps fissi fino a 2560×1440, 10 MB di memoria.

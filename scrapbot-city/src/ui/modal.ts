@@ -129,9 +129,14 @@ export function openModal(opts: ModalOptions): HTMLElement {
   }
   root.append(el);
   current = { el, opts };
-  // Focus the dialog itself (Tab reaches the buttons) or its first text field; never pre-select a choice.
+  // Focus the dialog itself (Tab reaches the buttons) or its first text field; never pre-select a story choice.
+  // With a controller, ordinary dialogs start on their main button so one press of A answers them
+  // (the 400 ms guard above still swallows a press that was meant for the screen behind).
   const field = dialog.querySelector<HTMLElement>('input[type="text"], input[type="number"]');
   dialog.tabIndex = -1;
-  (field ?? dialog).focus();
+  const pad = document.body.classList.contains('pad-mode') && opts.dismissable !== false;
+  // forms (settings) start on their first control, other dialogs on their main button
+  const padPick = pad ? dialog.querySelector<HTMLElement>('.modal-body select, .modal-body input, .modal-actions .btn-primary:not(:disabled)') : null;
+  (field ?? padPick ?? dialog).focus();
   return dialog;
 }

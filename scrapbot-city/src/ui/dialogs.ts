@@ -2,6 +2,8 @@
 import { ACHIEVEMENTS, achDesc, achName, unlockedAchievements } from '../achievements';
 import { audio } from '../audio';
 import { BANK_FEE, loadCampaign, sendToBank, withdrawFromBank } from '../campaign';
+import { importParts } from '../game/actions';
+import { IMPORT_PARTS } from '../game/defs';
 import type { Hint } from '../game/hints';
 import type { GameState, OutcomeKind } from '../game/state';
 import { choiceLabel, endingSubtitle, endingText, endingTitle, eventText, eventTitle, speakerName, speakerRole } from '../game/story';
@@ -14,6 +16,7 @@ import { isTutorialDone, loadSettings, openSavesFolder, saveGame, saveSettings, 
 import type { Settings, SlotId } from '../storage';
 import { esc } from './escape';
 import { closeModal, openModal } from './modal';
+import type { ModalAction } from './modal';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, html?: string): HTMLElementTagNameMap[K] {
   const n = document.createElement(tag);
@@ -140,7 +143,7 @@ export function openCredits(): void {
     body: `
       <dl class="credits">
         <dt>${t('credits.design')}</dt><dd>Qwerty3D Games</dd>
-        <dt>${t('credits.build')}</dt><dd>0.5 · Pixel Planet Initiative</dd>
+        <dt>${t('credits.build')}</dt><dd>0.5.1 · Pixel Planet Initiative</dd>
         <dt>${t('credits.music')}</dt><dd>${t('credits.musicValue')}</dd>
         <dt>${t('credits.fonts')}</dt><dd>Bungee, Lilita One, Nunito, Silkscreen, Permanent Marker, DotGothic16 (SIL Open Font License)</dd>
         <dt>${t('credits.morale')}</dt><dd>${t('credits.moraleValue')}</dd>
@@ -281,6 +284,48 @@ export function openHintPay(price: number, canPay: boolean, onPay: () => void): 
       { label: canPay ? t('hint.pay.button', { n: price }) : t('hint.pay.need', { n: price }), primary: true, disabled: !canPay, onClick: onPay },
       { label: t('common.notNow'), onClick: closeModal },
     ],
+  });
+}
+
+// 2PM sells parts in packs. `need` offers to buy exactly what a building is missing and build it.
+export function openImport(s: GameState, opts: { need?: { packs: number; onBuild: () => void }; onDone?: () => void }): void {
+  const buy = (packs: number) => {
+    if (!importParts(s, packs)) return audio.play('error');
+    audio.play('coin');
+    closeModal();
+    opts.onDone?.();
+  };
+  const actions: ModalAction[] = [];
+  if (opts.need) {
+    const { packs, onBuild } = opts.need;
+    actions.push({
+      label: t('import.missing', { n: packs * IMPORT_PARTS.parts }),
+      hint: t('import.cost', { n: packs * IMPORT_PARTS.credits }),
+      primary: true,
+      onClick: () => {
+        if (!importParts(s, packs)) return audio.play('error');
+        closeModal();
+        onBuild();
+      },
+    });
+  }
+  for (const packs of [1, 5, 10]) {
+    actions.push({
+      label: t('import.buy', { n: packs * IMPORT_PARTS.parts }),
+      hint: t('import.cost', { n: packs * IMPORT_PARTS.credits }),
+      primary: !opts.need && packs === 1,
+      tone: 'industrial',
+      disabled: s.res.credits < packs * IMPORT_PARTS.credits,
+      onClick: () => buy(packs),
+    });
+  }
+  openModal({
+    title: t('import.title'),
+    eyebrow: t('import.eyebrow'),
+    portrait: portraitUrl('corp'),
+    className: 'modal-story speaker-corp',
+    body: `<p class="story">${t('import.text', { have: Math.floor(s.res.parts), parts: IMPORT_PARTS.parts, credits: IMPORT_PARTS.credits })}</p>`,
+    actions,
   });
 }
 

@@ -140,12 +140,20 @@ al primo avvio; si cambia dal pulsante col globo nel menu o dalle impostazioni.
 Fatto nella 0.5: salvataggi su file con Steam Cloud, controller e Steam Deck, 8 lingue, 4 brani di musica
 (menu, città di giorno, città di notte, mappa della regione), font giapponese per il logo.
 
-1. **Musica di un compositore**: i 4 brani sono chiptune scritti come note in `src/music.ts` e suonati dal codice.
+1. **Più contenuti** (è il punto più importante): ci sono solo 10 eventi narrativi in tutto, che si ripetono
+   in tutte e 5 le città, e una città si completa in 12–20 minuti. Per un gioco a pagamento servono almeno
+   30–40 eventi, qualche edificio o miglioramento in più per la seconda metà della partita e una modalità
+   "infinita" con obiettivi; Steam rimborsa chi lo chiede entro 14 giorni e con meno di 2 ore di gioco, e oggi la campagna dura 1,5–3 ore.
+2. **Copertina (capsule) disegnata da una persona**: è la cosa che decide se qualcuno clicca sul gioco.
+   **Dichiarazione IA**: testi, traduzioni, grafica e musica del gioco sono stati creati con l'aiuto dell'IA, e così
+   il mockup del menu. Steam chiede di dichiarare i contenuti generati con l'IA che i giocatori vedono o sentono
+   (modulo "AI Generated Content Disclosure" in Steamworks): compilalo con onestà, compare sulla pagina del negozio.
+3. **Musica di un compositore**: i 4 brani sono chiptune scritti come note in `src/music.ts` e suonati dal codice.
    Vanno bene per demo e playtest; per il lancio conviene un compositore (anche solo per riscriverli meglio).
-2. **Passata grafica**: gli sprite sono disegnati dal codice; un artista pixel può sostituirli tenendo le stesse misure (caselle 16 px).
-3. **Playtest** con 10–20 persone che non conoscono il gioco: vedi **[PLAYTEST.md](PLAYTEST.md)**.
-4. **Revisione delle traduzioni** da madrelingua (soprattutto eventi e finali) durante il playtest.
-5. Verifica legale di nomi e marchi ("2PM", "Scrapbot City") prima di registrare la pagina.
+4. **Passata grafica**: gli sprite sono disegnati dal codice; un artista pixel può sostituirli tenendo le stesse misure (caselle 16 px).
+5. **Playtest** con 10–20 persone che non conoscono il gioco: vedi **[PLAYTEST.md](PLAYTEST.md)**.
+6. **Revisione delle traduzioni** da madrelingua (soprattutto eventi e finali) durante il playtest.
+7. Verifica legale di nomi e marchi ("2PM", "Scrapbot City") prima di registrare la pagina.
 
 ## 10. Idee per allungare la vita del gioco (aggiornamenti post-lancio)
 

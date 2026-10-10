@@ -15,9 +15,12 @@ import './style.css';
 
 import { achName, checkCampaign, onAchievement, syncAchievements } from './achievements';
 import { audio } from './audio';
+import * as actions from './game/actions';
 import { CITIES } from './game/cities';
 import type { CityDef } from './game/cities';
+import * as defs from './game/defs';
 import { DEFAULT_MODS } from './game/defs';
+import * as hints from './game/hints';
 import { createGame } from './game/state';
 import { initGamepad } from './gamepad';
 import { loadKeyboardLayout } from './keys';
@@ -295,6 +298,11 @@ initGamepad({
   onConnect: () => showToast(t('pad.connected'), t('pad.help'), 'play'),
   onDisconnect: () => showToast(t('pad.disconnected'), '', 'play'),
 });
+
+// Development server only (npm run dev): playtest scripts and the browser console can look inside the game.
+if (import.meta.env.DEV) {
+  Object.assign(window, { scrapbot: { session: () => session, actions, defs, hints } });
+}
 
 applySettings(settings);
 if (desktop && settings.fullscreen) desktop.setFullscreen(true);

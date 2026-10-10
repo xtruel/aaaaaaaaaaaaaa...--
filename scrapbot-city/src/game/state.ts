@@ -2,7 +2,7 @@ import { BUILDINGS, DAY_LENGTH, DEFAULT_MODS, MAP_H, MAP_W, T, TILE } from './de
 import type { BuildingType, CityMods, Resource } from './defs';
 import { generateMap } from './world';
 
-export type BuildingStatus = 'building' | 'ok' | 'idle' | 'noPower' | 'noInput' | 'noFuel';
+export type BuildingStatus = 'building' | 'ok' | 'idle' | 'noPower' | 'noInput' | 'noFuel' | 'reserve';
 
 export interface Building {
   id: number;
@@ -107,6 +107,7 @@ export interface GameState {
   stars: boolean[]; // campaign goals reached in this city
   hints: Hints;
   warnedFullAt: number; // last "storage full" warning, so it does not flood the feed
+  warnedEmptyAt: number; // last "everyone left" warning
   tiles: Uint8Array;
   amount: Uint16Array; // junk per tile
   occ: Int32Array; // building id per tile or -1 (derived, not saved)
@@ -128,6 +129,7 @@ export interface GameState {
   overtimeUntil: number;
   botSpeedMul: number;
   eventsSeen: string[];
+  eventLast: Record<string, number>; // event id -> game time it last came up
   objective: number;
   stats: Stats;
   outcome: Outcome | null;
@@ -192,6 +194,7 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     stars: [false, false, false],
     hints: { free: FREE_HINTS, paid: 0, nextFreeDay: 6 },
     warnedFullAt: -999,
+    warnedEmptyAt: -999,
     tiles: map.tiles,
     amount: map.amount,
     occ: new Int32Array(MAP_W * MAP_H).fill(-1),
@@ -221,6 +224,7 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     overtimeUntil: 0,
     botSpeedMul: 1,
     eventsSeen: [],
+    eventLast: {},
     objective: 0,
     stats: { scrapCollected: 0, built: 0, cleaned: 0, creditsEarned: 0, maxPollution: mods.startPollution, industrialBuilt: 0, catPets: 0, partsMade: 0 },
     outcome: null,
