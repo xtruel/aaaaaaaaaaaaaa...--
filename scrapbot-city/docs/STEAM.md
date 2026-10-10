@@ -20,6 +20,17 @@ Testato: l'app si apre a 1280×800 (la risoluzione dello **Steam Deck**), il men
 il pacchetto Linux generato da `electron-builder` si avvia, i salvataggi finiscono nella cartella `saves`
 e la lingua scelta resta dopo il riavvio.
 
+### Stato dell'integrazione Steam (build 0.6.0) — verificato
+
+| Funzione | Stato | Perché |
+|---|---|---|
+| Achievement in gioco (18, salvati sul PC) | ✔ funzionano | `src/achievements.ts`, verificati nelle partite di prova |
+| Achievement **su Steam** | ⏳ **IN SOSPESO** | il codice di collegamento c'è (`ACH_<ID>` in `electron/main.cjs`), ma `steamworks.js` **non è installato** e non esiste ancora un App ID (`steam_appid.txt`). Finché manca, il gioco gira senza Steam e non invia nulla. Passi: sezione 3 |
+| Salvataggi su file (scrittura atomica + `.bak`, ripresa dalla copia se il file è rovinato) | ✔ fatto e testato | `tests/storage.test.ts`, `tests/saves.test.ts` |
+| **Steam Cloud** | ⏳ **IN SOSPESO** | il gioco scrive già i file nella cartella giusta; resta da attivare **Auto-Cloud** in Steamworks (sezione 4). Non si può provare senza l'app su Steam |
+| Overlay Steam e tastiera a schermo del Deck | ⏳ in sospeso | dipendono da `steamworks.js`; senza, il gioco usa la propria tastiera e i propri campi |
+| Controller / Steam Deck (1280×800) | ✔ testato | D-pad, cursore virtuale, menu, pausa |
+
 ## 2. Account e app su Steamworks
 
 1. Crea l'account Steamworks come sviluppatore (Qwerty3D Games) e completa dati fiscali e bancari.
@@ -150,7 +161,8 @@ Fatto nella 0.5: salvataggi su file con Steam Cloud, controller e Steam Deck, 8 
    (modulo "AI Generated Content Disclosure" in Steamworks): compilalo con onestà, compare sulla pagina del negozio.
 3. **Musica di un compositore**: i 4 brani sono chiptune scritti come note in `src/music.ts` e suonati dal codice.
    Vanno bene per demo e playtest; per il lancio conviene un compositore (anche solo per riscriverli meglio).
-4. **Passata grafica**: gli sprite sono disegnati dal codice; un artista pixel può sostituirli tenendo le stesse misure (caselle 16 px).
+4. **Passata grafica**: dalla 0.6 la città è isometrica e gli sprite sono modelli voxel generati dal codice (`scripts/art/`, `npm run art`).
+   Un artista pixel può sostituire qualsiasi fotogramma mettendo un PNG con lo stesso nome in `art/overrides/` (vedi README).
 5. **Playtest** con 10–20 persone che non conoscono il gioco: vedi **[PLAYTEST.md](PLAYTEST.md)**.
 6. **Revisione delle traduzioni** da madrelingua (soprattutto eventi e finali) durante il playtest.
 7. Verifica legale di nomi e marchi ("2PM", "Scrapbot City") prima di registrare la pagina.

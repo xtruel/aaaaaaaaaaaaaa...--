@@ -70,15 +70,27 @@ ipcMain.on('saves:open', () => {
 });
 
 // Steam is optional: outside Steam (or without steamworks.js) the game simply runs without it.
+// steamworks.js is loaded at startup, before the app is ready: the overlay needs Chromium switches that
+// only apply when set this early.
+let steamworks = null;
+try {
+  steamworks = require('steamworks.js');
+  steamworks.electronEnableSteamOverlay();
+} catch (err) {
+  console.log(`Steam not available: ${err.message}`);
+}
+
 function initSteam() {
+  if (!steamworks) return;
   try {
-    const steamworks = require('steamworks.js');
+    // App ID: an explicit one for local tests (STEAM_APP_ID or steam_appid.txt next to the exe); when the
+    // Steam client starts the game it sets SteamAppId itself, and steamworks.js reads it from there.
     const appIdFile = path.join(path.dirname(app.getPath('exe')), 'steam_appid.txt');
-    const appId = Number(process.env.STEAM_APP_ID || (fs.existsSync(appIdFile) ? fs.readFileSync(appIdFile, 'utf8').trim() : 0));
-    if (!appId) return;
-    steam = steamworks.init(appId);
-    steamworks.electronEnableSteamOverlay();
+    const fromFile = fs.existsSync(appIdFile) ? fs.readFileSync(appIdFile, 'utf8').trim() : '';
+    const appId = Number(process.env.STEAM_APP_ID || process.env.SteamAppId || fromFile || 0);
+    steam = steamworks.init(appId || undefined);
   } catch (err) {
+    steam = null;
     console.log(`Steam not available: ${err.message}`);
   }
 }

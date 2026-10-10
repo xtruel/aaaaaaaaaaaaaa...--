@@ -529,7 +529,8 @@ export class GameSession implements PadTarget {
       case 'KeyQ':
         this.askHint();
         break;
-      case 'KeyH': {
+      case 'KeyH':
+      case 'Home': {
         const hq = this.s.buildings.find((b) => b.type === 'hq');
         if (hq) this.renderer.centerOn((hq.x + 1.5) * TILE, (hq.y + 1.5) * TILE);
         break;

@@ -1245,6 +1245,13 @@ export class Renderer {
     if (b.paused) {
       ctx.fillRect(x + 1, y + 1, 1, 3);
       ctx.fillRect(x + 3, y + 1, 1, 3);
+    } else if (b.status === 'noPower') {
+      // a lightning bolt: no power reads apart from a missing input at a glance
+      ctx.fillRect(x + 3, y, 1, 1);
+      ctx.fillRect(x + 2, y + 1, 2, 1);
+      ctx.fillRect(x + 1, y + 2, 3, 1);
+      ctx.fillRect(x + 1, y + 3, 2, 1);
+      ctx.fillRect(x + 1, y + 4, 1, 1);
     } else {
       ctx.fillRect(x + 2, y + 1, 1, 2);
       ctx.fillRect(x + 2, y + 4, 1, 1);

@@ -328,6 +328,9 @@ if (desktop && settings.fullscreen) desktop.setFullscreen(true);
 // Fullscreen can also change outside the settings (F11, the browser's Esc, window controls): follow it,
 // so the checkbox and the next launch match what the player sees.
 function fullscreenChanged(on: boolean): void {
+  // an open Settings dialog shows it too, or its next change would re-apply the old checkbox
+  const box = document.querySelector<HTMLInputElement>('#set-full');
+  if (box) box.checked = on;
   if (on === settings.fullscreen) return;
   settings = { ...settings, fullscreen: on };
   saveSettings(settings);
