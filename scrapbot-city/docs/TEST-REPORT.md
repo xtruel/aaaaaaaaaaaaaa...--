@@ -132,6 +132,21 @@ Passi per completare Steam: `docs/STEAM.md` §3 e §4.
 - **Finale regionale** dopo la quinta Guglia ("The Green Coast"), mostrato una sola volta.
 - Tutte e 5 le città: introduzione, regole proprie, salvataggio e ritorno alla mappa dal menu di pausa.
 
+**Partite complete giocate da uno script come un giocatore** (`play.mjs`: solo clic sulla barra, sulla mappa e sui
+dialoghi, velocità 3, nessuna risorsa regalata), sulla build finale:
+
+| Città | Stile di gioco | Esito |
+|---|---|---|
+| Scrapbot City | costruttore (verde) | finale verde al giorno 12, 2 stelle, Neon Heights sbloccata |
+| Rustbay | costruttore | finale verde al giorno 9 (rigiocata: giorno 9) |
+| Neon Heights | costruttore | finale verde al giorno 11 (rigiocate: giorni 10 e 11) |
+| Greenvale | costruttore | finale verde al giorno 9, stelle "finale verde" e "smog mai sopra il 30%" |
+| 2PM Company Town | magnate (industria) | finale industriale al giorno 11; continuando solo con l'industria, sconfitta per smog al giorno 13 |
+
+Nessun errore della pagina. Lo script ha segnalato 2 clic che non hanno costruito su circa 150 costruzioni:
+in un caso al momento del clic si era aperto un evento narrativo (il clic finisce sul dialogo, come deve), nell'altro
+una tempesta aveva appena fatto cadere spazzatura su quella casella (il gioco rifiuta, come deve).
+
 ## 7. Build di release: niente trucchi né risorse infinite
 
 `verify-release/release.mjs` (36/36) e `bank-exploit.mjs` (5/5):
