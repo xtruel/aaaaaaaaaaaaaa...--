@@ -199,17 +199,17 @@ export const spire: BuildingArt = {
 
     // ---- offerings on the front corner of the plinth: a broken bot head (tipped over, its screen dead or
     // flickering), a tyre lying flat and a small pink crate
-    v.box(37, 38, 6, 41, 42, 9, M.white);
-    v.box(38, 38, 9, 42, 42, 10, M.white); // the top layer slipped sideways: the head lies askew
-    v.box(37, 41, 7, 41, 42, 9, on ? M.screen : M.window);
-    v.box(37, 41, 7, 38, 42, 9, M.ink);
-    v.box(38, 41, 7, 39, 42, 8, M.limeD);
-    v.box(40, 41, 7, 41, 42, 8, M.limeD);
-    v.box(38, 38, 10, 39, 40, 11, M.pink); // ears
-    v.box(41, 38, 10, 42, 40, 11, M.pink);
-    v.cylZ(40.5, 34.5, 2.5, 6, 8, M.dark, 1.2);
-    v.box(33, 38, 6, 36, 41, 9, M.pink);
-    v.box(33, 38, 8, 36, 41, 9, M.pinkD);
+    v.box(36, 37, 6, 41, 42, 10, M.white);
+    v.box(37, 37, 10, 42, 42, 11, M.white); // the top layer slipped sideways: the head lies askew
+    v.box(36, 41, 7, 41, 42, 10, M.ink); // face: a dark frame, the screen and two dead lime eyes
+    v.box(38, 41, 7, 39, 42, 10, on ? M.screen : M.window);
+    v.box(37, 41, 8, 38, 42, 10, M.limeD);
+    v.box(39, 41, 8, 40, 42, 10, M.limeD);
+    v.box(37, 37, 11, 39, 39, 12, M.pink); // ears
+    v.box(40, 37, 11, 42, 39, 12, M.pink);
+    v.cylZ(40, 33.5, 2.5, 6, 8, M.ink, 1.2);
+    v.box(32, 38, 6, 35, 41, 9, M.pink);
+    v.box(32, 38, 8, 35, 41, 9, M.pinkD);
 
     // ---- the golden crown on a pink cap: a gold ring whose walls rise into points with glowing tips (five points
     // in the silhouette), pink jewels on the band, a cyan jewel in the front notch, a pink gem orb at the heart
