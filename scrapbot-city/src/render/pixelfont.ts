@@ -73,6 +73,13 @@ export function pixelTextWidth(text: string, scale = 1): number {
   return n === 0 ? 0 : (n * 4 - 1) * scale;
 }
 
+const OUTLINE = [
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1],
+] as const;
+
 export function drawPixelText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -83,16 +90,7 @@ export function drawPixelText(
   outline?: string,
 ): void {
   const up = foldText(text);
-  if (outline) {
-    for (const [ox, oy] of [
-      [-1, 0],
-      [1, 0],
-      [0, -1],
-      [0, 1],
-    ]) {
-      paint(ctx, up, x + ox * scale, y + oy * scale, outline, scale);
-    }
-  }
+  if (outline) for (const [ox, oy] of OUTLINE) paint(ctx, up, x + ox * scale, y + oy * scale, outline, scale);
   paint(ctx, up, x, y, color, scale);
 }
 

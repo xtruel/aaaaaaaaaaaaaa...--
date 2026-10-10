@@ -36,10 +36,11 @@ interface Particle {
 interface Floater {
   x: number;
   y: number;
-  text: string;
-  color: string;
+  img: HTMLCanvasElement; // the outlined text, drawn once (see textSprite)
   life: number;
 }
+
+const MAX_FLOATERS = 48;
 
 export interface ViewState {
   hover: { x: number; y: number } | null;
@@ -125,7 +126,10 @@ export class Renderer {
   private focus: { x0: number; x1: number; y0: number; y1: number; sx0: number; sy0: number; sx1: number; sy1: number } | null = null;
   // adaptive quality: drops the costliest extras when frames get slow, restores them when it is fast again
   quality: 'high' | 'low' = 'high';
-  private frameAvg = 16;
+  private frameAvg = 16; // average interval between frames (ms)
+  private workAvg = 2; // average time render() itself takes (ms)
+  private displayMs = Infinity; // the display's own frame interval: the shortest recent one
+  private lastWork = 0;
   private slowFor = 0;
   private fastFor = 0;
   private walkers = new Walkers();
@@ -214,6 +218,10 @@ export class Renderer {
     this.clampCam();
   }
 
+  // Screen space covered by the HUD (CSS px), set by the session: the camera may scroll the map's edges
+  // clear of the top bar and the build toolbar, so every tile can be shown over bare map.
+  insets = { top: 0, bottom: 0 };
+
   clampCam(): void {
     // the map diamond's bounding box in iso pixels, with a margin
     const x0 = -MAP_H * TILE;
@@ -221,10 +229,13 @@ export class Renderer {
     const y0 = 0;
     const y1 = ((MAP_W + MAP_H) * TILE) / 2;
     const m = 64;
+    const mt = m + this.insets.top / this.pxZoom;
+    const mb = m + this.insets.bottom / this.pxZoom;
     if (this.viewW >= x1 - x0 + m * 2) this.cam.x = (x0 + x1 - this.viewW) / 2;
     else this.cam.x = Math.max(x0 - m, Math.min(x1 - this.viewW + m, this.cam.x));
-    if (this.viewH >= y1 - y0 + m * 2) this.cam.y = (y0 + y1 - this.viewH) / 2;
-    else this.cam.y = Math.max(y0 - m, Math.min(y1 - this.viewH + m, this.cam.y));
+    // when it all fits, centre the map in the part of the screen the HUD leaves free
+    if (this.viewH >= y1 - y0 + mt + mb) this.cam.y = (y0 + y1 - this.viewH) / 2 - (mt - mb) / 2;
+    else this.cam.y = Math.max(y0 - mt, Math.min(y1 - this.viewH + mb, this.cam.y));
   }
 
   // Shift the camera by whole tiles (controller D-pad).
@@ -501,12 +512,37 @@ export class Renderer {
   }
 
   private float(x: number, y: number, text: string, color: string): void {
-    this.floaters.push({ x, y, text, color, life: 1.4 });
+    // at high speed a big city makes dozens a second: the oldest go first
+    if (this.floaters.length >= MAX_FLOATERS) this.floaters.shift();
+    this.floaters.push({ x, y, img: this.textSprite(text, color), life: 1.4 });
+  }
+
+  // Floating texts repeat ("+2 PARTS", "+9 CR"): each text and colour is drawn once, outline included,
+  // into a small canvas, then blitted (one drawImage instead of hundreds of 1-pixel rectangles).
+  private textCache = new Map<string, HTMLCanvasElement>();
+  private textSprite(text: string, color: string): HTMLCanvasElement {
+    const key = `${color}|${text}`;
+    let c = this.textCache.get(key);
+    if (!c) {
+      if (this.textCache.size >= 256) this.textCache.clear();
+      c = document.createElement('canvas');
+      c.width = pixelTextWidth(text) + 2;
+      c.height = 7;
+      drawPixelText(c.getContext('2d')!, text, 1, 1, color, 1, PAL.ink);
+      this.textCache.set(key, c);
+    }
+    return c;
   }
 
   // ---------- frame ----------
 
   render(s: GameState, view: ViewState, dt: number, simRunning: boolean): void {
+    const started = performance.now();
+    this.renderFrame(s, view, dt, simRunning);
+    this.lastWork = performance.now() - started;
+  }
+
+  private renderFrame(s: GameState, view: ViewState, dt: number, simRunning: boolean): void {
     const ctx = this.ctx;
     this.clock += dt;
     ctx.fillStyle = '#0f0d18';
@@ -564,19 +600,31 @@ export class Renderer {
     this.drawFloaters(dt, camX, camY);
   }
 
-  // Average frame time decides the quality: below ~40 fps for 2 s the shadow layer, water glints and
-  // ambient particles go; above ~55 fps for 6 s they come back.
+  // Quality follows how busy the frames are, measured against the display's own rate (a 30 or 40 Hz screen,
+  // like the Steam Deck's 40 Hz mode, is not "slow"): when frames come 35% later than the display allows, or
+  // drawing takes over 70% of a frame, for 2 s, the shadow layer, water glints and ambient particles go; they
+  // come back after 6 s of frames on time with drawing under 40% of a frame.
   private adaptQuality(dt: number): void {
-    if (dt <= 0) return;
-    this.frameAvg += (dt * 1000 - this.frameAvg) * 0.05;
-    if (this.frameAvg > 25) {
+    if (dt <= 0 || dt > 0.25) return; // a hidden tab or a long pause says nothing about speed
+    const ms = dt * 1000;
+    this.frameAvg += (ms - this.frameAvg) * 0.05;
+    this.workAvg += (this.lastWork - this.workAvg) * 0.05;
+    // the shortest recent interval, slowly forgotten (so a monitor change is picked up)
+    this.displayMs = Math.min(Math.max(ms, 4), this.displayMs + dt * 0.1);
+    const slow = this.frameAvg > this.displayMs * 1.35 || this.workAvg > this.displayMs * 0.7;
+    const fast = this.frameAvg < this.displayMs * 1.12 && this.workAvg < this.displayMs * 0.4;
+    if (slow) {
       this.slowFor += dt;
       this.fastFor = 0;
       if (this.slowFor > 2) this.quality = 'low';
-    } else if (this.frameAvg < 18) {
+    } else if (fast) {
       this.fastFor += dt;
       this.slowFor = 0;
       if (this.fastFor > 6) this.quality = 'high';
+    } else {
+      // in between: neither verdict builds up
+      this.slowFor = Math.max(0, this.slowFor - dt);
+      this.fastFor = Math.max(0, this.fastFor - dt);
     }
   }
 
@@ -1417,9 +1465,11 @@ export class Renderer {
     this.floaters.length = w;
     for (const f of this.floaters) {
       f.y -= 10 * dt;
+      const x = Math.round(f.x - f.img.width / 2) - camX;
+      const y = Math.round(f.y) - 1 - camY;
+      if (x > this.viewW || y > this.viewH || x + f.img.width < 0 || y + f.img.height < 0) continue;
       ctx.globalAlpha = Math.min(1, f.life);
-      const tw = pixelTextWidth(f.text);
-      drawPixelText(ctx, f.text, Math.round(f.x - tw / 2) - camX, Math.round(f.y) - camY, f.color, 1, PAL.ink);
+      ctx.drawImage(f.img, x, y);
     }
     ctx.globalAlpha = 1;
   }

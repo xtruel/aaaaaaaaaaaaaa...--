@@ -181,6 +181,8 @@ export class RegionMap {
       audio.play('click');
       this.confirmRestart = true;
       this.renderPanel();
+      // the panel was rebuilt: the confirm button takes the focus, so a second A (or Enter) confirms
+      panel.querySelector<HTMLElement>('[data-restart-yes]')?.focus();
     });
     panel.querySelector('[data-restart-yes]')?.addEventListener('click', () => {
       audio.play('click');

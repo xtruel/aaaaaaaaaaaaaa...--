@@ -61,6 +61,8 @@ export class MainMenu {
   }
 
   render(): void {
+    // a language change rebuilds the menu: the highlight stays on the same entry
+    const keepAct = this.items[this.focusIndex]?.dataset.act;
     const ticker = tList('menu.ticker')
       .map((line) => `<span>${esc(line)}</span><b>✦</b>`)
       .join('');
@@ -126,12 +128,15 @@ export class MainMenu {
     });
     this.items = Array.from(this.ui.querySelectorAll<HTMLButtonElement>('.menu-list button'));
     this.items.forEach((b, i) => {
-      b.addEventListener('pointerenter', () => this.setFocus(i, false));
+      b.addEventListener('pointerenter', () => {
+        if (!b.disabled) this.setFocus(i, false);
+      });
       b.addEventListener('focus', () => this.setFocus(i, false));
       b.addEventListener('click', () => this.activate(b.dataset.act!));
     });
     this.refresh();
-    this.setFocus(Math.max(0, this.items.findIndex((b) => !b.disabled)), false, true);
+    const kept = this.items.findIndex((b) => b.dataset.act === keepAct && !b.disabled);
+    this.setFocus(kept >= 0 ? kept : Math.max(0, this.items.findIndex((b) => !b.disabled)), false, true);
   }
 
   private card(scene: CardScene, label: string, arrow = false): string {

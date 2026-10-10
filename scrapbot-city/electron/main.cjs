@@ -142,8 +142,10 @@ ipcMain.on('quit', () => app.quit());
 // Answers false when there is no Steam to ask, so the game can carry on without it.
 ipcMain.on('keyboard', (event, rect) => {
   const show = steam?.utils?.showFloatingGamepadTextInput;
-  event.returnValue = typeof show === 'function';
-  if (!event.returnValue) return;
+  // event.returnValue only sends the answer back: Electron's getter reads it as undefined, so keep our own copy
+  const ok = typeof show === 'function';
+  event.returnValue = ok;
+  if (!ok) return;
   const r = rect || {};
   try {
     Promise.resolve(show(r.numeric ? 3 : 0, Math.round(r.x || 0), Math.round(r.y || 0), Math.round(r.w || 0), Math.round(r.h || 0))).catch((err) =>

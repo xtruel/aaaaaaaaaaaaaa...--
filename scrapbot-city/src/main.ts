@@ -111,6 +111,9 @@ function pickLanguage(): void {
     const next = { ...settings, lang: l };
     saveSettings(next);
     applySettings(next);
+    // the menu was rebuilt in the new language: the language button keeps the focus
+    const pill = document.querySelector<HTMLElement>('[data-lang-open]');
+    if (pill?.offsetParent) pill.focus();
   });
 }
 
@@ -213,6 +216,7 @@ function freePlayDialog(prevName = 'Scrapbot City', prevSeed = Math.floor(Math.r
         { label: t('free.replace.go'), primary: true, onClick: go },
         { label: t('common.back'), onClick: () => freePlayDialog(name, s) },
       ],
+      onBack: () => freePlayDialog(name, s),
     });
   };
   body.addEventListener('submit', (e) => {
@@ -227,6 +231,7 @@ function freePlayDialog(prevName = 'Scrapbot City', prevSeed = Math.floor(Math.r
       { label: t('free.start'), primary: true, onClick: start },
       { label: t('common.back'), onClick: () => openModeChooser(modeHandlers) },
     ],
+    onBack: () => openModeChooser(modeHandlers),
   });
 }
 

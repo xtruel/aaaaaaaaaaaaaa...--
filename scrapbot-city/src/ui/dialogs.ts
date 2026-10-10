@@ -85,6 +85,7 @@ export function openSettings(current: Settings, onChange: (s: Settings) => void,
     eyebrow: t('settings.eyebrow'),
     body,
     actions: [{ label: t('common.done'), primary: true, onClick: () => (onBack ? onBack() : closeModal()) }],
+    onBack,
   });
   // opening only shows the values; nothing is saved or applied until the player changes something
   outputs(settings);
@@ -102,6 +103,18 @@ export function openLanguage(onPick: (l: Lang) => void): void {
   openModal({ title: t('menu.language'), eyebrow: 'Language · Sprache · Langue · Idioma · Lingua · Język · Taal', body });
 }
 
+// After a panel is rebuilt, the focus goes back to the same button, or to the first one still enabled:
+// a controller or keyboard player would otherwise lose their place (and the next A would hit Done).
+function refocus(root: HTMLElement, selector: string): void {
+  const same = root.querySelector<HTMLButtonElement>(selector);
+  if (same && !same.disabled) {
+    same.focus();
+    return;
+  }
+  const scope = root.closest<HTMLElement>('.modal') ?? root;
+  scope.querySelector<HTMLButtonElement>('.modal-body button:not(:disabled), .modal-actions button:not(:disabled)')?.focus();
+}
+
 export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLoad?: (slot: SlotId) => void; onBack?: () => void }): void {
   const body = el('div', 'slots');
   const render = () => {
@@ -116,6 +129,7 @@ export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLo
         : `<div><b>${label}</b><span class="empty">${t('slots.empty')}</span></div>`;
       const btn = el('button', 'btn btn-primary', mode === 'save' ? (meta ? t('slots.overwrite') : t('slots.doSave')) : t('slots.doLoad'));
       btn.type = 'button';
+      btn.dataset.slot = String(slot);
       btn.disabled = mode === 'load' && !meta;
       btn.addEventListener('click', () => {
         audio.play('click');
@@ -123,7 +137,11 @@ export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLo
           const ok = saveGame(slot, opts.state);
           audio.play(ok ? 'done' : 'error');
           if (!ok) row.querySelector('span')!.textContent = t('slots.failed');
-          else render();
+          else {
+            render();
+            // the rows are rebuilt: keep the focus on this slot (a controller would lose its place)
+            body.querySelector<HTMLElement>(`[data-slot="${slot}"]`)?.focus();
+          }
         } else if (mode === 'load') {
           opts.onLoad?.(slot);
         }
@@ -138,6 +156,7 @@ export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLo
     eyebrow: t('slots.eyebrow'),
     body,
     actions: opts.onBack ? [{ label: t('common.back'), onClick: opts.onBack }] : undefined,
+    onBack: opts.onBack,
   });
 }
 
@@ -362,6 +381,7 @@ export function openTrade(s: GameState, onChange: () => void): void {
         audio.play(got > 0 ? 'coin' : 'error');
         onChange();
         render();
+        refocus(body, `[data-send="${b.dataset.send}"]`);
       }),
     );
     body.querySelectorAll<HTMLButtonElement>('[data-take]').forEach((b) =>
@@ -371,6 +391,7 @@ export function openTrade(s: GameState, onChange: () => void): void {
         audio.play(got > 0 ? 'coin' : 'error');
         onChange();
         render();
+        refocus(body, `[data-take="${b.dataset.take}"]`);
       }),
     );
   };

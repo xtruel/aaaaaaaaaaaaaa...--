@@ -72,7 +72,7 @@ export class GameSession implements PadTarget {
   private keys = new Set<string>();
   private drag: Drag | null = null;
   private pointers = new Map<number, { x: number; y: number }>();
-  private pinch: { dist: number; zoom: number } | null = null;
+  private pinch: { dist: number; zoom: number; mx: number; my: number } | null = null;
   private wheelAcc = 0;
   private saveFailed = false;
   private unsaved = false;
@@ -97,6 +97,7 @@ export class GameSession implements PadTarget {
   private held = false; // the world under an open dialog is painted once, then held
   private padCursor!: HTMLElement;
   private padOn = false;
+  private hudCheckIn = 0; // seconds until the HUD's size is measured again (camera margins)
   private padHover: HTMLElement | null = null;
   private cursor = { x: 0, y: 0 };
 
@@ -213,9 +214,34 @@ export class GameSession implements PadTarget {
 
   // ---------- loop ----------
 
+  // The top bar and the build toolbar cover the map: the camera gets matching margins (see clampCam).
+  private measureHud(): void {
+    const top = this.root.querySelector<HTMLElement>('.hud-top');
+    const bar = this.root.querySelector<HTMLElement>('[data-toolbar]');
+    const insets = {
+      top: top?.offsetParent ? Math.max(0, Math.round(top.getBoundingClientRect().bottom)) : 0,
+      bottom: bar?.offsetParent ? Math.max(0, Math.round(window.innerHeight - bar.getBoundingClientRect().top)) : 0,
+    };
+    const r = this.renderer;
+    if (insets.top === r.insets.top && insets.bottom === r.insets.bottom) return;
+    r.insets = insets;
+    r.clampCam();
+  }
+
   private frame(dt: number): void {
     const s = this.s;
     const modal = isModalOpen();
+    this.hudCheckIn -= dt;
+    if (this.hudCheckIn <= 0) {
+      this.hudCheckIn = 0.5;
+      this.measureHud();
+    }
+    // controller unplugged: its cursor and the placement ghost under it go away
+    if (this.padOn && !padMode()) {
+      this.padOn = false;
+      this.padCursor.hidden = true;
+      this.pointer.inside = false;
+    }
     const running = !modal && this.speed > 0 && !s.outcome && !s.pendingEvent;
     if (running) {
       this.acc = advance(s, this.acc, this.simDt, this.speed);
@@ -334,7 +360,7 @@ export class GameSession implements PadTarget {
     if (k.has('KeyD') || k.has('ArrowRight')) dx += 1;
     if (k.has('KeyW') || k.has('ArrowUp')) dy -= 1;
     if (k.has('KeyS') || k.has('ArrowDown')) dy += 1;
-    if (this.settings.edgeScroll && this.pointer.inside && !this.drag) {
+    if (this.settings.edgeScroll && this.pointer.inside && !this.drag && !padMode()) {
       const m = 14;
       if (this.pointer.x < m) dx -= 1;
       if (this.pointer.x > window.innerWidth - m) dx += 1;
@@ -384,7 +410,7 @@ export class GameSession implements PadTarget {
       if (this.pointers.size >= 2) {
         // second finger: pinch to zoom, and the first finger's tap is cancelled
         const [a, b] = [...this.pointers.values()];
-        this.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.renderer.zoom };
+        this.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.renderer.zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
         this.drag = null;
         return;
       }
@@ -400,12 +426,28 @@ export class GameSession implements PadTarget {
     });
     this.listen(canvas, 'pointermove', (e) => {
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
+      // a press that began before a dialog opened (a story event, an ending) must not pan or build behind it
+      if (isModalOpen()) {
+        this.drag = null;
+        this.pinch = null;
+        this.pointers.clear();
+        return;
+      }
       if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pinch && this.pointers.size >= 2) {
+        // two fingers: their distance zooms, their midpoint drags the map along
         const [a, b] = [...this.pointers.values()];
+        const r = this.renderer;
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         const target = Math.round(this.pinch.zoom * (dist / Math.max(1, this.pinch.dist)));
-        if (target !== this.renderer.zoom) this.renderer.setZoom(target, (a.x + b.x) / 2, (a.y + b.y) / 2);
+        if (target !== r.zoom) r.setZoom(target, mx, my);
+        r.cam.x += (this.pinch.mx - mx) / r.pxZoom;
+        r.cam.y += (this.pinch.my - my) / r.pxZoom;
+        r.clampCam();
+        this.pinch.mx = mx;
+        this.pinch.my = my;
         this.cameraMoved = true;
         return;
       }
@@ -422,15 +464,23 @@ export class GameSession implements PadTarget {
         this.cameraMoved = true;
       }
     });
-    const release = (e: PointerEvent) => {
+    // Returns true when the lifted finger ended a pinch: the finger still down goes on dragging the map.
+    const release = (e: PointerEvent): boolean => {
+      const pinching = this.pinch !== null;
       this.pointers.delete(e.pointerId);
       if (this.pointers.size < 2) this.pinch = null;
+      if (pinching && this.pointers.size === 1) {
+        const [p] = [...this.pointers.values()];
+        const r = this.renderer;
+        this.drag = { x: p.x, y: p.y, camX: r.cam.x, camY: r.cam.y, moved: true, button: 0, pointerType: 'touch' };
+      }
+      return pinching;
     };
     this.listen(canvas, 'pointerup', (e) => {
-      release(e);
+      if (release(e)) return;
       const d = this.drag;
       this.drag = null;
-      if (!d || d.moved) return;
+      if (!d || d.moved || isModalOpen()) return;
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
       if (d.button === 2) this.cancelTool();
       else if (d.button === 0) this.click(e.clientX, e.clientY);
@@ -713,9 +763,14 @@ export class GameSession implements PadTarget {
     ] as const) {
       if (!f.pressed.has(dir)) continue;
       const tile = r.screenToTile(c.x, c.y);
+      // the cursor stops at the map's edge (it may come back in from outside)
+      if (inBounds(tile.x, tile.y) && !inBounds(tile.x + dx, tile.y + dy)) continue;
       const toScreen = () => r.tileToScreen(tile.x + dx, tile.y + dy);
       let p = toScreen();
-      if (p.x < w * 0.15 || p.x > w * 0.85 || p.y < h * 0.18 || p.y > h * 0.75) {
+      // near the screen's edge or under the HUD (toolbar, objective card): the map moves one tile instead,
+      // so the new tile lands where the cursor was
+      const covered = () => document.elementFromPoint(p.x, p.y) !== r.canvas;
+      if (p.x < w * 0.15 || p.x > w * 0.85 || p.y < h * 0.18 || p.y > h * 0.75 || covered()) {
         r.panTiles(dx, dy);
         this.cameraMoved = true;
         p = toScreen();
@@ -839,15 +894,20 @@ export class GameSession implements PadTarget {
       this.save();
       return;
     }
+    // until the player answers, nothing is saved (closing the window now keeps the old city)
+    this.unsaved = true;
     openModal({
       title: t('free.replace.title'),
       body: `<p>${t('free.replace.body', { city: esc(old.city), day: old.day })}</p>`,
+      // two real choices: Esc, B or a click outside must not leave the saved city exposed to the next autosave
+      dismissable: false,
       actions: [
         {
           label: t('free.replace.go'),
           primary: true,
           onClick: () => {
             closeModal();
+            this.unsaved = false;
             this.save();
           },
         },

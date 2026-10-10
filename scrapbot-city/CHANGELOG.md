@@ -73,6 +73,25 @@
 - Impostazioni: aprirle non azzera più niente con lo storage bloccato; lo schermo intero resta allineato quando cambia
   con F11, Esc o i controlli della finestra, anche con la finestra delle impostazioni aperta.
 - Tasto Home: come H, riporta la camera sull'HQ.
+- Fine del tutorial con una città già salvata: la domanda "Sostituire la città?" non si chiude più con Esc, B o un clic
+  fuori (prima la città salvata veniva poi sovrascritta in silenzio), e finché non si risponde non si salva nulla.
+- Un clic o un trascinamento iniziato prima che si apra un dialogo (evento, finale) non costruisce e non sposta più la
+  città dietro il dialogo.
+- Esc, B, × e il clic fuori tornano indietro di un passo nei dialoghi aperti da un altro (Impostazioni e Salvataggi dalla
+  pausa, Partita libera dal menu "Nuova partita") invece di chiudere tutto; chiuso l'ultimo dialogo, il focus torna al
+  pulsante che l'aveva aperto. Il menu principale tiene la voce evidenziata dopo un cambio di lingua e il passaggio del
+  mouse su "Continua" disattivato non sposta più l'evidenziazione.
+- Controller: ai bordi sud della mappa il cursore non finisce più sotto la barra degli strumenti (la camera ha margini
+  pari all'HUD e il D-pad sposta la mappa quando la casella sarebbe coperta); il D-pad si ferma al bordo della mappa;
+  "Ricomincia questa città", la banca regionale e i salvataggi tengono il focus sul pulsante giusto dopo ogni pressione;
+  staccare il controller toglie il cursore virtuale; lo scorrimento ai bordi (opzione mouse) non trascina più la mappa
+  quando il cursore del controller è fermo al bordo.
+- Touch: due dita insieme spostano la mappa mentre fanno zoom, e il dito rimasto dopo un pinch continua a trascinare.
+- Qualità adattiva: decide in base al lavoro di disegno e alla frequenza dello schermo, quindi su schermi a 30/40 Hz
+  (Steam Deck a 40 Hz, risparmio energetico del browser) non resta più bloccata in qualità bassa.
+- Testi fluttuanti disegnati una volta e riusati, saltati fuori schermo e al massimo 48: alla velocità massima erano metà
+  del costo del disegno.
+- Desktop: la tastiera a schermo di Steam Deck si apre davvero (la risposta della richiesta veniva riletta come vuota).
 - Desktop/Steam: steamworks.js (quando installato) si carica all'avvio, così l'overlay di Steam funziona; lanciato dal
   client Steam il gioco prende l'App ID da Steam anche senza `steam_appid.txt`.
 
@@ -92,5 +111,7 @@
 - `tests/art.test.ts`: l'atlante ha tutti i fotogrammi di ogni edificio; i fotogrammi di animazione cambiano davvero
   l'uno dall'altro; "spento" è diverso da "al lavoro"; i cantieri crescono; bot e terreno completi.
   `scripts/art/check-frames.ts` misura lo stesso prima di generare l'atlante.
+- `tests/modal.test.ts`: Esc/B tornano indietro di un passo, i dialoghi con due scelte non si chiudono da soli, il focus
+  torna a chi ha aperto il dialogo.
 - `tests/stability.test.ts`: una città completa gioca 40 giorni alla velocità massima con eventi, salvando e
   ricaricando ogni 5 giorni: niente NaN, niente valori negativi, niente liste che crescono senza limite.

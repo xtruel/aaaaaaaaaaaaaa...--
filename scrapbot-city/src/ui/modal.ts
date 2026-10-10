@@ -21,16 +21,26 @@ export interface ModalOptions {
   wide?: boolean;
   className?: string;
   onClose?: () => void;
+  // a dialog opened from another one (Settings from Pause): Esc, B, × and the backdrop go back one step
+  onBack?: () => void;
 }
 
 let current: { el: HTMLElement; opts: ModalOptions } | null = null;
+// what had the focus before the first dialog opened: it gets it back when the last one closes
+let opener: HTMLElement | null = null;
+
+function dismiss(): void {
+  if (!current || current.opts.dismissable === false) return;
+  if (current.opts.onBack) current.opts.onBack();
+  else closeModal();
+}
 
 // Registered before any screen's own key handler, so Esc closes the dialog and nothing else.
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || !current) return;
   e.stopImmediatePropagation();
   e.preventDefault();
-  if (current.opts.dismissable !== false) closeModal();
+  dismiss();
 });
 
 export function isModalOpen(): boolean {
@@ -50,6 +60,11 @@ export function closeModal(): void {
   el.remove();
   setBackgroundInert(false);
   opts.onClose?.();
+  if (!current) {
+    const back = opener;
+    opener = null;
+    if (back?.isConnected && !back.closest('[inert]') && !(back as HTMLButtonElement).disabled) back.focus();
+  }
 }
 
 export function openModal(opts: ModalOptions): HTMLElement {
@@ -57,6 +72,9 @@ export function openModal(opts: ModalOptions): HTMLElement {
     // replace without firing the previous onClose
     current.el.remove();
     current = null;
+  } else {
+    const active = document.activeElement;
+    opener = active instanceof HTMLElement && active !== document.body ? active : null;
   }
   const root = document.getElementById('modal-root')!;
   const el = document.createElement('div');
@@ -95,7 +113,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
     x.textContent = '×';
     x.addEventListener('click', () => {
       audio.play('click');
-      closeModal();
+      dismiss();
     });
     head.append(x);
   }
@@ -131,7 +149,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
   el.append(dialog);
   if (opts.dismissable !== false) {
     el.addEventListener('pointerdown', (e) => {
-      if (e.target === el) closeModal();
+      if (e.target === el) dismiss();
     });
   }
   root.append(el);

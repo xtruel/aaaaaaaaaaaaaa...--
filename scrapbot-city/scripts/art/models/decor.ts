@@ -37,23 +37,23 @@ const CONT_RD = mat('decor-contRD', { rgb: hex('#6b3721'), jitter: 0.05 });
 const CONCRETE_D = mat('decor-concreteD', { rgb: hex('#56526a'), jitter: 0.06 });
 const CRANE = mat('decor-crane', { rgb: hex('#deae38'), jitter: 0.02 });
 const CRANE_D = mat('decor-craneD', { rgb: hex('#9e7a25'), jitter: 0.02 });
-const TURBINE = mat('decor-turbine', { rgb: hex('#e2deec'), jitter: 0 });
+const TURBINE = mat('decor-turbine', { rgb: hex('#cdc9db'), jitter: 0 });
 const CAR = mat('decor-car', { rgb: hex('#4f8189'), jitter: 0.03 });
 const CAR_D = mat('decor-carD', { rgb: hex('#365a64'), jitter: 0.03 });
 const PRIMER = mat('decor-primer', { rgb: hex('#a29fb0'), jitter: 0.03 });
 const POLE = mat('decor-pole', { rgb: hex('#6b4c38'), jitter: 0.04 });
 const CABLE = mat('decor-cable', { rgb: hex('#3a3550'), jitter: 0 });
 const DRUM_G = mat('decor-drumG', { rgb: hex('#4f7a3c'), jitter: 0.03 });
-const TYRE = mat('decor-tyre', { rgb: hex('#433d50'), jitter: 0.03 });
-const TYRE_D = mat('decor-tyreD', { rgb: hex('#2c2838'), jitter: 0.03 });
+const TYRE = mat('decor-tyre', { rgb: hex('#4b4559'), jitter: 0.03 });
+const TYRE_D = mat('decor-tyreD', { rgb: hex('#332e40'), jitter: 0.03 });
 const DUMP = mat('decor-dump', { rgb: hex('#3c6d4c'), jitter: 0.03 });
 const DUMP_D = mat('decor-dumpD', { rgb: hex('#2a4d38'), jitter: 0.03 });
 const FORK = mat('decor-fork', { rgb: hex('#e6b52e'), jitter: 0.02 });
 const FORK_D = mat('decor-forkD', { rgb: hex('#9c7720'), jitter: 0.02 });
 const PIPE = mat('decor-pipe', { rgb: hex('#7f86a6'), jitter: 0.02 });
 // backlit sign faces: plain by day, softly glowing at night (dark letters stay readable on them)
-const LIGHTBOX = mat('decor-lightbox', { rgb: hex('#f4eff8'), emit: 0.42, glow: hex('#ffe2ef'), flat: true, jitter: 0 });
-const LIGHTBOX_Y = mat('decor-lightboxY', { rgb: hex('#ffd440'), emit: 0.42, glow: hex('#ffcf4a'), flat: true, jitter: 0 });
+const LIGHTBOX = mat('decor-lightbox', { rgb: hex('#f4eff8'), emit: 0.3, glow: hex('#ffe2ef'), flat: true, jitter: 0 });
+const LIGHTBOX_Y = mat('decor-lightboxY', { rgb: hex('#ffd440'), emit: 0.3, glow: hex('#ffcf4a'), flat: true, jitter: 0 });
 
 // ---------- helpers ----------
 
@@ -277,8 +277,6 @@ function crates(): Vox {
   crate(v, 2, 3, 6, 7, 8, 10);
   crate(v, 9, 6, 0, 15, 13, 5);
   crate(v, 3, 11, 0, 8, 15, 4);
-  // a pink 2PM shipping mark on the big crate
-  v.box(4, 9, 2, 7, 10, 4, M.pinkD);
   return v;
 }
 
@@ -301,17 +299,24 @@ function barrels(): Vox {
 }
 
 function tyres(): Vox {
-  const v = tile(1, 1, 8);
-  // a stack of three used as a planter, one more flat in the dirt
-  for (let k = 0; k < 3; k++) {
-    v.cylZ(6, 6, 3.6, k * 2, k * 2 + 2, TYRE, 1.7);
-    v.cylZ(6, 6, 3.7, k * 2, k * 2 + 1, TYRE_D, 2.6);
-  }
-  v.cylZ(6, 6, 1.8, 4, 6, DIRT);
-  v.sphere(6, 6, 6.5, 1.8, LEAF);
-  v.box(5, 6, 6, 7, 7, 8, LEAF_L);
-  v.cylZ(11.5, 11.5, 3.4, 0, 2, TYRE, 1.6);
-  v.cylZ(11.5, 11.5, 3.5, 0, 1, TYRE_D, 2.4);
+  const v = tile(1, 1, 9);
+  // a stack of two used as a planter, one more flat in the dirt; rounded profiles keep the tyres apart
+  const tyre = (cx: number, cy: number, z: number) => {
+    v.cylZ(cx, cy, 3.1, z, z + 1, TYRE_D, 1.6);
+    v.cylZ(cx, cy, 3.6, z + 1, z + 2, TYRE, 1.6);
+    v.cylZ(cx, cy, 3.1, z + 2, z + 3, TYRE, 1.6);
+  };
+  tyre(4.5, 10, 0);
+  tyre(4.5, 10, 3);
+  v.cylZ(4.5, 10, 1.8, 0, 5, DIRT);
+  v.sphere(4.5, 10, 6.6, 2, LEAF_L);
+  v.box(4, 10, 7, 5, 11, 9, LEAF);
+  // one standing on its edge against the stack, showing its hole
+  for (let x = 6; x < 16; x++)
+    for (let z = 0; z < 8; z++) {
+      const d = Math.hypot(x + 0.5 - 11.5, z + 0.5 - 3.6);
+      if (d <= 3.6 && d > 1.5) v.box(x, 5, z, x + 1, 7, z + 1, d > 3 ? TYRE_D : TYRE);
+    }
   return v;
 }
 
@@ -422,47 +427,46 @@ function fence(): Vox {
   return v;
 }
 
+// Side-on to the front-left so the yellow body, the black wheels and the overhead guard read; forks to the +x.
 function forklift(): Vox {
   const v = tile(1, 1, 11);
   // chassis with the engine hood / counterweight at the back
-  v.box(4, 2, 1, 12, 11, 4, FORK);
-  v.box(4, 2, 4, 12, 6, 7, FORK);
-  v.box(4, 1, 1, 12, 3, 7, FORK_D);
-  v.box(4, 10, 3, 12, 11, 4, FORK_D);
-  // wheels
-  for (const [y, r] of [
-    [4, 1.8],
-    [9, 2],
+  v.box(2, 4, 1, 12, 11, 5, FORK);
+  v.box(2, 4, 5, 7, 11, 7, FORK);
+  v.box(1, 4, 1, 2, 11, 7, FORK_D);
+  v.box(2, 4, 1, 12, 11, 2, FORK_D);
+  // wheels with grey hubs
+  for (const [x, r] of [
+    [4.5, 1.9],
+    [10, 2.1],
   ] as const) {
-    v.cylX(y, 1.6, r, 3, 4, M.ink);
-    v.cylX(y, 1.6, r, 12, 13, M.ink);
-    v.box(3, y - 1, 1, 4, y, 2, M.steelL);
-    v.box(12, y - 1, 1, 13, y, 2, M.steelL);
+    v.cylY(x, 1.8, r, 3, 4, M.ink);
+    v.cylY(x, 1.8, r, 11, 12, M.ink);
+    v.box(Math.floor(x), 11, 1, Math.floor(x) + 1, 12, 2, M.steelL);
   }
   // seat and steering wheel
-  v.box(6, 6, 4, 10, 9, 5, M.ink);
-  v.box(6, 6, 5, 10, 7, 8, M.ink);
-  v.box(7, 9, 4, 9, 10, 6, M.steelD);
-  v.box(7, 9, 6, 9, 11, 7, M.ink);
+  v.box(7, 6, 5, 10, 9, 6, M.ink);
+  v.box(7, 6, 6, 8, 9, 8, M.ink);
+  v.box(10, 7, 5, 11, 8, 7, M.steelD);
+  v.box(10, 6, 7, 11, 9, 8, M.ink);
   // overhead guard: four posts and an open roof frame
   for (const [x, y] of [
-    [4, 3],
-    [11, 3],
-    [4, 10],
+    [3, 4],
+    [3, 10],
+    [11, 4],
     [11, 10],
   ])
-    v.box(x, y, 4, x + 1, y + 1, 10, M.steelD);
-  v.box(4, 3, 9, 12, 4, 10, M.steelD);
-  v.box(4, 10, 9, 12, 11, 10, M.steelD);
-  v.box(4, 3, 9, 5, 11, 10, M.steelD);
-  v.box(11, 3, 9, 12, 11, 10, M.steelD);
-  v.box(7, 3, 9, 9, 11, 10, M.steelD);
-  // mast and forks in front
-  for (const x of [5, 10]) v.box(x, 11, 0, x + 1, 13, 10, M.steel);
-  v.box(5, 11, 9, 11, 13, 10, M.steel);
-  v.box(5, 12, 2, 11, 13, 6, M.steelD);
-  v.box(5, 13, 2, 7, 16, 3, M.steelL);
-  v.box(9, 13, 2, 11, 16, 3, M.steelL);
+    v.box(x, y, 5, x + 1, y + 1, 10, M.steelD);
+  v.box(3, 4, 9, 12, 5, 10, M.steelD);
+  v.box(3, 10, 9, 12, 11, 10, M.steelD);
+  v.box(5, 4, 9, 6, 11, 10, M.steelD);
+  v.box(9, 4, 9, 10, 11, 10, M.steelD);
+  // mast and forks
+  for (const y of [5, 9]) v.box(12, y, 0, 14, y + 1, 10, M.steel);
+  v.box(12, 5, 9, 14, 10, 10, M.steel);
+  v.box(13, 5, 2, 14, 10, 6, M.steelD);
+  v.box(14, 5, 2, 16, 7, 3, M.steelL);
+  v.box(14, 8, 2, 16, 10, 3, M.steelL);
   return v;
 }
 
@@ -535,32 +539,36 @@ function pipeRun(): Vox {
   return v;
 }
 
+// A wooden utility pole with two crossarms, glass insulators, a transformer can and its cable running down into a
+// ground box.
 function cablePole(): Vox {
-  const v = tile(1, 1, 31);
-  v.box(6, 6, 0, 10, 10, 1, DIRT);
-  v.box(7, 7, 0, 9, 9, 29, POLE);
-  // crossarm with braces and three glass insulators
-  v.box(1, 7, 24, 15, 9, 26, POLE);
-  line(v, [3, 7, 24], [7, 7, 20], POLE);
-  line(v, [12, 7, 24], [8, 7, 20], POLE);
-  for (const x of [2, 13]) v.box(x, 7, 26, x + 1, 9, 28, M.cyanD);
-  v.box(7, 7, 29, 9, 9, 30, M.cyanD);
-  // slack lines looping between the insulators
-  for (let x = 2; x < 14; x++) {
-    const t = (x - 7.5) / 5.5;
-    v.set(x, 9, Math.round(22 + 4 * t * t), CABLE);
+  const v = tile(1, 1, 37);
+  v.box(6, 6, 0, 10, 10, 1, M.concrete);
+  v.box(7, 7, 0, 9, 9, 35, POLE);
+  v.box(7, 7, 35, 9, 9, 36, M.steelD);
+  // two crossarms set across the view (along x − y) so they read as a T on screen, insulators on their ends
+  for (const [z, n] of [
+    [31, 6],
+    [26, 4],
+  ]) {
+    for (let k = -n; k <= n; k++) v.box(8 + k, 7 - k, z - 1, 9 + k, 9 - k, z + 1, POLE);
+    for (const k of [-n, n]) v.box(8 + k, 7 - k, z + 1, 9 + k, 9 - k, z + 3, M.white);
   }
-  // transformer can, its cable running down into a ground box, and a warning plate
-  v.cylZ(10.5, 8, 2, 14, 20, M.steelL);
-  v.cylZ(10.5, 8, 2.1, 20, 21, M.steelD);
-  v.box(11, 9, 1, 12, 10, 14, CABLE);
-  v.box(10, 9, 0, 14, 12, 4, M.steelD);
-  v.box(11, 11, 1, 13, 12, 3, M.hazardY);
-  v.box(7, 9, 9, 9, 10, 12, M.hazardY);
-  v.box(7, 9, 10, 9, 10, 11, M.hazardK);
-  // guy wire to an anchor
-  line(v, [7, 8, 23], [2, 13, 1], M.steelL);
-  v.box(1, 12, 0, 4, 15, 1, M.concrete);
+  // loose drop cables hanging from the upper arm's ends
+  for (const k of [-6, 6]) {
+    const x = 8 + k;
+    const y = 8 - k;
+    for (let dz = 0; dz < 7; dz++) v.set(x + (dz > 3 ? Math.sign(-k) : 0), y + (dz > 3 ? Math.sign(k) : 0), 29 - dz, CABLE);
+  }
+  // transformer can, its cable down the pole, the ground box and a warning plate
+  v.cylZ(10.5, 8, 2, 17, 23, M.steelL);
+  v.cylZ(10.5, 8, 2.1, 23, 24, M.steelD);
+  v.box(9, 7, 20, 10, 9, 21, M.steelD);
+  v.box(9, 9, 1, 10, 10, 18, CABLE);
+  v.box(9, 9, 0, 13, 13, 4, M.steelD);
+  v.box(10, 12, 1, 12, 13, 3, M.hazardY);
+  v.box(7, 9, 11, 9, 10, 14, M.hazardY);
+  v.box(7, 9, 12, 9, 10, 13, M.hazardK);
   return v;
 }
 
@@ -621,10 +629,10 @@ function ruinWall(): Vox {
   v.box(8, 4, 23, 10, 5, 24, M.rust); // one bent over
   // rubble in front
   v.box(10, 8, 0, 14, 11, 2, M.concrete);
-  v.box(11, 9, 2, 13, 11, 3, M.concreteL);
-  v.box(20, 9, 0, 23, 12, 2, M.concreteL);
+  v.box(11, 9, 2, 13, 11, 3, M.concrete);
+  v.box(20, 9, 0, 23, 12, 2, CONCRETE_D);
   v.box(25, 7, 0, 28, 10, 3, M.concrete);
-  v.box(26, 10, 0, 30, 11, 1, M.concreteL);
+  v.box(26, 10, 0, 30, 11, 1, CONCRETE_D);
   return v;
 }
 
@@ -737,11 +745,11 @@ function windTurbine(frame: number): Vox {
   v.cone(cx, cy, 2, 40, 2.3, 1.3, TURBINE);
   v.paint(15, 8, 2, 17, 10, 6, M.steelD);
   // nacelle pointing to the front-left, a red light on top
-  v.box(14, 4, 38, 18, 11, 42, M.steelL);
-  v.box(14, 4, 41, 18, 11, 42, TURBINE);
+  v.box(14, 5, 38, 18, 11, 42, M.steel);
+  v.box(14, 5, 41, 18, 11, 42, M.steelD);
   v.box(16, 5, 42, 18, 7, 43, M.redLit);
   // hub and pink nose
-  v.box(15, 11, 39, 17, 12, 42, TURBINE);
+  v.box(15, 11, 39, 17, 12, 42, M.steel);
   v.box(15, 13, 39, 17, 14, 41, M.pink);
   // three blades turning 30° per frame (120° symmetry: four frames make a seamless loop)
   const hx = 16;
@@ -759,7 +767,7 @@ function windTurbine(frame: number): Vox {
         const p = Math.abs(-dx * s + dz * c);
         if (t < 0.5 || t > L) continue;
         if (p > (t < 7 ? 1.25 : 0.8)) continue;
-        v.set(x, 12, z, t > L - 3.6 ? M.pink : TURBINE);
+        v.set(x, 12, z, t > L - 3.6 ? M.pink : M.white);
       }
   }
   v.box(15, 12, 39, 17, 13, 41, M.steelL);
