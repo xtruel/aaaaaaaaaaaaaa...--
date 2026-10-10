@@ -141,7 +141,10 @@ al primo avvio; si cambia dal pulsante col globo nel menu o dalle impostazioni.
 
 ## 8. Prezzo e lancio (consiglio)
 
-- Prezzo indicativo per un city builder pixel indie di 6–10 ore: **9,99–12,99 €**, con sconto lancio del 10–15%.
+- Con i contenuti di oggi (campagna di 1,5–3 ore, 10 eventi) il prezzo onesto è **4,99–6,99 €**: sotto le 2 ore
+  di gioco molti chiedono il rimborso, e Steam lo concede entro 14 giorni.
+- Un city builder pixel indie di 6–10 ore regge **9,99–12,99 €**: è il traguardo dopo i contenuti della sezione 9.
+- Sconto di lancio del 10–15%.
 - Usa il **tutorial + Scrapbot City** come **demo gratuita** per lo Steam Next Fest: è già un pezzo chiuso del gioco.
 - Lingue: le 8 europee sono già nel gioco. Le prossime da valutare: portoghese brasiliano, giapponese,
   cinese semplificato e coreano (i city builder vendono molto in Asia; servono font CJK, oggi c'è solo il katakana del logo).
