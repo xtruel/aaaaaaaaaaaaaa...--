@@ -184,3 +184,16 @@ HQ, Riciclatore, Bot Dock, bot animati, terreno, piazzamento isometrico. Verific
 | Prestazioni: 121 edifici, 35 bot, velocità 3 | 60 fps a 1280×800 e 2560×1440 (Chromium senza GPU) |
 
 ### Dopo la migrazione
+Tutti i 12 edifici, i bot, 6 cittadini, il gatto, il dirigibile, 25 elementi di scenografia, il terreno, i lampioni,
+le demolizioni e la notte sono passati all'isometrico. Risultati sulla release candidate 0.6.0 (dettagli e limiti in
+[TEST-REPORT.md](TEST-REPORT.md)):
+
+| Verifica | Risultato |
+|---|---|
+| Casella sotto il mouse a zoom 1–5, clic sui tetti, piazzamento, tastiera, rotella, D-pad, H/Home, demolizione | 23/23 (891 punti) |
+| Touch: trascinamento, pinch, tap, costruzione | 9/9 |
+| Scenografia mai dentro la mappa, terreni decorativi tutti edificabili, clic che attraversano scenografia e bot | 7/7 |
+| Animazioni: ogni passo di ogni edificio cambia ≥ 0,4% dei pixel, "spento" ≠ "al lavoro" (`tests/art.test.ts`) | 12/12 edifici |
+| Progressione dall'interfaccia: nuova partita → costruzione → produzione → salvataggio → caricamento | 9/9 |
+| Campagna completa (5 città, finali verde/industriale/smog, finale regionale) | 109/109 |
+| Prestazioni, 121 edifici e 35 bot a velocità 3, senza GPU | 60 fps a 1280×800, 59–60 fps a 2560×1440; disegno 1,8 ms per fotogramma |

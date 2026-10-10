@@ -22,6 +22,7 @@ npm run dist:win     # build per Steam in release/ (anche dist:linux, dist:mac)
 
 Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, Steam Cloud, Steam Deck, upload,
 pagina del negozio, prezzo. Per i test con giocatori veri c'è **[docs/PLAYTEST.md](docs/PLAYTEST.md)**.
+Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
 
 ## Modalità di gioco
 
@@ -121,6 +122,7 @@ scripts/art/           pipeline della grafica: modelli voxel (models/), ray cast
 art/sprites/           ogni fotogramma come PNG singolo; art/contact-sheet.png li mostra tutti
 art/overrides/         PNG ritoccati a mano con lo stesso nome di uno sprite: sostituiscono quello generato
 docs/ISO-MIGRATION.md  piano tecnico del passaggio all'isometrico
+docs/TEST-REPORT.md    rapporto di test della release candidate 0.6.0
 scripts/i18n-check.ts  controllo delle traduzioni
 docs/STEAM.md          guida alla pubblicazione su Steam
 docs/PLAYTEST.md       come organizzare un playtest e cosa osservare
