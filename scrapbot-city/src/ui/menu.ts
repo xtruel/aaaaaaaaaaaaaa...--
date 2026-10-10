@@ -184,6 +184,15 @@ export class MainMenu {
     } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
       e.preventDefault();
       this.setFocus(enabled[(pos - 1 + enabled.length) % enabled.length], true);
+    } else if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') {
+      // the highlighted entry works with Enter even before an arrow key gave it real focus
+      const active = document.activeElement;
+      if (active && active !== document.body && this.root.contains(active)) return; // a focused button clicks itself
+      const b = this.items[this.focusIndex];
+      if (b && !b.disabled) {
+        e.preventDefault();
+        b.click();
+      }
     }
   }
 

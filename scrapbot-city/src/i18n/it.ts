@@ -417,6 +417,8 @@ export const it: Dict = {
   'pause.tip': "Consiglio: <kbd>Q</kbd> chiede un suggerimento a USA-9, <kbd>H</kbd> ti riporta al QG, <kbd>Tab</kbd> cambia la velocità.",
   'pause.resume': "Riprendi",
   'pause.save': "Salva partita",
+  'tut.keepOld': 'Tieni la mia città salvata',
+  'msg.tutorialNotSaved': 'Questa città di addestramento non si salva da sola, così la tua città del gioco libero resta al sicuro. Usa Salva partita nel menu per tenerla in uno slot.',
   'pause.load': "Carica partita",
   'pause.saveMenu': "Salva e torna al menu",
   'pause.region': "Mappa della regione",

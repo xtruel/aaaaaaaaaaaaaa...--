@@ -4,6 +4,7 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { usable } = require('./storage-utils.cjs');
 
 let steam = null;
 
@@ -26,23 +27,30 @@ function readText(file) {
 }
 
 // Write next to the file, then rename over it: a crash mid-save never leaves half a city behind.
-// The previous version stays as .bak and is used if the main file is ever missing or empty.
-function writeAtomic(file, value) {
+// The previous good version stays as .bak and is used if the main file is ever missing or damaged;
+// a damaged file is never copied over a good backup.
+function writeAtomic(key, file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.tmp`;
   fs.writeFileSync(tmp, value, 'utf8');
-  if (fs.existsSync(file)) fs.copyFileSync(file, `${file}.bak`);
+  if (usable(key, readText(file))) fs.copyFileSync(file, `${file}.bak`);
   fs.renameSync(tmp, file);
 }
 
 ipcMain.on('storage:get', (event, key) => {
   const file = fileFor(key);
-  event.returnValue = readText(file) ?? readText(`${file}.bak`);
+  const main = readText(file);
+  if (usable(key, main)) {
+    event.returnValue = main;
+    return;
+  }
+  const bak = readText(`${file}.bak`);
+  event.returnValue = usable(key, bak) ? bak : main;
 });
 
 ipcMain.on('storage:set', (event, key, value) => {
   try {
-    writeAtomic(fileFor(key), String(value));
+    writeAtomic(key, fileFor(key), String(value));
     event.returnValue = true;
   } catch (err) {
     console.log(`Could not save ${key}: ${err.message}`);
@@ -95,6 +103,9 @@ function createWindow() {
   Menu.setApplicationMenu(null);
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   win.once('ready-to-show', () => win.show());
+  // keep the game's Fullscreen setting in step with the window, however it changed (F11, OS controls)
+  win.on('enter-full-screen', () => win.webContents.send('fullscreen-changed', true));
+  win.on('leave-full-screen', () => win.webContents.send('fullscreen-changed', false));
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && input.key === 'F11') {
       win.setFullScreen(!win.isFullScreen());

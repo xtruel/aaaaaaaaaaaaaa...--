@@ -32,6 +32,9 @@ export function loadCampaign(): Campaign {
     const c = JSON.parse(raw) as Campaign;
     return { ...fresh(), ...c, bank: { ...fresh().bank, ...c.bank } };
   } catch {
+    // damaged: keep a copy aside (once) before the next save replaces it
+    if (!readKey('campaign-damaged')) writeKey('campaign-damaged', raw);
+    console.warn('Campaign progress could not be read; a copy was kept as campaign-damaged');
     return fresh();
   }
 }

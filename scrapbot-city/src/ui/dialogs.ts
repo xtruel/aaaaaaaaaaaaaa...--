@@ -12,7 +12,7 @@ import { LANGS, bName, lang, t } from '../i18n';
 import { localizeKeys } from '../keys';
 import type { Key, Lang } from '../i18n';
 import { buildingThumb, iconUrl, portraitUrl } from '../render/icons';
-import { isTutorialDone, loadSettings, openSavesFolder, saveGame, saveSettings, slotMeta, SLOTS, unlockedEndings } from '../storage';
+import { isTutorialDone, openSavesFolder, saveGame, saveSettings, slotMeta, SLOTS, unlockedEndings } from '../storage';
 import type { Settings, SlotId } from '../storage';
 import { esc } from './escape';
 import { closeModal, openModal } from './modal';
@@ -31,8 +31,9 @@ function pathName(alignment: number): string {
   return t('path.balanced');
 }
 
-export function openSettings(onChange: (s: Settings) => void, onBack?: () => void): void {
-  const settings = loadSettings();
+// Shows the settings in use (not a fresh read: with blocked storage that would show the defaults).
+export function openSettings(current: Settings, onChange: (s: Settings) => void, onBack?: () => void): void {
+  const settings = current;
   const body = el('form', 'settings-form');
   body.innerHTML = `
     <label for="set-lang">${t('settings.language')}</label>
@@ -60,16 +61,19 @@ export function openSettings(onChange: (s: Settings) => void, onBack?: () => voi
     fullscreen: (body.querySelector('#set-full') as HTMLInputElement).checked,
     lang: (body.querySelector('#set-lang') as HTMLSelectElement).value as Lang,
   });
-  const sync = () => {
-    const s = read();
+  const outputs = (s: Settings) => {
     body.querySelector('[data-out="sfx"]')!.textContent = `${Math.round(s.sfx * 100)}%`;
     body.querySelector('[data-out="music"]')!.textContent = `${Math.round(s.music * 100)}%`;
+  };
+  const sync = () => {
+    const s = read();
+    outputs(s);
     saveSettings(s);
     const relabel = s.lang !== lang();
     onChange(s);
     // reopen in the new language, with the picker still focused
     if (relabel) {
-      openSettings(onChange, onBack);
+      openSettings(s, onChange, onBack);
       document.getElementById('set-lang')?.focus();
     }
   };
@@ -82,7 +86,8 @@ export function openSettings(onChange: (s: Settings) => void, onBack?: () => voi
     body,
     actions: [{ label: t('common.done'), primary: true, onClick: () => (onBack ? onBack() : closeModal()) }],
   });
-  sync();
+  // opening only shows the values; nothing is saved or applied until the player changes something
+  outputs(settings);
 }
 
 export function openLanguage(onPick: (l: Lang) => void): void {

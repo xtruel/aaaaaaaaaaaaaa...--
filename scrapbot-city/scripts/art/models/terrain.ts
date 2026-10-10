@@ -132,6 +132,62 @@ export function sludgeTiles(): Record<string, Image> {
   return out;
 }
 
+// Decorative ground styles (all of them buildable, purely visual): sidewalks along the old streets, cracked
+// concrete lots, purple industrial paving, mud around sludge, dirty ground around junk heaps.
+export function groundStyles(): Record<string, Image> {
+  const out: Record<string, Image> = {};
+  for (let k = 0; k < 4; k++) {
+    // sidewalk: 4x4 slabs with seams, a weed or a cracked slab now and then
+    out[`t/pave/${k}`] = tile((x, y) => {
+      const [cx, cy] = cell(x, y);
+      const sx = Math.floor(cx / 4);
+      const sy = Math.floor(cy / 4);
+      if (cx % 4 === 0 || cy % 4 === 0) return hex('#2b2739');
+      const slab = hash(sx, sy, 1000 + k);
+      if (slab > 0.9 && Math.abs((x % 4) - (y % 4)) < 0.6) return hex('#2b2739');
+      const h = hash(cx, cy, 1010 + k);
+      if (h > 0.97) return hex('#3f7a3f');
+      return slab > 0.6 ? hex('#433d57') : hex('#3d3850');
+    });
+    // concrete lot: big pale slabs, cracks and oil stains
+    out[`t/lot/${k}`] = tile((x, y) => {
+      const [cx, cy] = cell(x, y);
+      if (cx % 8 === 0 || cy % 8 === 0) return hex('#35314a');
+      if (k % 2 === 0 && Math.abs(y - x * 0.7 - 3 - k) < 0.5 && x > 3 && x < 13) return hex('#28243a');
+      const d = Math.hypot(x - 5 - k * 2, y - 9);
+      if (k === 3 && d < 2.6) return hex('#262236');
+      const h = hash(cx, cy, 1100 + k);
+      return h > 0.94 ? hex('#4d4862') : h < 0.06 ? hex('#3a3650') : hex('#423d56');
+    });
+    // industrial paving: purple tiles with dark joints, a hazard stripe on one variant
+    out[`t/ind/${k}`] = tile((x, y) => {
+      const [cx, cy] = cell(x, y);
+      if (cx % 8 === 0 || cy % 8 === 0) return hex('#251e3a');
+      if (k === 1 && cy >= 6 && cy < 8) return Math.floor(cx / 2) % 2 ? hex('#8a7a35') : hex('#2a2238');
+      const h = hash(cx, cy, 1200 + k);
+      return h > 0.93 ? hex('#463a66') : hex('#3a2f58');
+    });
+    // mud next to sludge: brown-purple with dark puddles
+    out[`t/mud/${k}`] = tile((x, y) => {
+      const d = Math.hypot(x - 4 - k * 3, y - 6 - (k % 2) * 4);
+      if (d < 2.2) return hex('#231c27');
+      const [cx, cy] = cell(x, y);
+      const h = hash(cx, cy, 1300 + k);
+      return h > 0.9 ? hex('#4a3a3a') : h < 0.1 ? hex('#2e2430') : hex('#3a2e36');
+    });
+    // dirty ground around junk: bits of rust and metal
+    out[`t/dirty/${k}`] = tile((x, y) => {
+      const [cx, cy] = cell(x, y);
+      const h = hash(cx, cy, 1400 + k);
+      if (h > 0.965) return hex('#8a5030');
+      if (h > 0.94) return hex('#6c7096');
+      if (h < 0.06) return hex('#1f1a2c');
+      return hex('#2c2639');
+    });
+  }
+  return out;
+}
+
 // Wasteland outside the playable area: darker and cracked.
 export function outerTiles(): Record<string, Image> {
   const out: Record<string, Image> = {};

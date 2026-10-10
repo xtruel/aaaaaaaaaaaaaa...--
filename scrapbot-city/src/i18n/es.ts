@@ -419,6 +419,8 @@ export const es: Dict = {
   'pause.tip': 'Consejo: <kbd>Q</kbd> le pide una pista a USA-9, <kbd>H</kbd> te devuelve a la Base y <kbd>Tab</kbd> cambia la velocidad.',
   'pause.resume': 'Reanudar',
   'pause.save': 'Guardar partida',
+  'tut.keepOld': 'Conservar mi ciudad guardada',
+  'msg.tutorialNotSaved': 'Esta ciudad de entrenamiento no se guarda sola, así que tu ciudad del juego libre está a salvo. Usa Guardar partida en el menú para conservarla en una ranura.',
   'pause.load': 'Cargar partida',
   'pause.saveMenu': 'Guardar y volver al menú',
   'pause.region': 'Mapa de la región',

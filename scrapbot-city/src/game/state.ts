@@ -1,4 +1,4 @@
-import { BUILDINGS, DAY_LENGTH, DEFAULT_MODS, MAP_H, MAP_W, T, TILE } from './defs';
+import { BUILDINGS, DAY_LENGTH, DEFAULT_MODS, MAP_H, MAP_W, SMOG_DANGER, T, TILE } from './defs';
 import type { BuildingType, CityMods, Resource } from './defs';
 import { generateMap } from './world';
 
@@ -93,6 +93,8 @@ export interface Hints {
   free: number; // free hints left
   paid: number; // hints bought so far (drives the price)
   nextFreeDay: number; // day a free hint recharges
+  lastTitle: string; // last hint shown, and its day: asking again the same day is free
+  lastDay: number;
 }
 
 export interface GameState {
@@ -141,6 +143,12 @@ export interface GameState {
 }
 
 export const SAVE_VERSION = 2;
+
+// Automatic saves skip a running smog countdown: the retry offered after a smog loss loads the last
+// autosave, so it must be a moment the city can still recover from.
+export function canAutosave(s: GameState): boolean {
+  return s.smog <= 0 && s.pollution < SMOG_DANGER;
+}
 
 export function idx(x: number, y: number): number {
   return y * MAP_W + x;
@@ -192,7 +200,7 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     spireDone: false,
     endingKind: null,
     stars: [false, false, false],
-    hints: { free: FREE_HINTS, paid: 0, nextFreeDay: 6 },
+    hints: { free: FREE_HINTS, paid: 0, nextFreeDay: 6, lastTitle: '', lastDay: 0 },
     warnedFullAt: -999,
     warnedEmptyAt: -999,
     tiles: map.tiles,
@@ -301,7 +309,11 @@ type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'bots' |
 
 export function serialize(s: GameState): string {
   const { tiles, amount, occ: _occ, claims: _claims, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
-  const data: SaveData = { ...rest, tiles: Array.from(tiles).join(''), amount: Array.from(amount) };
+  // bots are not saved: the scrap they carry goes into storage (as far as it fits) instead of vanishing
+  const carried = s.bots.reduce((n, b) => n + b.carry, 0);
+  const room = Math.max(0, (s.derived.storage || 0) - s.res.scrap);
+  const res = { ...rest.res, scrap: rest.res.scrap + Math.min(carried, room) };
+  const data: SaveData = { ...rest, res, tiles: Array.from(tiles).join(''), amount: Array.from(amount) };
   return JSON.stringify(data);
 }
 

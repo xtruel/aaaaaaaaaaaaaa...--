@@ -13,6 +13,10 @@ interface MusicPlayer {
 
 export type SfxName = 'click' | 'hover' | 'build' | 'error' | 'collect' | 'coin' | 'event' | 'alert' | 'done' | 'demolish';
 
+const MAX_VOICES = 18;
+// shortest gap between two plays of the same effect, in seconds
+const MIN_GAP: Partial<Record<SfxName, number>> = { hover: 0.04, click: 0.03, collect: 0.12, coin: 0.15, build: 0.08, done: 0.2, demolish: 0.15, alert: 0.5, event: 0.3, error: 0.12 };
+
 class SoundSystem {
   private ctx: AudioContext | null = null;
   private sfxGain: GainNode | null = null;
@@ -20,12 +24,14 @@ class SoundSystem {
   private sfxVolume = 0.6;
   private musicVolume = 0.35;
   private musicTimer = 0;
-  private lastCollect = 0;
   private songId: SongId | null = 'menu';
   private player: MusicPlayer | null = null;
   private noiseBuf: AudioBuffer | null = null;
   private pulse12: PeriodicWave | null = null;
   private pulse25: PeriodicWave | null = null;
+  // a cap on simultaneous effect voices, and a minimum gap per effect, so a busy city never turns into noise
+  private voices = 0;
+  private lastPlayed: Partial<Record<SfxName, number>> = {};
 
   // Browsers only allow audio after a user gesture, so this runs on the first click.
   unlock(): void {
@@ -38,8 +44,16 @@ class SoundSystem {
     this.ctx = new Ctor();
     this.sfxGain = this.ctx.createGain();
     this.musicGain = this.ctx.createGain();
-    this.sfxGain.connect(this.ctx.destination);
-    this.musicGain.connect(this.ctx.destination);
+    // master limiter: many effects at once never clip
+    const limiter = this.ctx.createDynamicsCompressor();
+    limiter.threshold.value = -10;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 12;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.25;
+    limiter.connect(this.ctx.destination);
+    this.sfxGain.connect(limiter);
+    this.musicGain.connect(limiter);
     this.applyVolumes();
     // one second of noise, shared by every drum hit
     const len = this.ctx.sampleRate;
@@ -87,27 +101,49 @@ class SoundSystem {
     g.connect(dest);
     osc.start(t);
     osc.stop(t + dur + 0.02);
+    if (!out) {
+      this.voices++;
+      osc.onended = () => {
+        this.voices--;
+        osc.disconnect();
+        g.disconnect();
+      };
+    }
   }
 
   private noise(dur: number, vol: number, when = 0, out?: GainNode): void {
     const ctx = this.ctx;
     const dest = out ?? this.sfxGain;
-    if (!ctx || !dest) return;
-    const len = Math.floor(ctx.sampleRate * dur);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    if (!ctx || !dest || !this.noiseBuf) return;
+    // the shared second of noise, faded out by a gain envelope (no new buffer per hit)
+    const t = ctx.currentTime + when;
     const src = ctx.createBufferSource();
     const g = ctx.createGain();
-    g.gain.value = vol;
-    src.buffer = buf;
+    src.buffer = this.noiseBuf;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.linearRampToValueAtTime(0, t + dur);
     src.connect(g);
     g.connect(dest);
-    src.start(ctx.currentTime + when);
+    src.start(t, Math.random() * 0.5);
+    src.stop(t + dur + 0.01);
+    if (!out) {
+      this.voices++;
+      src.onended = () => {
+        this.voices--;
+        src.disconnect();
+        g.disconnect();
+      };
+    }
   }
 
   play(name: SfxName): void {
     if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const gap = MIN_GAP[name] ?? 0.05;
+    if (now - (this.lastPlayed[name] ?? -1) < gap) return;
+    // keep room for the sounds that matter when the voice budget is full
+    if (this.voices > MAX_VOICES && name !== 'alert' && name !== 'event' && name !== 'error') return;
+    this.lastPlayed[name] = now;
     switch (name) {
       case 'hover':
         this.tone(880, 0.04, 'square', 0.05);
@@ -123,13 +159,9 @@ class SoundSystem {
       case 'error':
         this.tone(160, 0.18, 'sawtooth', 0.12, 0, -60);
         break;
-      case 'collect': {
-        const now = this.ctx.currentTime;
-        if (now - this.lastCollect < 0.12) return;
-        this.lastCollect = now;
+      case 'collect':
         this.tone(1200 + Math.random() * 300, 0.04, 'triangle', 0.06);
         break;
-      }
       case 'coin':
         this.tone(988, 0.07, 'square', 0.08);
         this.tone(1319, 0.12, 'square', 0.08, 0.07);

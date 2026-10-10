@@ -416,6 +416,8 @@ export const pt: Dict = {
   'pause.tip': 'Truque: <kbd>Q</kbd> pede uma dica a USA-9, <kbd>H</kbd> leva-te de volta ao QG, <kbd>Tab</kbd> muda a velocidade.',
   'pause.resume': 'Continuar',
   'pause.save': 'Guardar jogo',
+  'tut.keepOld': 'Manter a minha cidade guardada',
+  'msg.tutorialNotSaved': 'Esta cidade de treino não é guardada automaticamente, por isso a tua cidade do jogo livre fica a salvo. Usa Guardar jogo no menu para a manter numa ranhura.',
   'pause.load': 'Carregar jogo',
   'pause.saveMenu': 'Guardar e sair para o menu',
   'pause.region': 'Mapa da região',

@@ -86,12 +86,13 @@ function burnFuel(s: GameState, dt: number): void {
   for (const b of s.buildings) {
     const fuel = BUILDINGS[b.type].fuel;
     if (!fuel || b.built < 1) continue;
-    if (b.fuel <= 0 && !b.paused && s.res.scrap >= fuel.scrap) {
+    // burn first, then refuel in the same step: no one-step power cut at the end of every load
+    if (b.fuel > 0) b.fuel = Math.max(0, b.fuel - dt);
+    if (b.fuel <= 1e-9 && !b.paused && s.res.scrap >= fuel.scrap) {
       s.res.scrap -= fuel.scrap;
       b.fuel += fuel.seconds;
       b.lastWork = s.time;
     }
-    if (b.fuel > 0) b.fuel = Math.max(0, b.fuel - dt);
   }
 }
 

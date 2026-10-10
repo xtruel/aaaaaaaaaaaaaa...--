@@ -40,6 +40,7 @@ import { RegionMap } from './ui/region';
 interface DesktopBridge {
   isDesktop: boolean;
   setFullscreen(on: boolean): void;
+  onFullscreenChange?(fn: (on: boolean) => void): void;
   quit(): void;
 }
 const desktop = (window as unknown as { scrapbotDesktop?: DesktopBridge }).scrapbotDesktop;
@@ -121,7 +122,7 @@ function hideScreens(): void {
   document.getElementById('quit')!.hidden = true;
 }
 
-function startSession(state: GameState, intro: boolean): void {
+function startSession(state: GameState, intro: boolean, fromSlot: SlotId | null = null): void {
   hideScreens();
   session = new GameSession(document.getElementById('game')!, state, settings, {
     onExitToMenu: () => backToMenu(),
@@ -134,7 +135,7 @@ function startSession(state: GameState, intro: boolean): void {
     },
     onTutorialDone: (campaign) => (campaign ? showRegion() : backToMenu()),
     onSettingsChanged: (s) => applySettings(s),
-  });
+  }, fromSlot);
   session.start(intro);
 }
 
@@ -154,6 +155,15 @@ function playCity(city: CityDef, restart: boolean): void {
   const slot = citySlot(city.id);
   if (restart) clearSlot(slot);
   const saved = restart ? null : loadGame(slot);
+  // a save that exists but cannot be read (damaged, or from a newer version) is never silently replaced
+  if (!restart && !saved && slotMeta(slot)) {
+    openModal({
+      title: t('load.failed.title'),
+      body: `<p>${t('load.failed.body')}</p>`,
+      actions: [{ label: t('common.ok'), primary: true, onClick: closeModal }],
+    });
+    return;
+  }
   const state = saved ?? createGame({ seed: city.seed, cityName: city.name, cityId: city.id, mods: city.mods });
   startSession(state, !saved);
 }
@@ -168,22 +178,26 @@ function loadSlot(slot: SlotId): void {
     });
     return;
   }
-  startSession(state, false);
+  // a manual free play slot keeps receiving this city's autosaves (it never replaces the 'auto' city)
+  startSession(state, false, slot === 'auto' || slot.startsWith('city-') ? null : slot);
 }
 
-function freePlayDialog(): void {
-  const seed = Math.floor(Math.random() * 1e6);
+function freePlayDialog(prevName = 'Scrapbot City', prevSeed = Math.floor(Math.random() * 1e6)): void {
+  const seed = prevSeed;
   const body = document.createElement('form');
   body.className = 'newgame-form';
   body.innerHTML = `
     <label for="ng-name">${t('free.name')}</label>
-    <input id="ng-name" type="text" maxlength="24" value="Scrapbot City" autocomplete="off" />
+    <input id="ng-name" type="text" maxlength="24" value="${esc(prevName)}" autocomplete="off" />
     <label for="ng-seed">${t('free.seed')}</label>
     <input id="ng-seed" type="number" min="0" max="999999" value="${seed}" />
-    <p class="fine">${t('free.seedHint')}</p>`;
+    <p class="fine">${t('free.seedHint')}</p>
+    <button type="submit" hidden></button>`;
   const start = () => {
     const name = (body.querySelector('#ng-name') as HTMLInputElement).value.trim() || 'Scrapbot City';
-    const s = Number((body.querySelector('#ng-seed') as HTMLInputElement).value) || seed;
+    // 0 is a valid seed: fall back to the random one only when the field is empty or not a number
+    const raw = (body.querySelector('#ng-seed') as HTMLInputElement).value.trim();
+    const s = raw !== '' && Number.isFinite(Number(raw)) ? Math.max(0, Math.floor(Number(raw))) : seed;
     const go = () => startSession(createGame({ seed: s, cityName: name }), true);
     // free play has one autosave: never replace a city without asking
     const old = slotMeta('auto');
@@ -193,7 +207,7 @@ function freePlayDialog(): void {
       body: `<p>${t('free.replace.body', { city: esc(old.city), day: old.day })}</p>`,
       actions: [
         { label: t('free.replace.go'), primary: true, onClick: go },
-        { label: t('common.back'), onClick: () => freePlayDialog() },
+        { label: t('common.back'), onClick: () => freePlayDialog(name, s) },
       ],
     });
   };
@@ -259,7 +273,7 @@ const menu = new MainMenu(document.getElementById('menu')!, {
     if (slot) loadSlot(slot);
   },
   onLoadGame: () => openSlots('load', { onLoad: (slot) => loadSlot(slot) }),
-  onSettings: () => openSettings((s) => applySettings(s)),
+  onSettings: () => openSettings(settings, (s) => applySettings(s)),
   onLanguage: () => pickLanguage(),
   onQuit: () =>
     openModal({
@@ -306,6 +320,17 @@ if (import.meta.env.DEV) {
 
 applySettings(settings);
 if (desktop && settings.fullscreen) desktop.setFullscreen(true);
+
+// Fullscreen can also change outside the settings (F11, the browser's Esc, window controls): follow it,
+// so the checkbox and the next launch match what the player sees.
+function fullscreenChanged(on: boolean): void {
+  if (on === settings.fullscreen) return;
+  settings = { ...settings, fullscreen: on };
+  saveSettings(settings);
+  session?.applySettings(settings);
+}
+desktop?.onFullscreenChange?.(fullscreenChanged);
+if (!desktop) document.addEventListener('fullscreenchange', () => fullscreenChanged(!!document.fullscreenElement));
 syncAchievements();
 checkCampaign();
 void loadKeyboardLayout();

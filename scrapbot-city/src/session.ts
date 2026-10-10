@@ -7,8 +7,8 @@ import { cityById, cityDesc, cityTagline, cityTraits, goalText } from './game/ci
 import { BUILDINGS, BUILD_ORDER, SIM_STEP, T, TILE } from './game/defs';
 import type { BuildingType } from './game/defs';
 import { freeHintsLeft, hintPrice, suggest } from './game/hints';
-import { dayPhase, step } from './game/sim';
-import { day, idx, inBounds, pushMessage } from './game/state';
+import { computeDerived, dayPhase, step } from './game/sim';
+import { canAutosave, day, idx, inBounds, pushMessage } from './game/state';
 import type { FxEvent, GameState } from './game/state';
 import { endingSubtitle, endingText, endingTitle, eventById } from './game/story';
 import { padMode } from './gamepad';
@@ -74,6 +74,9 @@ export class GameSession implements PadTarget {
   private pinch: { dist: number; zoom: number } | null = null;
   private wheelAcc = 0;
   private saveFailed = false;
+  private unsaved = false;
+  private simDt = 0;
+  private homeSlot: SlotId | null; // free play slot this city was loaded from (autosaves go back there) // the training yard kept after the tutorial, when the player keeps their free play city
   private raf = 0;
   private last = 0;
   private acc = 0;
@@ -91,15 +94,17 @@ export class GameSession implements PadTarget {
   private alive = false;
   private disposers: (() => void)[] = [];
   private held = false; // the world under an open dialog is painted once, then held
-  private lastHint = { title: '', day: 0 };
   private padCursor!: HTMLElement;
   private padOn = false;
   private padHover: HTMLElement | null = null;
   private cursor = { x: 0, y: 0 };
 
-  constructor(root: HTMLElement, s: GameState, settings: Settings, handlers: SessionHandlers) {
+  constructor(root: HTMLElement, s: GameState, settings: Settings, handlers: SessionHandlers, fromSlot: SlotId | null = null) {
     this.root = root;
     this.s = s;
+    this.homeSlot = fromSlot;
+    // stats shown by the HUD and used by hints are ready before the first step (paused, intro dialog, pending event)
+    computeDerived(s);
     this.settings = settings;
     this.handlers = handlers;
     root.innerHTML = `<canvas class="world" aria-label="${t('hud.map')}"></canvas><div class="hud"></div><div class="pad-cursor" aria-hidden="true" hidden></div>`;
@@ -139,9 +144,11 @@ export class GameSession implements PadTarget {
     this.last = performance.now();
     const loop = (now: number) => {
       if (!this.alive) return;
-      const dt = Math.min(0.1, (now - this.last) / 1000);
+      const raw = Math.max(0, (now - this.last) / 1000);
       this.last = now;
-      this.frame(dt);
+      // animations take at most a 0.1 s step; the simulation catches up on up to 0.25 s of a slow frame
+      this.simDt = Math.min(0.25, raw);
+      this.frame(Math.min(0.1, raw));
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
@@ -181,8 +188,15 @@ export class GameSession implements PadTarget {
 
   // Where this city is saved: campaign cities have their own slot, the tutorial is never saved.
   private get slot(): SlotId | null {
-    if (this.s.tutorial) return null;
-    return this.s.cityId ? citySlot(this.s.cityId) : 'auto';
+    if (this.s.tutorial || this.unsaved) return null;
+    if (this.s.cityId) return citySlot(this.s.cityId);
+    return this.homeSlot ?? 'auto';
+  }
+
+  // Automatic saves (new day, window closed) skip a running smog countdown, see canAutosave.
+  private autosave(): void {
+    if (!canAutosave(this.s)) return;
+    this.save();
   }
 
   save(): void {
@@ -203,7 +217,7 @@ export class GameSession implements PadTarget {
     const modal = isModalOpen();
     const running = !modal && this.speed > 0 && !s.outcome && !s.pendingEvent;
     if (running) {
-      this.acc += dt * this.speed;
+      this.acc += this.simDt * this.speed;
       let n = 0;
       while (this.acc >= SIM_STEP && n < 16) {
         step(s, SIM_STEP);
@@ -212,6 +226,8 @@ export class GameSession implements PadTarget {
         if (s.pendingEvent || s.outcome) break;
       }
       if (n >= 16) this.acc = 0;
+    } else {
+      computeDerived(s);
     }
 
     for (const fx of s.fx) this.onFx(fx);
@@ -230,7 +246,7 @@ export class GameSession implements PadTarget {
 
     if (day(s) !== this.lastDay) {
       this.lastDay = day(s);
-      if (!s.outcome) this.save();
+      if (!s.outcome) this.autosave();
     }
 
     this.checkTimer -= dt;
@@ -457,7 +473,7 @@ export class GameSession implements PadTarget {
     });
     this.listen(window, 'blur', () => this.keys.clear());
     // closing the tab or window mid-day should not lose the day
-    this.listen(window, 'pagehide', () => this.save());
+    this.listen(window, 'pagehide', () => this.autosave());
     // pause while the game is hidden (alt-tab, minimised window), resume when it comes back
     this.listen(document, 'visibilitychange', () => {
       if (document.hidden) {
@@ -768,13 +784,18 @@ export class GameSession implements PadTarget {
     // asking twice for the same thing on the same day, or being told to wait, costs nothing
     const next = suggest(s);
     const title = next.title;
-    if (next.free || (title === this.lastHint.title && day(s) === this.lastHint.day)) {
+    if (next.free || (title === s.hints.lastTitle && day(s) === s.hints.lastDay)) {
       this.showHint(t('hint.repeat'));
       return;
     }
-    this.lastHint = { title, day: day(s) };
+    // only a hint that is actually shown counts as "asked today" (declining the paid one does not)
+    const remember = () => {
+      s.hints.lastTitle = title;
+      s.hints.lastDay = day(s);
+    };
     if (freeHintsLeft(s) > 0) {
       s.hints.free--;
+      remember();
       this.showHint(s.hints.free > 0 ? t('hint.freeLeft', { n: s.hints.free }) : t('hint.lastFree'));
       return;
     }
@@ -783,6 +804,7 @@ export class GameSession implements PadTarget {
     openHintPay(price, s.res.credits >= price, () => {
       s.res.credits -= price;
       s.hints.paid++;
+      remember();
       this.showHint(t('hint.paid', { n: price, next: hintPrice(s) }));
     });
   }
@@ -817,7 +839,34 @@ export class GameSession implements PadTarget {
       return;
     }
     pushMessage(s, finished ? t('msg.tutorialDone') : localizeKeys(t('msg.tutorialSkipped')), 'good');
-    this.save();
+    // free play has one autosave: the training yard never replaces a city without asking
+    const old = slotMeta('auto');
+    if (!old) {
+      this.save();
+      return;
+    }
+    openModal({
+      title: t('free.replace.title'),
+      body: `<p>${t('free.replace.body', { city: esc(old.city), day: old.day })}</p>`,
+      actions: [
+        {
+          label: t('free.replace.go'),
+          primary: true,
+          onClick: () => {
+            closeModal();
+            this.save();
+          },
+        },
+        {
+          label: t('tut.keepOld'),
+          onClick: () => {
+            closeModal();
+            this.unsaved = true;
+            pushMessage(s, t('msg.tutorialNotSaved'), 'info');
+          },
+        },
+      ],
+    });
   }
 
   // ---------- dialogs ----------
@@ -963,6 +1012,7 @@ export class GameSession implements PadTarget {
       label: t('menu.settings'),
       onClick: () =>
         openSettings(
+          this.settings,
           (set) => this.handlers.onSettingsChanged(set),
           () => this.openPause(),
         ),

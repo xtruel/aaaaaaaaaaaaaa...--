@@ -415,6 +415,8 @@ export const en = {
   'pause.tip': 'Tip: <kbd>Q</kbd> asks USA-9 for a hint, <kbd>H</kbd> jumps back to the HQ, <kbd>Tab</kbd> changes speed.',
   'pause.resume': 'Resume',
   'pause.save': 'Save game',
+  'tut.keepOld': 'Keep my saved city',
+  'msg.tutorialNotSaved': 'This training city is not saved automatically, so your free play city stays safe. Use Save game in the menu to keep it in a slot.',
   'pause.load': 'Load game',
   'pause.saveMenu': 'Save & main menu',
   'pause.region': 'Region map',

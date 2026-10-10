@@ -19,7 +19,7 @@ import { M } from './palette';
 import { ART } from './models/index';
 import { BOT_FRAMES, DIRS, botModel, facing } from './models/bot';
 import type { BotPose } from './models/bot';
-import { edgeTiles, grassTiles, groundTiles, outerTiles, roadTiles, sludgeTiles } from './models/terrain';
+import { edgeTiles, grassTiles, groundStyles, groundTiles, outerTiles, roadTiles, sludgeTiles } from './models/terrain';
 import { junkModel, rubbleModel } from './models/props';
 import { CAT_FRAMES, CITIZEN_FRAMES, CITIZEN_VARIANTS, catModel, citizenModel } from './models/characters';
 import type { CatPose } from './models/characters';
@@ -167,7 +167,7 @@ for (const d of DECOR) {
 }
 
 // ---------- terrain ----------
-const tiles = { ...groundTiles(), ...grassTiles(), ...roadTiles(), ...sludgeTiles(), ...outerTiles() };
+const tiles = { ...groundTiles(), ...groundStyles(), ...grassTiles(), ...roadTiles(), ...sludgeTiles(), ...outerTiles() };
 for (const [name, img] of Object.entries(tiles)) add(name, img, 16, 0);
 for (const [name, img] of Object.entries(edgeTiles())) add(name, img, name.startsWith('t/edge/l') ? 16 : 0, -8);
 for (let size = 0; size < 3; size++)

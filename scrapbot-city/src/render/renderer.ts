@@ -12,12 +12,14 @@ import type { Bot, Building, FxEvent, GameState } from '../game/state';
 import { hash2 } from '../game/world';
 import { t } from '../i18n';
 import { drawPixelText, pixelTextWidth } from './pixelfont';
-import { PAL, catSprite } from './sprites';
-import { atlasImage, buildingArt, frame, opaqueAt, whenAtlasReady } from './iso/atlas';
+import { PAL } from './sprites';
+import { atlasImage, buildingArt, citizenVariants, decorArt, frame, opaqueAt, whenAtlasReady } from './iso/atlas';
 import type { Frame } from './iso/atlas';
 import { DepthSorter } from './iso/depth';
 import type { DepthItem } from './iso/depth';
 import { groundAt, tileAt, tileTop } from './iso/projection';
+import { Walkers, isRoadCol, isRoadRow, placeScenery, ringKey } from './iso/life';
+import type { SceneryItem } from './iso/life';
 
 interface Particle {
   x: number; // iso px
@@ -76,9 +78,9 @@ const ALWAYS_ANIMATED = new Set<BuildingType>(['hq', 'dock', 'pods', 'garden', '
 const K_BUILDING = 1;
 const K_BOT = 2;
 const K_CAT = 3;
+const K_WALKER = 4;
+const K_DECOR = 5;
 
-const isRoadRow = (ty: number) => ty % 11 === 4;
-const isRoadCol = (tx: number) => ((tx % 14) + 14) % 14 === 6;
 
 function valueNoise(x: number, y: number, salt: number): number {
   const x0 = Math.floor(x);
@@ -111,7 +113,16 @@ export class Renderer {
   private clock = 0;
   private particles: Particle[] = [];
   private floaters: Floater[] = [];
-  private blimp = { x: -80, timer: 8 };
+  private blimp = { x: 0, y: 0, active: false, timer: 20 };
+  private shake = 0; // seconds of camera shake left (demolition, storms)
+  private walkers = new Walkers();
+  private scenery: SceneryItem[] = [];
+  private sceneryTaken = new Set<number>();
+  private catVis = { lx: 0, ly: 0, dir: 0 };
+  // buildings seen last frame, to animate the ones that disappear (demolished)
+  private known = new Map<number, { type: BuildingType; x: number; y: number; built: number }>();
+  private seen = new Set<number>();
+  private collapsing: { type: BuildingType; x: number; y: number; t: number }[] = [];
 
   // terrain cache
   private terrain: HTMLCanvasElement;
@@ -270,6 +281,9 @@ export class Renderer {
       this.terrainPainted = false;
       return;
     }
+    const sc = placeScenery(s.seed, RING, decorArt);
+    this.scenery = sc.items;
+    this.sceneryTaken = sc.taken;
     const ctx = this.tctx;
     ctx.clearRect(0, 0, this.terrain.width, this.terrain.height);
     const tx0 = -RING;
@@ -313,14 +327,26 @@ export class Renderer {
       const mask = (same(-1, 0) ? 1 : 0) | (same(1, 0) ? 2 : 0) | (same(0, -1) ? 4 : 0) | (same(0, 1) ? 8 : 0);
       return `t/sludge/${mask}/0`;
     }
-    if (tile === T.GROUND || tile === T.RUBBLE || tile === T.JUNK) {
-      const row = isRoadRow(ty);
-      const col = isRoadCol(tx);
-      if (tile === T.GROUND && (row || col)) return row && col ? 't/road/c' : row ? 't/road/x' : 't/road/y';
-    }
+    const v = Math.floor(h * 4);
+    const row = isRoadRow(ty);
+    const col = isRoadCol(tx);
+    if (tile === T.GROUND && (row || col)) return row && col ? 't/road/c' : row ? 't/road/x' : 't/road/y';
+    if (tile === T.JUNK) return `t/dirty/${v}`;
+    if (tile === T.RUBBLE) return `t/lot/${v}`;
+    const near = (kind: number, r: number) => {
+      for (let y = ty - r; y <= ty + r; y++) for (let x = tx - r; x <= tx + r; x++) if ((x !== tx || y !== ty) && inBounds(x, y) && s.tiles[idx(x, y)] === kind) return true;
+      return false;
+    };
+    // sidewalks along the old streets
+    if (isRoadRow(ty - 1) || isRoadRow(ty + 1) || isRoadCol(tx - 1) || isRoadCol(tx + 1)) return `t/pave/${v}`;
+    if (near(T.SLUDGE, 1)) return `t/mud/${v}`;
+    if (near(T.JUNK, 1)) return `t/dirty/${v}`;
+    const lot = valueNoise(tx / 7, ty / 7, 21);
+    if (lot < 0.26) return `t/lot/${v}`;
+    if (lot > 0.78) return `t/ind/${v}`;
     const n = valueNoise(tx / 5, ty / 5, 9);
     const fam = n < 0.38 ? 0 : n < 0.62 ? 1 : 2;
-    return `t/ground/${fam}/${Math.floor(h * 4)}`;
+    return `t/ground/${fam}/${v}`;
   }
 
   private paintGround(s: GameState, tx: number, ty: number): void {
@@ -340,7 +366,7 @@ export class Renderer {
       // scattered scrap and rubble outside the fence (low props only on the front side)
       const behind = tx < 0 || ty < 0;
       const near = tx >= MAP_W ? tx - MAP_W : ty >= MAP_H ? ty - MAP_H : 99;
-      if (isRoadRow(ty) || isRoadCol(tx)) return;
+      if (isRoadRow(ty) || isRoadCol(tx) || this.sceneryTaken.has(ringKey(tx, ty, RING))) return;
       if (h > 0.9 && (behind || near >= 1)) this.blitT(`p/junk/${Math.floor(hash2(tx, ty, 32) * 3)}/${Math.floor(hash2(tx, ty, 33) * 4)}`, tx, ty);
       else if (h > 0.82) this.blitT(`p/rubble/${Math.floor(hash2(tx, ty, 34) * 4)}`, tx, ty);
       return;
@@ -376,22 +402,25 @@ export class Renderer {
   private paintDirty(s: GameState): void {
     if (s.dirtyTiles.length === 0 || !this.terrainPainted) return;
     const ctx = this.tctx;
+    const done = new Set<number>();
     for (const i of s.dirtyTiles) {
+      if (done.has(i)) continue;
+      done.add(i);
       const tx = i % MAP_W;
       const ty = Math.floor(i / MAP_W);
-      // the tile, its neighbours (sludge rims) and anything that rises over them
+      // the tile and its 8 neighbours (their ground style depends on it), plus anything rising over them
       const top = tileTop(tx, ty);
-      const rx = top.X - TILE * 2 - this.tox;
-      const ry = top.Y - TILE / 2 - SPILL - this.toy;
-      const rw = TILE * 4;
-      const rh = TILE * 2 + SPILL;
+      const rx = top.X - TILE * 3 - this.tox;
+      const ry = top.Y - TILE - SPILL - this.toy;
+      const rw = TILE * 6;
+      const rh = TILE * 3 + SPILL;
       ctx.save();
       ctx.beginPath();
       ctx.rect(rx, ry, rw, rh);
       ctx.clip();
       ctx.clearRect(rx, ry, rw, rh);
       const near: [number, number][] = [];
-      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) near.push([tx + dx, ty + dy]);
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) near.push([tx + dx, ty + dy]);
       near.sort((p, q) => p[0] + p[1] - (q[0] + q[1]));
       for (const [x, y] of near) if (x >= -RING && y >= -RING && x < MAP_W + RING && y < MAP_H + RING) this.paintGround(s, x, y);
       this.paintMapBorder();
@@ -424,11 +453,13 @@ export class Renderer {
         this.float(X, Y - 10, t('fx.clean'), PAL.cyan);
         break;
       case 'demolish':
+        this.shake = Math.max(this.shake, 0.25);
         for (let k = 0; k < 16; k++) this.spawn(X + (Math.random() - 0.5) * 30, Y - Math.random() * 20, (Math.random() - 0.5) * 44, -Math.random() * 34, 0.9, 2, k % 2 ? PAL.concrete : PAL.rust, 0);
         for (let k = 0; k < 10; k++) this.spawn(X + (Math.random() - 0.5) * 40, Y + 2, (Math.random() - 0.5) * 24, -3 - Math.random() * 8, 1.8, 4, '#77718a', 3);
         if (fx.text) this.float(X, Y - 16, fx.text, PAL.white);
         break;
       case 'storm':
+        this.shake = Math.max(this.shake, 0.6);
         break;
     }
   }
@@ -453,17 +484,31 @@ export class Renderer {
     if (!img) return;
     if (!this.terrainPainted || this.terrainState !== s) this.paintAllTerrain(s);
     this.paintDirty(s);
-    const camX = Math.round(this.cam.x);
-    const camY = Math.round(this.cam.y);
+    let camX = Math.round(this.cam.x);
+    let camY = Math.round(this.cam.y);
+    if (this.shake > 0) {
+      this.shake = Math.max(0, this.shake - dt);
+      if (!view.reducedMotion) {
+        const a = this.shake > 0.3 ? 2 : 1;
+        camX += Math.round((Math.random() - 0.5) * 2 * a);
+        camY += Math.round((Math.random() - 0.5) * 2 * a);
+      }
+    }
+    this.trackRemovals(s, view.reducedMotion);
 
     ctx.drawImage(this.terrain, this.tox - camX, this.toy - camY);
     if (!view.reducedMotion) this.drawSludgeBubbles(s, camX, camY);
+    this.drawBackScenery(camX, camY, img, view.reducedMotion);
 
     this.updateTileHeights(s);
+    if (simRunning) this.walkers.update(s, dt, Math.max(1, citizenVariants()));
+    this.updateBlimp(s, dt, simRunning && !view.reducedMotion);
     this.collect(s, view, camX, camY);
     this.drawShadows(s, camX, camY);
     this.drawGroundMarks(s, view, camX, camY);
     this.drawObjects(s, view, camX, camY, img);
+    this.drawCollapsing(dt, camX, camY, img);
+    this.drawBlimp(camX, camY, img);
 
     if (simRunning && !view.reducedMotion) this.emitAmbient(s, dt);
     this.updateParticles(dt, camX, camY, simRunning);
@@ -473,7 +518,6 @@ export class Renderer {
     this.drawLighting(s, camX, camY, img);
     this.drawSmog(s, view.reducedMotion);
     this.drawFloaters(dt, camX, camY);
-    this.drawBlimp(dt, view.reducedMotion);
   }
 
   private updateTileHeights(s: GameState): void {
@@ -551,21 +595,71 @@ export class Renderer {
     // Miso the cat
     {
       const cat = s.cat;
+      const cv = this.catVis;
+      const mx = cat.x - cv.lx;
+      const my = cat.y - cv.ly;
+      if (Math.abs(mx) + Math.abs(my) > 0.02) cv.dir = Math.abs(mx) > Math.abs(my) ? (mx > 0 ? 1 : 3) : my > 0 ? 0 : 2;
+      cv.lx = cat.x;
+      cv.ly = cat.y;
+      const it = sorter.add();
       const X = cat.x - cat.y;
       const Y = (cat.x + cat.y) / 2;
-      const it = sorter.add();
       it.x0 = cat.x - 3;
       it.x1 = cat.x + 3;
       it.y0 = cat.y - 3;
       it.y1 = cat.y + 3;
       it.z0 = 0;
       it.z1 = 8;
-      it.sx0 = X - 6;
-      it.sy0 = Y - 12;
-      it.sx1 = X + 6;
-      it.sy1 = Y + 1;
+      it.sx0 = X - 10;
+      it.sy0 = Y - 14;
+      it.sx1 = X + 10;
+      it.sy1 = Y + 4;
       it.kind = K_CAT;
       it.ref = 0;
+    }
+    // citizens
+    for (let k = 0; k < this.walkers.list.length; k++) {
+      const w = this.walkers.list[k];
+      const X = w.x - w.y;
+      const Y = (w.x + w.y) / 2;
+      if (X + 8 < vx0 || X - 8 > vx1 || Y + 4 < vy0 || Y - 20 > vy1) continue;
+      const it = sorter.add();
+      it.x0 = w.x - 2;
+      it.x1 = w.x + 2;
+      it.y0 = w.y - 2;
+      it.y1 = w.y + 2;
+      it.z0 = 0;
+      it.z1 = 13;
+      it.sx0 = X - 8;
+      it.sy0 = Y - 18;
+      it.sx1 = X + 8;
+      it.sy1 = Y + 4;
+      it.kind = K_WALKER;
+      it.ref = k;
+    }
+    // scenery in front of the map
+    for (let k = 0; k < this.scenery.length; k++) {
+      const d = this.scenery[k];
+      if (d.back) continue;
+      const f = frame(`d/${d.name}/0`);
+      if (!f) continue;
+      const top = tileTop(d.tx, d.ty);
+      const sx = top.X - f.ax;
+      const sy = top.Y - f.ay;
+      if (sx > vx1 || sy > vy1 || sx + f.w < vx0 || sy + f.h < vy0) continue;
+      const it = sorter.add();
+      it.x0 = d.tx * TILE;
+      it.x1 = (d.tx + d.w) * TILE;
+      it.y0 = d.ty * TILE;
+      it.y1 = (d.ty + d.d) * TILE;
+      it.z0 = 0;
+      it.z1 = 12;
+      it.sx0 = sx;
+      it.sy0 = sy;
+      it.sx1 = sx + f.w;
+      it.sy1 = sy + f.h;
+      it.kind = K_DECOR;
+      it.ref = k;
     }
   }
 
@@ -633,6 +727,17 @@ export class Renderer {
       const w = z > 12 ? 5 : 7;
       sc.fillRect(X - (w >> 1), Y - 1, w, 2);
       sc.fillRect(X - (w >> 1) + 1, Y - 2, w - 2, 4);
+    }
+    for (const w of this.walkers.list) {
+      const X = Math.round(w.x - w.y) - camX;
+      const Y = Math.round((w.x + w.y) / 2) - camY;
+      sc.fillRect(X - 2, Y - 1, 5, 2);
+    }
+    if (this.blimp.active) {
+      const X = Math.round(this.blimp.x - this.blimp.y) - camX;
+      const Y = Math.round((this.blimp.x + this.blimp.y) / 2) - camY;
+      sc.fillRect(X - 16, Y - 3, 32, 6);
+      sc.fillRect(X - 12, Y - 5, 24, 10);
     }
     const dark = darkness(dayPhase(s));
     this.ctx.globalAlpha = Math.max(0.12, 0.34 - dark * 0.4);
@@ -716,14 +821,118 @@ export class Renderer {
       else if (it.kind === K_BOT) this.drawBot(s.bots[it.ref], it.ref, camX, camY, img, view.reducedMotion);
       else if (it.kind === K_CAT) {
         const cat = s.cat;
-        const walking = !cat.sitting && Math.floor(this.clock * 6) % 2 === 0;
-        const sp = catSprite(walking, cat.facing);
-        const X = Math.round(cat.x - cat.y) - 5;
-        const Y = Math.round((cat.x + cat.y) / 2) - 9;
-        ctx.drawImage(sp, X - camX, Y - camY);
-        this.pushDrawn(K_CAT, 0, 0, null, X, Y, sp.width, sp.height);
+        const walking = !cat.sitting;
+        const fr = walking ? Math.floor(this.clock * 6) % 2 : 0;
+        const f = frame(`cat/${BOT_DIRS[this.catVis.dir]}/${walking ? 'walk' : 'sit'}/${fr}`);
+        if (!f) continue;
+        const sx = Math.round(cat.x - cat.y) - f.ax;
+        const sy = Math.round((cat.x + cat.y) / 2) - f.ay;
+        ctx.drawImage(img, f.x, f.y, f.w, f.h, sx - camX, sy - camY, f.w, f.h);
+        this.pushDrawn(K_CAT, 0, 0, f, sx, sy, f.w, f.h);
+      } else if (it.kind === K_WALKER) {
+        const w = this.walkers.list[it.ref];
+        const f = frame(`cit/${w.variant}/${BOT_DIRS[w.dir]}/${view.reducedMotion ? 0 : Math.floor(this.clock * 4 + w.id) % 2}`);
+        if (!f) continue;
+        const sx = Math.round(w.x - w.y) - f.ax;
+        const sy = Math.round((w.x + w.y) / 2) - f.ay;
+        ctx.drawImage(img, f.x, f.y, f.w, f.h, sx - camX, sy - camY, f.w, f.h);
+      } else if (it.kind === K_DECOR) {
+        this.drawScenery(this.scenery[it.ref], camX, camY, img, view.reducedMotion);
       }
     }
+  }
+
+  private trackRemovals(s: GameState, reduced: boolean): void {
+    const seen = this.seen;
+    seen.clear();
+    for (const b of s.buildings) {
+      seen.add(b.id);
+      const k = this.known.get(b.id);
+      if (k) k.built = b.built;
+      else this.known.set(b.id, { type: b.type, x: b.x, y: b.y, built: b.built });
+    }
+    if (this.known.size === seen.size) return;
+    for (const [id, k] of this.known) {
+      if (seen.has(id)) continue;
+      this.known.delete(id);
+      // a new game or a loaded save replaces the whole list: only animate single removals
+      if (!reduced && this.terrainState === s && this.known.size > 0 && k.built >= 1) this.collapsing.push({ type: k.type, x: k.x, y: k.y, t: 0 });
+    }
+  }
+
+  // A demolished building sinks into its plate in a cloud of dust.
+  private drawCollapsing(dt: number, camX: number, camY: number, img: HTMLImageElement): void {
+    if (!this.collapsing.length) return;
+    const ctx = this.ctx;
+    const DUR = 0.7;
+    for (const c of this.collapsing) {
+      c.t += dt;
+      const f = frame(`b/${c.type}/off`);
+      if (!f) continue;
+      const def = BUILDINGS[c.type];
+      const top = tileTop(c.x, c.y);
+      const k = Math.min(1, c.t / DUR);
+      const sink = Math.round(k * k * (f.ay + 4));
+      const ground = f.ay + ((def.w + def.h) * TILE) / 2; // bottom vertex row
+      const visible = Math.max(0, ground - sink);
+      if (visible > 0) {
+        const shake = Math.round(Math.sin(c.t * 60) * (1 - k) * 1.5);
+        ctx.globalAlpha = 1 - k * 0.6;
+        ctx.drawImage(img, f.x, f.y, f.w, visible, top.X - f.ax - camX + shake, top.Y - f.ay + sink - camY, f.w, visible);
+        ctx.globalAlpha = 1;
+      }
+      if (Math.random() < 0.8) {
+        const mid = top.X + ((def.w - def.h) * TILE) / 2;
+        const y = top.Y + ((def.w + def.h) * TILE) / 4;
+        this.spawn(mid + (Math.random() - 0.5) * def.w * 22, y + (Math.random() - 0.3) * 10, (Math.random() - 0.5) * 20, -4 - Math.random() * 10, 1.2, 3, '#857f96', 3);
+      }
+    }
+    this.collapsing = this.collapsing.filter((c) => c.t < 0.7);
+  }
+
+  private drawScenery(d: SceneryItem, camX: number, camY: number, img: HTMLImageElement, reduced: boolean): void {
+    const fr = d.frames > 1 && !reduced ? Math.floor(this.clock * d.fps + d.tx * 0.37 + d.ty * 0.61) % d.frames : 0;
+    const f = frame(`d/${d.name}/${fr}`);
+    if (!f) return;
+    const top = tileTop(d.tx, d.ty);
+    const x = top.X - f.ax - camX;
+    const y = top.Y - f.ay - camY;
+    if (x > this.viewW || y > this.viewH || x + f.w < 0 || y + f.h < 0) return;
+    this.ctx.drawImage(img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
+  }
+
+  // Scenery behind the map never covers anything on it: drawn right after the ground.
+  private drawBackScenery(camX: number, camY: number, img: HTMLImageElement, reduced: boolean): void {
+    for (const d of this.scenery) if (d.back) this.drawScenery(d, camX, camY, img, reduced);
+  }
+
+  // The 2PM blimp crosses the sky now and then, high above everything, with its shadow on the ground.
+  private updateBlimp(s: GameState, dt: number, running: boolean): void {
+    const b = this.blimp;
+    if (!running) return;
+    if (!b.active) {
+      b.timer -= dt;
+      if (b.timer > 0) return;
+      b.active = true;
+      b.x = -RING * TILE - 80;
+      b.y = (6 + Math.floor(hash2(Math.floor(this.clock), s.seed) * (MAP_H - 12))) * TILE;
+      return;
+    }
+    b.x += dt * 14;
+    if (b.x > (MAP_W + RING) * TILE + 80) {
+      b.active = false;
+      b.timer = 45 + hash2(Math.floor(this.clock), 3) * 40;
+    }
+  }
+
+  private drawBlimp(camX: number, camY: number, img: HTMLImageElement): void {
+    const b = this.blimp;
+    if (!b.active) return;
+    const f = frame(`blimp/${Math.floor(this.clock * 6) % 2}`);
+    if (!f) return;
+    const X = Math.round(b.x - b.y) - f.ax;
+    const Y = Math.round((b.x + b.y) / 2 - 92) - f.ay;
+    this.ctx.drawImage(img, f.x, f.y, f.w, f.h, X - camX, Y - camY, f.w, f.h);
   }
 
   private pushDrawn(kind: number, ref: number, index: number, f: Frame | null, sx: number, sy: number, w: number, h: number): void {
@@ -1007,6 +1216,20 @@ export class Renderer {
       const g = frame(`bot/${BOT_DIRS[v.dir]}/${pose}/0/g`);
       if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, d.sx - camX, d.sy - camY, g.w, g.h);
     }
+    for (const d of this.scenery) {
+      const fr = d.frames > 1 ? Math.floor(this.clock * d.fps + d.tx * 0.37 + d.ty * 0.61) % d.frames : 0;
+      const g = frame(`d/${d.name}/${fr}/g`);
+      if (!g) continue;
+      const top = tileTop(d.tx, d.ty);
+      const x = top.X - g.ax - camX;
+      const y = top.Y - g.ay - camY;
+      if (x > this.viewW || y > this.viewH || x + g.w < 0 || y + g.h < 0) continue;
+      ctx.drawImage(img, g.x, g.y, g.w, g.h, x, y, g.w, g.h);
+    }
+    if (this.blimp.active) {
+      const g = frame(`blimp/${Math.floor(this.clock * 6) % 2}/g`);
+      if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, Math.round(this.blimp.x - this.blimp.y) - g.ax - camX, Math.round((this.blimp.x + this.blimp.y) / 2 - 92) - g.ay - camY, g.w, g.h);
+    }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -1034,37 +1257,6 @@ export class Renderer {
     }
   }
 
-  private drawBlimp(dt: number, reducedMotion: boolean): void {
-    const bl = this.blimp;
-    if (bl.timer > 0) {
-      bl.timer -= dt;
-      return;
-    }
-    bl.x += dt * (reducedMotion ? 30 : 14);
-    if (bl.x > this.viewW + 60) {
-      bl.x = -80;
-      bl.timer = 35 + Math.random() * 30;
-      return;
-    }
-    const ctx = this.ctx;
-    const x = Math.round(bl.x);
-    const y = Math.round(this.viewH * 0.16 + Math.sin(bl.x / 30) * 2);
-    ctx.fillStyle = PAL.ink;
-    ctx.fillRect(x - 1, y - 1, 38, 14);
-    ctx.fillRect(x - 6, y + 2, 6, 8);
-    ctx.fillStyle = PAL.white;
-    ctx.fillRect(x, y, 36, 12);
-    ctx.fillStyle = PAL.pink;
-    ctx.fillRect(x, y, 36, 3);
-    ctx.fillRect(x, y + 9, 36, 3);
-    ctx.fillStyle = PAL.pinkD;
-    ctx.fillRect(x - 5, y + 3, 5, 6);
-    drawPixelText(ctx, '2PM', x + 12, y + 4, PAL.ink);
-    ctx.fillStyle = PAL.purpleD;
-    ctx.fillRect(x + 12, y + 13, 12, 3);
-    ctx.fillStyle = 'rgba(236,232,246,0.5)';
-    ctx.fillRect(x - 12 - (Math.floor(this.clock * 8) % 4), y + 6, 4, 1);
-  }
 }
 
 export function darkness(phase: number): number {

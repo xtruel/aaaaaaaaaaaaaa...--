@@ -416,6 +416,8 @@ export const nl: Dict = {
   'pause.tip': 'Handig: <kbd>Q</kbd> vraagt USA-9 om een tip, <kbd>H</kbd> springt terug naar het HQ, <kbd>Tab</kbd> wisselt de snelheid.',
   'pause.resume': 'Hervatten',
   'pause.save': 'Spel opslaan',
+  'tut.keepOld': 'Mijn opgeslagen stad houden',
+  'msg.tutorialNotSaved': 'Deze oefenstad wordt niet automatisch opgeslagen, zodat je stad uit het vrije spel veilig blijft. Gebruik Spel opslaan in het menu om haar in een slot te bewaren.',
   'pause.load': 'Spel laden',
   'pause.saveMenu': 'Opslaan & hoofdmenu',
   'pause.region': 'Regiokaart',

@@ -3,6 +3,7 @@ import type { BuildingType } from '../game/defs';
 import { mulberry32 } from '../game/world';
 import { drawPixelText } from './pixelfont';
 import { PAL, botSprite, buildingSprite, catSprite, heroBotSprite, heroCatSprite, makeCanvas } from './sprites';
+import { atlasImage, frame } from './iso/atlas';
 
 const BASE_H = 200;
 
@@ -306,7 +307,14 @@ export function paintCardScene(canvas: HTMLCanvasElement, scene: CardScene): voi
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
+  // the half-size isometric sprites, like the toolbar (old art only while the atlas is still decoding)
   const draw = (type: BuildingType, x: number, groundY: number) => {
+    const img = atlasImage();
+    const f = frame(`b/${type}/icon`);
+    if (img && f) {
+      ctx.drawImage(img, f.x, f.y, f.w, f.h, x, groundY - f.h + 2, f.w, f.h);
+      return;
+    }
     const sp = buildingSprite(type);
     ctx.drawImage(sp.canvas, x, groundY - sp.canvas.height);
   };

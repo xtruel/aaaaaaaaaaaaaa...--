@@ -419,6 +419,8 @@ export const pl: Dict = {
   'pause.tip': 'Wskazówka: <kbd>Q</kbd> prosi USA-9 o podpowiedź, <kbd>H</kbd> wraca do bazy, <kbd>Tab</kbd> zmienia prędkość.',
   'pause.resume': 'Wznów',
   'pause.save': 'Zapisz grę',
+  'tut.keepOld': 'Zachowaj moje zapisane miasto',
+  'msg.tutorialNotSaved': 'To miasto treningowe nie zapisuje się samo, więc twoje miasto z gry swobodnej jest bezpieczne. Użyj „Zapisz grę” w menu, aby zachować je w slocie.',
   'pause.load': 'Wczytaj grę',
   'pause.saveMenu': 'Zapisz i wyjdź do menu',
   'pause.region': 'Mapa regionu',

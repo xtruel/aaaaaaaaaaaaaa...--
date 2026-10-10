@@ -21,12 +21,26 @@ export interface BuildingArtMeta {
 }
 
 type RawFrame = [number, number, number, number, number, number];
-const raw = data as unknown as { w: number; h: number; frames: Record<string, RawFrame>; buildings: Record<BuildingType, BuildingArtMeta> };
+const raw = data as unknown as {
+  w: number;
+  h: number;
+  frames: Record<string, RawFrame>;
+  buildings: Record<BuildingType, BuildingArtMeta>;
+  decor?: Record<string, { w: number; d: number; frames: number; fps: number; tall: boolean }>;
+};
 
 const frames = new Map<string, Frame>();
 for (const [name, [x, y, w, h, ax, ay]] of Object.entries(raw.frames)) frames.set(name, { x, y, w, h, ax, ay });
 
 export const buildingArt = raw.buildings;
+export const decorArt = raw.decor ?? {};
+
+// how many citizen looks the atlas has (cit/<variant>/sw/0)
+export function citizenVariants(): number {
+  let n = 0;
+  while (frames.has(`cit/${n}/sw/0`)) n++;
+  return n;
+}
 
 export function frame(name: string): Frame | undefined {
   return frames.get(name);

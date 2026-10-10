@@ -416,6 +416,8 @@ export const de: Dict = {
   'pause.tip': 'Tipp: <kbd>Q</kbd> fragt USA-9 um Rat, <kbd>H</kbd> springt zurück zum HQ, <kbd>Tab</kbd> ändert das Tempo.',
   'pause.resume': 'Weiterspielen',
   'pause.save': 'Spiel speichern',
+  'tut.keepOld': 'Meine gespeicherte Stadt behalten',
+  'msg.tutorialNotSaved': 'Diese Übungsstadt wird nicht automatisch gespeichert, damit deine Stadt aus dem freien Spiel sicher bleibt. Mit „Spiel speichern“ im Menü kannst du sie in einem Slot behalten.',
   'pause.load': 'Spiel laden',
   'pause.saveMenu': 'Speichern & Hauptmenü',
   'pause.region': 'Regionskarte',

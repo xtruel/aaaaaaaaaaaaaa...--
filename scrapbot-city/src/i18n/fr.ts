@@ -416,6 +416,8 @@ export const fr: Dict = {
   'pause.tip': "Astuce : <kbd>Q</kbd> demande un conseil à USA-9, <kbd>H</kbd> te ramène au QG, <kbd>Tab</kbd> change la vitesse.",
   'pause.resume': "Reprendre",
   'pause.save': "Sauvegarder la partie",
+  'tut.keepOld': 'Garder ma ville sauvegardée',
+  'msg.tutorialNotSaved': "Cette ville d'entraînement n'est pas sauvegardée automatiquement : ta ville de partie libre reste en sécurité. Utilise Sauvegarder la partie dans le menu pour la garder dans un emplacement.",
   'pause.load': "Charger une partie",
   'pause.saveMenu': "Sauvegarder et menu principal",
   'pause.region': "Carte de la région",
