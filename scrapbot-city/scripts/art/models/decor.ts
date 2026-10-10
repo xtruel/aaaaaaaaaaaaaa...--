@@ -149,27 +149,24 @@ function blocks(v: Vox, list: readonly (readonly number[])[], base: number, ligh
         }
 }
 
-// A wooden crate: chunky dark frame (2-voxel corner posts on the visible edges, rails top and bottom) and one
-// dark plank band across the middle of each visible face.
+// A wooden crate: light planks in a dark frame (the visible top edges and corner posts) with one dark plank band
+// across the middle of each visible face.
 function crate(v: Vox, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): void {
   v.box(x0, y0, z0, x1, y1, z1, WOOD);
-  // rails along the visible bottom edges and around the whole top
-  v.box(x0, y1 - 1, z0, x1, y1, z0 + 1, WOOD_D);
-  v.box(x1 - 1, y0, z0, x1, y1, z0 + 1, WOOD_D);
-  v.box(x0, y0, z1 - 1, x1, y1, z1, WOOD_D);
-  v.box(x0 + 1, y0 + 1, z1 - 1, x1 - 1, y1 - 1, z1, WOOD);
-  // corner posts, 2 wide on each visible face
-  v.box(x0, y1 - 1, z0, x0 + 2, y1, z1, WOOD_D);
-  v.box(x1 - 2, y1 - 1, z0, x1, y1, z1, WOOD_D);
-  v.box(x1 - 1, y0, z0, x1, y0 + 2, z1, WOOD_D);
-  v.box(x1 - 1, y1 - 2, z0, x1, y1, z1, WOOD_D);
-  // the plank band across the middle
-  const h = z1 - z0 - 2;
-  if (h >= 3) {
-    const zb = z0 + 1 + Math.floor((h - 1) / 2);
-    const n = h % 2 ? 1 : 2;
-    v.box(x0, y1 - 1, zb, x1, y1, zb + n, WOOD_D);
-    v.box(x1 - 1, y0, zb, x1, y1, zb + n, WOOD_D);
+  v.box(x0, y1 - 1, z1 - 1, x1, y1, z1, WOOD_D);
+  v.box(x1 - 1, y0, z1 - 1, x1, y1, z1, WOOD_D);
+  v.box(x0, y0, z1 - 1, x1, y0 + 1, z1, WOOD_D);
+  v.box(x0, y0, z1 - 1, x0 + 1, y1, z1, WOOD_D);
+  for (const [x, y] of [
+    [x1 - 1, y1 - 1],
+    [x0, y1 - 1],
+    [x1 - 1, y0],
+  ])
+    v.box(x, y, z0, x + 1, y + 1, z1, WOOD_D);
+  const zb = z0 + Math.floor((z1 - z0 - 1) / 2);
+  if (z1 - z0 >= 5) {
+    v.box(x0, y1 - 1, zb, x1, y1, zb + 1, WOOD_D);
+    v.box(x1 - 1, y0, zb, x1, y1, zb + 1, WOOD_D);
   }
 }
 
@@ -354,11 +351,10 @@ function containerStack(): Vox {
 
 function crates(): Vox {
   const v = tile(1, 1, 12);
-  crate(v, 1, 3, 0, 9, 11, 7);
-  crate(v, 2, 4, 7, 7, 9, 12);
-  crate(v, 10, 9, 0, 15, 14, 5);
-  // a yellow stencil on the big crate
-  v.box(4, 10, 2, 6, 11, 4, M.hazardY);
+  crate(v, 1, 2, 0, 9, 10, 7);
+  crate(v, 2, 3, 7, 7, 8, 12);
+  crate(v, 10, 6, 0, 15, 12, 5);
+  crate(v, 3, 11, 0, 8, 15, 4);
   return v;
 }
 
@@ -393,7 +389,7 @@ function tyres(): Vox {
   tyre(4.5, 10, 3, M.pink);
   v.cylZ(4.5, 10, 2, 0, 5, DIRT);
   // the plant
-  balls(v, [[4.5, 10, 7.5, 2.8]], LEAF, LEAF_L, M.greenD);
+  balls(v, [[4.5, 10, 7.5, 2.8]], LEAF, LEAF_L, M.greenD, 2.2);
   v.box(3, 11, 8, 5, 12, 9, M.pink);
   v.box(5, 8, 9, 7, 9, 10, M.pink);
   // the standing tyre
@@ -524,38 +520,38 @@ function fence(): Vox {
 // Side-on to the front-left: a yellow body with a counterweight at the back, a thin black cage, black tyres
 // sticking out below and two steel forks to the +x.
 function forklift(): Vox {
-  const v = tile(1, 1, 12);
+  const v = tile(1, 1, 13);
   // body and counterweight, a dark skirt along the bottom
-  v.box(2, 4, 1, 12, 11, 6, M.yellow);
-  v.box(1, 4, 1, 5, 11, 8, M.yellow);
+  v.box(2, 4, 1, 12, 11, 7, M.yellow);
+  v.box(1, 4, 1, 5, 11, 9, M.yellow);
   v.box(1, 4, 1, 12, 11, 2, M.sandD);
-  v.box(1, 4, 7, 5, 11, 8, M.orange);
+  v.box(5, 10, 3, 10, 11, 5, M.sandD);
   // wheels with grey hubs
   for (const x of [4.5, 10]) {
-    v.cylY(x, 2, 2.2, 3, 4, M.ink);
-    v.cylY(x, 2, 2.2, 11, 12, M.ink);
+    v.cylY(x, 1.9, 2, 3, 4, M.dark);
+    v.cylY(x, 1.9, 2, 11, 12, M.dark);
     v.box(Math.floor(x), 11, 1, Math.floor(x) + 1, 12, 3, M.steelL);
   }
   // seat and steering wheel
-  v.box(6, 6, 6, 8, 9, 7, M.darkL);
-  v.box(6, 6, 7, 7, 9, 9, M.darkL);
-  v.box(10, 7, 6, 11, 8, 8, M.steelD);
-  v.box(9, 6, 8, 11, 9, 9, M.steelD);
+  v.box(6, 6, 7, 8, 9, 8, M.darkL);
+  v.box(5, 6, 8, 6, 9, 10, M.darkL);
+  v.box(9, 7, 7, 10, 8, 9, M.steelD);
+  v.box(9, 6, 9, 10, 9, 10, M.steelD);
   // overhead guard: four thin black posts and two roof rails, an orange lamp on top
   for (const [x, y] of [
     [3, 4],
     [3, 10],
-    [11, 4],
-    [11, 10],
+    [10, 4],
+    [10, 10],
   ])
-    v.box(x, y, 6, x + 1, y + 1, 11, M.ink);
-  v.box(3, 4, 10, 12, 5, 11, M.ink);
-  v.box(3, 10, 10, 12, 11, 11, M.ink);
-  v.box(3, 9, 11, 5, 11, 12, M.orange);
+    v.box(x, y, 7, x + 1, y + 1, 12, M.ink);
+  v.box(3, 4, 11, 11, 5, 12, M.ink);
+  v.box(3, 10, 11, 11, 11, 12, M.ink);
+  v.box(3, 9, 12, 5, 11, 13, M.orange);
   // mast, carriage and forks
-  v.box(12, 5, 1, 13, 6, 11, M.ink);
-  v.box(12, 9, 1, 13, 10, 11, M.ink);
-  v.box(12, 5, 10, 13, 10, 11, M.ink);
+  v.box(12, 5, 1, 13, 6, 12, M.steel);
+  v.box(12, 9, 1, 13, 10, 12, M.steel);
+  v.box(12, 5, 11, 13, 10, 12, M.steel);
   v.box(13, 5, 2, 14, 10, 4, M.steelD);
   v.box(13, 5, 1, 16, 7, 2, M.steelL);
   v.box(13, 8, 1, 16, 10, 2, M.steelL);
@@ -706,18 +702,21 @@ function dumpster(): Vox {
 function ruinWall(): Vox {
   const v = tile(2, 1, 24);
   // a long wall, 3 thick, with a broken top stepping in 2-voxel blocks
-  const H = [10, 15, 19, 20, 18, 14, 9, 11, 15, 16, 13, 11, 8, 9];
+  const H = [12, 17, 19, 20, 20, 19, 18, 13, 15, 16, 14, 12, 8, 9];
   H.forEach((h, i) => v.box(2 + i * 2, 3, 0, 4 + i * 2, 6, h, M.concrete));
   // a side wall coming forward at the left end, broken lower towards the front
   for (let y = 6; y < 13; y++) v.box(2, y, 0, 5, y + 1, 14 - (y - 6) * 2, M.concrete);
-  // prefab panels, grime at the base, the floor slab line, a faded 2PM pink band from better days
-  for (let x = 2; x < 30; x += 8) v.paint(x, 5, 2, x + 4, 6, 12, M.concreteL);
+  // prefab panels, grime at the base, the floor slab line
+  for (let x = 2; x < 30; x += 8) v.paint(x, 5, 2, x + 4, 6, 11, M.concreteL);
   v.paint(2, 3, 0, 30, 13, 2, M.darkL);
-  v.paint(2, 5, 12, 30, 6, 13, M.concreteL);
-  v.paint(4, 6, 12, 5, 13, 13, M.concreteL);
-  v.paint(2, 5, 13, 30, 6, 15, M.pinkD);
-  v.paint(4, 6, 13, 5, 13, 15, M.pinkD);
-  isoText(v, '2PM', '+y', 6, 5, 19, M.pinkD, true);
+  v.paint(2, 5, 11, 30, 6, 12, M.concreteL);
+  v.paint(4, 6, 11, 5, 13, 12, M.concreteL);
+  // a faded pink 2PM band from better days, and the 2PM tag sprayed over the plaster above it
+  v.paint(16, 5, 12, 30, 6, 14, M.pinkD);
+  v.paint(2, 5, 12, 4, 6, 14, M.pinkD);
+  v.paint(4, 6, 12, 5, 13, 14, M.pinkD);
+  v.paint(4, 5, 12, 17, 6, 19, M.concreteL);
+  isoText(v, '2PM', '+y', 5, 5, 16, M.pinkD, true);
   // two window openings with sills, dark inside
   for (const x of [9, 19]) {
     v.clear(x, 3, 5, x + 4, 6, 10);
@@ -729,7 +728,7 @@ function ruinWall(): Vox {
   for (const [x, len] of [
     [4, 3],
     [8, 4],
-    [12, 3],
+    [13, 3],
     [17, 3],
     [21, 2],
     [26, 3],

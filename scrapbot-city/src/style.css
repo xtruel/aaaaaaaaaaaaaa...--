@@ -2603,7 +2603,10 @@ input[type='number'] {
   pointer-events: none;
 }
 
-.toasts.below {
+/* over a dialog (an ending, a story event) toasts go to the bottom, clear of its title, also when the
+   dialog opens while a toast is already showing */
+.toasts.below,
+body:has(#modal-root .modal-backdrop) .toasts {
   top: auto;
   bottom: 24px;
 }
