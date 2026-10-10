@@ -244,11 +244,16 @@ export class Renderer {
     this.clampCam();
   }
 
-  // Centre the view on a world point (ground level).
+  // Centre the view on a world point (ground level), in the part of the screen the HUD leaves free.
   centerOn(wx: number, wy: number): void {
     this.cam.x = wx - wy - this.viewW / 2;
-    this.cam.y = (wx + wy) / 2 - this.viewH / 2;
+    this.cam.y = (wx + wy) / 2 - this.freeMid();
     this.clampCam();
+  }
+
+  // Vertical middle (view px) of the screen between the top bar and the build toolbar.
+  private freeMid(): number {
+    return (this.insets.top / this.pxZoom + this.viewH - this.insets.bottom / this.pxZoom) / 2;
   }
 
   // Screen space covered by the HUD (CSS px), set by the session: the camera may scroll the map's edges
@@ -256,19 +261,19 @@ export class Renderer {
   insets = { top: 0, bottom: 0 };
 
   clampCam(): void {
-    // the map diamond's bounding box in iso pixels, with a margin
+    // The centre of the part of the screen the HUD leaves free may go anywhere over the map diamond's bounding box
+    // (iso pixels) plus a margin: at every zoom the player can bring any edge of the map, and the scenery around
+    // it, to the middle of the screen. (The map used to be locked in the centre whenever it nearly fitted.)
     const x0 = -MAP_H * TILE;
     const x1 = MAP_W * TILE;
     const y0 = 0;
     const y1 = ((MAP_W + MAP_H) * TILE) / 2;
-    const m = 64;
-    const mt = m + this.insets.top / this.pxZoom;
-    const mb = m + this.insets.bottom / this.pxZoom;
-    if (this.viewW >= x1 - x0 + m * 2) this.cam.x = (x0 + x1 - this.viewW) / 2;
-    else this.cam.x = Math.max(x0 - m, Math.min(x1 - this.viewW + m, this.cam.x));
-    // when it all fits, centre the map in the part of the screen the HUD leaves free
-    if (this.viewH >= y1 - y0 + mt + mb) this.cam.y = (y0 + y1 - this.viewH) / 2 - (mt - mb) / 2;
-    else this.cam.y = Math.max(y0 - mt, Math.min(y1 - this.viewH + mb, this.cam.y));
+    const m = 3 * TILE;
+    const freeMid = this.freeMid();
+    const cx = Math.max(x0 - m, Math.min(x1 + m, this.cam.x + this.viewW / 2));
+    const cy = Math.max(y0 - m, Math.min(y1 + m, this.cam.y + freeMid));
+    this.cam.x = cx - this.viewW / 2;
+    this.cam.y = cy - freeMid;
   }
 
   // Shift the camera by whole tiles (controller D-pad).

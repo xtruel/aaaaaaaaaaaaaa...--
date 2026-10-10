@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1 — comandi della camera
+
+- **Il tasto sinistro del mouse non sposta più la mappa**: serve solo a selezionare e costruire. La mappa si sposta
+  trascinando col tasto destro o centrale, con WASD/frecce, con i bordi dello schermo (opzione) e, sul touch, con un dito
+  come prima. Un trascinamento col sinistro senza strumento in mano non seleziona nulla.
+- **La mappa non resta più bloccata al centro**: a ogni zoom e con qualsiasi dimensione della finestra (anche stretta e
+  verticale) si può spostare finché ogni bordo e ogni angolo della mappa arriva al centro dello schermo. Prima, quando la
+  mappa entrava quasi tutta nello schermo, la camera la teneva ferma al centro.
+- H/Home centrano l'HQ nella parte di schermo libera tra la barra in alto e la barra degli strumenti.
+- Tutorial e aiuto dei comandi aggiornati in 8 lingue ("tieni premuto il tasto destro e trascina, o usa WASD").
+
 ## 0.6.0 — 2.5D isometric world (release candidate)
 
 ### Grafica: da vista dall'alto a isometrico 2.5D

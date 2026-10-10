@@ -1,4 +1,4 @@
-# Scrapbot City — build 0.6.0
+# Scrapbot City — build 0.6.1
 
 City builder in pixel art: piccoli robot raccolgono spazzatura, tu decidi cosa diventa.
 **Recycle × Build × Expand × Survive.** Un pianeta pulito o un profitto più grande?
@@ -76,7 +76,7 @@ i testi di aiuto mostrano i nomi dei tasti della tastiera del giocatore (per ese
 
 | Azione | Tasti |
 |---|---|
-| Muovere la camera | WASD, frecce, trascinare |
+| Muovere la camera | WASD, frecce, trascinare col tasto destro o centrale del mouse, un dito sul touch |
 | Zoom | rotella, pinch su trackpad e touch, `+` / `-` |
 | Scegliere un edificio | `1`–`0`, `M` per la Scrap Spire |
 | Ruspa (macerie) | `X` |

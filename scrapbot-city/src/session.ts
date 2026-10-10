@@ -44,6 +44,7 @@ interface Drag {
   camX: number;
   camY: number;
   moved: boolean;
+  far?: boolean; // a left-button drag that went too far to count as a click
   button: number;
   pointerType: string;
 }
@@ -457,8 +458,11 @@ export class GameSession implements PadTarget {
       const d = this.drag;
       if (!d) return;
       const dist = Math.hypot(e.clientX - d.x, e.clientY - d.y);
-      const canPan = d.button === 1 || d.button === 2 || !this.build || d.pointerType === 'touch';
+      // The left mouse button selects and builds, it never moves the map: the right or middle button does
+      // (as do WASD, the arrows and the screen edges). A finger or a pen has no other button, so it pans.
+      const canPan = d.button === 1 || d.button === 2 || d.pointerType !== 'mouse';
       if (!d.moved && dist > 6 && canPan) d.moved = true;
+      if (!canPan && dist > 12) d.far = true;
       if (d.moved) {
         const r = this.renderer;
         r.cam.x = d.camX - (e.clientX - d.x) / r.pxZoom;
@@ -484,6 +488,8 @@ export class GameSession implements PadTarget {
       const d = this.drag;
       this.drag = null;
       if (!d || d.moved || isModalOpen()) return;
+      // a left-button drag with no tool in hand is not a click (it used to move the map; now it does nothing)
+      if (d.far && !this.build && !this.bulldoze) return;
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
       if (d.button === 2) this.cancelTool();
       else if (d.button === 0) this.click(e.clientX, e.clientY);
