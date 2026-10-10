@@ -60,8 +60,19 @@ Pavimento industriale, recinzione, cancello, lampione, deposito per il Bot Dock 
 | Attesa della Guglia | Quando hanno i crediti ma mancano i pezzi, fanno qualcosa (altro Riciclatore, deposito) o accelerano e aspettano? | economia dei pezzi, `src/game/defs.ts` |
 | Dopo la Guglia | **Tornano a sistemare la città** (recinzioni, pavimenti, lampioni) senza un obiettivo che lo chieda? | è la domanda più importante di questa versione |
 
-Nelle partite simulate della 0.6 la città smette di costruire per 1,5–2 giorni di gioco su 9–12 (15–20% del tempo) per
-mettere da parte i pezzi della Guglia: guarda come vivono quel momento le persone vere.
+Nelle partite simulate della 0.6 il giocatore automatico smette di costruire per 1,5–2 giorni di gioco su 9–12 (15–20%
+del tempo) per mettere da parte i pezzi della Guglia. È un dato sulle **priorità dello script**, non una prova che il gioco sia
+lento: «non costruire» non vuol dire «essere bloccati» (si può controllare gli impianti, scegliere una specializzazione,
+riorganizzare i consumi, guardare la città che lavora). Nel playtest segna il minuto in cui la persona **smette di prendere
+decisioni e si limita ad accelerare**, e subito dopo chiedi, senza suggerire la risposta:
+
+> «Che cosa volevi fare in quel momento, e cosa te lo impediva?»
+
+La risposta separa tre problemi diversi: non capire il prossimo passo; non sapere come avere più pezzi; aver capito tutto e
+trovare l'attesa poco interessante. Solo il terzo è un problema di ritmo.
+
+I sei oggetti nuovi devono aggiungere libertà, non riempire l'attesa: chi sta risparmiando pezzi per la Guglia ha buone
+ragioni per non spenderli in decorazioni, e non usarli in quel momento non vuol dire che non gli piacciano.
 
 ## 5. Le domande finali
 
