@@ -129,8 +129,8 @@ function expectRowsFromSim(s: GameState): number {
       }
     }
     if (st.housing) expect([at('homes').nominal, at('homes').now]).toEqual([`${st.housing}`, `${eff.housing}`]);
-    // storage with its unit, as the panel always wrote it ("180 scrap")
-    if (st.storage) expect([at('storage').nominal, at('storage').now]).toEqual([t('cost.scrap', { n: st.storage }), t('cost.scrap', { n: eff.storage })]);
+    // storage with its unit, as the panel always wrote it ("180 scrap"), across both columns (power does not change it)
+    if (st.storage) expect([at('storage').nominal, at('storage').now]).toEqual([t('cost.scrap', { n: st.storage }), null]);
     if (st.cleanRadius) {
       expect(at('radius').nominal).toBe(`${st.cleanRadius}`);
       expect(at('clean').now).toBe(Number.isFinite(eff.cleanEvery) ? tenth(eff.cleanEvery) : t('insp.stopped'));

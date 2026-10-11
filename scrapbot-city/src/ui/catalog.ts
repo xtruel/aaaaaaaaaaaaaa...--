@@ -296,8 +296,9 @@ export function buildingRows(s: GameState, b: Building): PanelRow[] {
   }
   if (def.fuel) out.push({ key: 'fuel', label: t('insp.fuel'), nominal: t('insp.fuelValue', { n: def.fuel.scrap, s: def.fuel.seconds }), now: null });
   if (st.housing) add('homes');
-  // storage in scrap, with its unit ("180 scrap"), as the panel always wrote it
-  if (st.storage) out.push({ key: 'storage', label: rowLabel({ stat: 'storage' }), nominal: scrapAmount(st.storage), now: scrapAmount(eff.storage) });
+  // storage in scrap, with its unit ("180 scrap"), as the panel always wrote it; across both columns, like the bots:
+  // power does not change it (until the building is finished it gives none, which its state already says)
+  if (st.storage) out.push({ key: 'storage', label: rowLabel({ stat: 'storage' }), nominal: scrapAmount(st.storage), now: null });
   if (def.bots) out.push({ key: 'bots', label: t('insp.bots'), nominal: `+${def.bots}`, now: null });
   if (def.happiness) out.push({ key: 'happiness', label: t('insp.happiness'), nominal: `+${def.happiness}`, now: null });
   if (st.cleanRadius) {
