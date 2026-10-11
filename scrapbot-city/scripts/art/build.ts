@@ -52,6 +52,8 @@ import {
   wallPiece,
 } from './models/catalog-pieces';
 import type { WallShape } from './models/catalog-pieces';
+import { THEMES, THEME_FAMILIES, themeEdges, themeTiles } from './models/city-terrain';
+import { THEME_SCENERY, THEME_SETUP } from './models/city-scenery';
 
 // npm runs scripts from the package root; fall back to walking up from this file
 function projectRoot(): string {
@@ -327,6 +329,34 @@ for (const [name, v] of icons2) {
   add(name, r.img, r.ax, r.ay);
 }
 
+// ---------- city themes, increment 2 (city-terrain.ts, city-scenery.ts) ----------
+// Rustbay, Neon Heights, Greenvale and the 2PM Company Town get their own ground and border scenery; Scrapbot City
+// keeps the frames above. Terrain: t/<theme>/<family>/... twins of every t/<family>/... frame the terrain cache
+// paints, same size and anchor. Scenery: sc/<theme>/<name>/<f> (+ /g), the same metadata as the decor frames.
+// Rendered last, so their materials are registered after every older model's.
+interface ThemeMeta {
+  terrain: string[]; // families with a t/<theme>/<family>/... twin
+  scenery: Record<string, { w: number; d: number; frames: number; fps: number; tall: boolean }>;
+  decor: string[]; // the existing d/<name> scenery that suits the theme, to mix into its border ring
+  light: { day: [number, number, number]; night: [number, number, number]; dark: number };
+}
+const themes: Record<string, ThemeMeta> = {};
+for (const theme of THEMES) {
+  for (const [name, img] of Object.entries(themeTiles(theme))) add(name, img, 16, 0);
+  for (const [name, img] of Object.entries(themeEdges(theme))) add(name, img, name.includes('/edge/l/') ? 16 : 0, -8);
+  const scenery: ThemeMeta['scenery'] = {};
+  for (const d of THEME_SCENERY[theme]) {
+    for (let f = 0; f < d.frames; f++) {
+      const m = d.model(f);
+      if (m.w !== d.w * 16 || m.d !== d.d * 16) throw new Error(`scenery ${theme}/${d.name}: model ${m.w}×${m.d} does not match ${d.w * 16}×${d.d * 16}`);
+      addRendered(`sc/${theme}/${d.name}/${f}`, render(m));
+    }
+    scenery[d.name] = { w: d.w, d: d.d, frames: d.frames, fps: d.fps, tall: d.tall };
+  }
+  for (const name of THEME_SETUP[theme].decor) if (!decor[name]) throw new Error(`theme ${theme}: unknown decor ${name}`);
+  themes[theme] = { terrain: [...THEME_FAMILIES], scenery, decor: [...THEME_SETUP[theme].decor], light: THEME_SETUP[theme].light };
+}
+
 // ---------- hand-made overrides ----------
 const safe = (name: string) => name.replace(/\//g, '_');
 const overrideDir = join(PROJECT, 'art/overrides');
@@ -374,7 +404,7 @@ for (const f of frames) {
 const outDir = join(PROJECT, 'src/assets/iso');
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'atlas.png'), encodePNG(atlas));
-writeFileSync(join(outDir, 'atlas.json'), JSON.stringify({ w: ATLAS_W, h: atlasH, frames: frameMeta, buildings, decor, variants }) + '\n');
+writeFileSync(join(outDir, 'atlas.json'), JSON.stringify({ w: ATLAS_W, h: atlasH, frames: frameMeta, buildings, decor, variants, themes }) + '\n');
 
 // ---------- individual sprites + contact sheet ----------
 const spriteDir = join(PROJECT, 'art/sprites');

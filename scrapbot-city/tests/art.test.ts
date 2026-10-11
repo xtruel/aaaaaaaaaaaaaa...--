@@ -11,6 +11,7 @@ import type { Vox } from '../scripts/art/voxel';
 import { dock } from '../scripts/art/models/dock';
 import { fenceModel, gateModel } from '../scripts/art/models/pieces';
 import { WALL_H, pillarPiece, wallPiece } from '../scripts/art/models/catalog-pieces';
+import { decorArt, themeArt, themedFrame } from '../src/render/iso/atlas';
 
 const meta = JSON.parse(readFileSync(new URL('../src/assets/iso/atlas.json', import.meta.url), 'utf8')) as {
   w: number;
@@ -59,7 +60,7 @@ describe('building sprites', () => {
 
   it('anchors sit inside their frames', () => {
     for (const [name, [, , w, h, ax, ay]] of Object.entries(meta.frames)) {
-      if (name.startsWith('t/edge')) continue; // slab sides hang below their tile on purpose
+      if (/^t\/([a-z]+\/)?edge\//.test(name)) continue; // slab sides (and their city-theme twins) hang below their tile on purpose
       expect(ax >= -1 && ax <= w + 1 && ay >= -1 && ay <= h + 40, name).toBe(true);
     }
   });
@@ -385,7 +386,10 @@ describe('catalogue art, increment 2 (0.7)', () => {
       /^b\/[a-z]+\+(recyclerMagnet|recyclerSorter|factoryArm|podsCapsule|solarTracker|purifierNozzle)\//.test(n) ||
       /^mod\/(recyclerMagnet|recyclerSorter|factoryArm|podsCapsule|solarTracker|purifierNozzle)\//.test(n) ||
       /^pc\/(bench|planter|sign|pergola|cathouse|sculpture|tree|fountain|statue|base|wall|pillar)\//.test(n) ||
-      n.startsWith('t/base/');
+      n.startsWith('t/base/') ||
+      // city themes (increment 2): terrain twins and border scenery
+      /^t\/(rust|neon|green|corp)\//.test(n) ||
+      n.startsWith('sc/');
     const h = createHash('sha256');
     const old = Object.keys(meta.frames)
       .filter((n) => !isNew(n))
@@ -583,5 +587,135 @@ describe('catalogue art, increment 2 (0.7)', () => {
     // isolated walls run along their rotation
     expect(section(wallPiece('x'), 'e').lo).toBe(6);
     expect(section(wallPiece('y'), 's').lo).toBe(6);
+  });
+});
+
+// ---------- city themes, increment 2 (0.7): terrain twins and border scenery per campaign city ----------
+
+const THEMES = ['rust', 'neon', 'green', 'corp'] as const;
+// the terrain families the renderer's terrain cache paints (renderer.ts groundFrame, paintAllTerrain)
+const TERRAIN_FAMILY = /^t\/(ground|grass|road|pave|lot|ind|mud|dirty|water|outer|edge)\//;
+const themesMeta = (meta as unknown as { themes: Record<string, { terrain: string[]; scenery: Record<string, { w: number; d: number; frames: number; fps: number; tall: boolean }>; decor: string[]; light: { day: number[]; night: number[]; dark: number } }> }).themes;
+const decorMeta = (meta as unknown as { decor: Record<string, unknown> }).decor;
+
+// mean colour of a frame's opaque pixels
+function meanRGB(name: string): [number, number, number] {
+  const p = pixels(name);
+  const sum = [0, 0, 0];
+  let n = 0;
+  for (let i = 0; i < p.px.length; i += 4) {
+    if (!p.px[i + 3]) continue;
+    for (let c = 0; c < 3; c++) sum[c] += p.px[i + c];
+    n++;
+  }
+  return [sum[0] / n, sum[1] / n, sum[2] / n];
+}
+// mean colour of a whole family (all its variants)
+function familyRGB(prefix: string): [number, number, number] {
+  const names = Object.keys(meta.frames).filter((n) => n.startsWith(prefix) && !n.slice(prefix.length).includes('/g'));
+  const sum = [0, 0, 0];
+  for (const n of names) meanRGB(n).forEach((v, c) => (sum[c] += v));
+  return [sum[0] / names.length, sum[1] / names.length, sum[2] / names.length];
+}
+const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+describe('city themes (0.7, increment 2)', () => {
+  it('every terrain frame the renderer paints has a twin in every theme, same size and anchor', () => {
+    const base = Object.keys(meta.frames).filter((n) => TERRAIN_FAMILY.test(n));
+    expect(base.length).toBeGreaterThan(60);
+    for (const theme of THEMES) {
+      expect(themesMeta[theme], theme).toBeTruthy();
+      expect([...themesMeta[theme].terrain].sort(), theme).toEqual(['dirty', 'edge', 'grass', 'ground', 'ind', 'lot', 'mud', 'outer', 'pave', 'road', 'water']);
+      for (const n of base) {
+        const twin = `t/${theme}/${n.slice(2)}`;
+        expect(meta.frames[twin], twin).toBeTruthy();
+        expect(meta.frames[twin].slice(2), twin).toEqual(meta.frames[n].slice(2));
+      }
+      // and nothing else: no themed twin of a frame that does not exist
+      for (const n of Object.keys(meta.frames).filter((f) => f.startsWith(`t/${theme}/`))) expect(meta.frames[`t/${n.slice(3 + theme.length)}`], n).toBeTruthy();
+    }
+  });
+
+  it('gameplay tiles and player pieces stay shared: no themed sludge, junk, rubble, floor, base or lamp', () => {
+    for (const theme of THEMES)
+      for (const fam of ['sludge', 'floor', 'base']) expect(Object.keys(meta.frames).some((n) => n.startsWith(`t/${theme}/${fam}/`)), `${theme} ${fam}`).toBe(false);
+    expect(Object.keys(meta.frames).some((n) => /^p\/(rust|neon|green|corp)\//.test(n))).toBe(false);
+  });
+
+  it('the five cities are told apart by their ground, and grass still reads as grass everywhere', () => {
+    const grounds: Record<string, [number, number, number]> = { home: familyRGB('t/ground/') };
+    for (const theme of THEMES) grounds[theme] = familyRGB(`t/${theme}/ground/`);
+    const ids = Object.keys(grounds);
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++) expect(dist(grounds[ids[i]], grounds[ids[j]]), `${ids[i]} vs ${ids[j]}`).toBeGreaterThan(10);
+    const greenness = ([r, g, b]: number[]) => g - (r + b) / 2;
+    for (const theme of ['', ...THEMES.map((t) => `${t}/`)]) {
+      const grass = familyRGB(`t/${theme}grass/`);
+      // green first, and clearly greener than the ground and the paving around it
+      expect(greenness(grass), `${theme}grass`).toBeGreaterThan(18);
+      for (const fam of ['ground', 'pave', 'lot', 'dirty', 'mud']) expect(greenness(grass) - greenness(familyRGB(`t/${theme}${fam}/`)), `${theme}grass vs ${fam}`).toBeGreaterThan(20);
+    }
+  });
+
+  it('each theme has 2 to 4 signature scenery pieces with every frame, one low enough for the front ring', () => {
+    for (const theme of THEMES) {
+      const sc = themesMeta[theme].scenery;
+      const names = Object.keys(sc);
+      expect(names.length, theme).toBeGreaterThanOrEqual(2);
+      expect(names.length, theme).toBeLessThanOrEqual(4);
+      expect(names.some((n) => !sc[n].tall), `${theme}: a low piece`).toBe(true);
+      for (const n of names) {
+        const m = sc[n];
+        for (let f = 0; f < m.frames; f++) expect(meta.frames[`sc/${theme}/${n}/${f}`], `${theme}/${n}/${f}`).toBeTruthy();
+        expect(meta.frames[`sc/${theme}/${n}/${m.frames}`], `${theme}/${n}: no extra frame`).toBeUndefined();
+        const [, , w, h, ax, ay] = meta.frames[`sc/${theme}/${n}/0`];
+        // the anchor is the model's back corner, like the decor's: the footprint fits the sprite's width
+        expect(w, `${theme}/${n} width`).toBe((m.w + m.d) * 16 + 2);
+        expect(ax, `${theme}/${n} ax`).toBe(m.d * 16 + 1);
+        expect(ay >= 0 && ay < h, `${theme}/${n} ay`).toBe(true);
+        // low pieces stay low (they may stand in front of the map), tall ones are tall
+        const height = h - ((m.w + m.d) * 16) / 2 - 2;
+        if (m.tall) expect(height, `${theme}/${n} tall`).toBeGreaterThan(11);
+        else expect(height, `${theme}/${n} low`).toBeLessThanOrEqual(12);
+        for (let f = 1; f < m.frames; f++) expect(difference(`sc/${theme}/${n}/${f - 1}`, `sc/${theme}/${n}/${f}`), `${theme}/${n} ${f - 1}->${f}`).toBeGreaterThan(0.0005);
+      }
+    }
+  });
+
+  it('theme scenery lights up at night where it has lights', () => {
+    const lit = ['sc/rust/harbour-crane/0', 'sc/neon/billboard-tower/0', 'sc/neon/apartment-tall/0', 'sc/neon/apartment-mid/0', 'sc/neon/vending/0', 'sc/green/greenhouse/0', 'sc/green/turbines/0', 'sc/corp/corp-tower/0', 'sc/corp/corp-billboard/0', 'sc/corp/office-block/0'];
+    for (const n of lit) expect(meta.frames[`${n}/g`], n).toBeTruthy();
+  });
+
+  it("each theme's decor list names existing scenery, and its light is a sane suggestion", () => {
+    for (const theme of THEMES) {
+      const t = themesMeta[theme];
+      expect(t.decor.length, theme).toBeGreaterThanOrEqual(6);
+      for (const d of t.decor) expect(decorMeta[d], `${theme} decor ${d}`).toBeTruthy();
+      expect(t.light.day.length).toBe(3);
+      expect(t.light.night.length).toBe(3);
+      for (const c of [...t.light.day, ...t.light.night]) expect(c >= 0 && c <= 255, theme).toBe(true);
+      expect(Math.min(...t.light.day), `${theme}: the day tint stays light`).toBeGreaterThan(200);
+      expect(t.light.dark > 0.5 && t.light.dark < 1.5, theme).toBe(true);
+    }
+  });
+
+  it('the loader exposes the themes and picks a themed terrain frame only where a twin exists', () => {
+    expect(Object.keys(themeArt).sort()).toEqual(['corp', 'green', 'neon', 'rust']);
+    expect(Object.keys(decorArt).length).toBeGreaterThan(20);
+    expect(themedFrame('t/ground/1/2', null)).toBe('t/ground/1/2');
+    expect(themedFrame('t/ground/1/2', 'rust')).toBe('t/rust/ground/1/2');
+    expect(themedFrame('t/edge/l/0', 'neon')).toBe('t/neon/edge/l/0');
+    expect(themedFrame('t/water/5', 'green')).toBe('t/green/water/5');
+    // shared in every city
+    expect(themedFrame('t/sludge/15/0', 'corp')).toBe('t/sludge/15/0');
+    expect(themedFrame('t/floor/0', 'corp')).toBe('t/floor/0');
+    expect(themedFrame('p/junk/2/1', 'rust')).toBe('p/junk/2/1');
+    expect(themedFrame('t/ground/1/2', 'nope')).toBe('t/ground/1/2');
+  });
+
+  it('the atlas stays within 4096 px on each side', () => {
+    expect(meta.w).toBeLessThanOrEqual(4096);
+    expect(meta.h).toBeLessThanOrEqual(4096);
   });
 });

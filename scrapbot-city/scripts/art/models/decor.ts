@@ -51,7 +51,7 @@ const tile = (w: number, d: number, h: number) => new Vox(w * 16, d * 16, h);
 // glyph off its row; lifting (or dropping) each column by the right amount keeps every glyph square on screen.
 // On '+y' columns rise by up to 1 voxel above zTop, on '+x' they drop up to 1 below zTop − 4: leave that room.
 // paintOnly: recolour the existing wall only (a sprayed tag on a broken wall).
-function isoText(v: Vox, str: string, face: '+x' | '+y', x: number, y: number, zTop: number, m: number, paintOnly = false): void {
+export function isoText(v: Vox, str: string, face: '+x' | '+y', x: number, y: number, zTop: number, m: number, paintOnly = false): void {
   let cur = 0;
   for (const ch of str.toUpperCase()) {
     const g = FONT[ch];
@@ -82,7 +82,7 @@ function isoText(v: Vox, str: string, face: '+x' | '+y', x: number, y: number, z
   }
 }
 
-const textW = (str: string) => str.length * 4 - 1;
+export const textW = (str: string) => str.length * 4 - 1;
 
 // A straight run of voxels from a to b, 'size' voxels thick.
 export function line(v: Vox, a: readonly number[], b: readonly number[], m: number, size = 1): void {

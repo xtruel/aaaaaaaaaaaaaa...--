@@ -1,6 +1,6 @@
 // Quick look at one model without touching the game's atlas.
 //   npx esbuild scripts/art/preview.ts --bundle --platform=node --format=esm --outfile=<tmp>/preview.mjs --log-level=warning
-//   node <tmp>/preview.mjs <building type[+module] | citizens | cat | decor | blimp | bots> <out.png> [scale]
+//   node <tmp>/preview.mjs <building type[+module] | citizens | cat | decor | blimp | bots | scenery:<theme>> <out.png> [scale]
 // For a building: every work frame, the "off" frame, 4 construction stages and the toolbar icon, then the
 // building on a patch of ground next to the HQ (for scale) by day and with the night glow.
 import { writeFileSync } from 'node:fs';
@@ -16,9 +16,11 @@ import { CAT_FRAMES, CITIZEN_FRAMES, CITIZEN_VARIANTS, catModel, citizenModel } 
 import { DECOR } from './models/decor';
 import { BLIMP_FRAMES, blimpModel } from './models/blimp';
 import { groundTiles } from './models/terrain';
+import { THEME_SCENERY } from './models/city-scenery';
+import type { Theme } from './models/city-terrain';
 
 const [what, out, scaleArg] = process.argv.slice(2);
-if (!what || !out) throw new Error('usage: preview <type|citizens|cat|decor|blimp|bots> <out.png> [scale]');
+if (!what || !out) throw new Error('usage: preview <type|citizens|cat|decor|blimp|bots|scenery:<theme>> <out.png> [scale]');
 const SCALE = Number(scaleArg ?? 3);
 const BG: [number, number, number] = [46, 40, 65];
 
@@ -189,6 +191,20 @@ if (baseType in BUILDINGS) {
   }
   if (cur.length) rows.push(row(cur));
   sheet = upscale(stack(rows.length ? rows : [row([createImage(8, 8)])]), SCALE);
+} else if (what.startsWith('scenery:')) {
+  // scenery:<rust|neon|green|corp>: a city theme's border scenery, every frame by day and at night
+  const list = THEME_SCENERY[what.slice(8) as Theme];
+  if (!list) throw new Error(`unknown theme in ${what}`);
+  const imgs: Image[] = [];
+  for (const d of list)
+    for (let f = 0; f < d.frames; f++) {
+      const r = render(d.model(f));
+      const day = createImage(r.img.w, r.img.h);
+      fill(day, BG);
+      blit(day, r.img, 0, 0);
+      imgs.push(day, darkenNight(day, r.hasGlow ? r.glow : null, 0, 0));
+    }
+  sheet = upscale(row(imgs), SCALE);
 } else if (what === 'blimp') {
   const imgs: Image[] = [];
   for (let f = 0; f < BLIMP_FRAMES; f++) imgs.push(render(blimpModel(f)).img);
