@@ -10,6 +10,7 @@ import type { CatalogKind, ModuleKind } from '../src/game/pieces';
 import { computeDerived } from '../src/game/sim';
 import { createGame, idx } from '../src/game/state';
 import type { Building, GameState } from '../src/game/state';
+import { setLang } from '../src/i18n';
 import { Hud } from '../src/ui/hud';
 import type { HudHandlers, HudView } from '../src/ui/hud';
 
@@ -78,7 +79,7 @@ function setup(s = city()) {
   const hud = new Hud(root, handlers, s);
   const view: HudView = { speed: 1, build: null, bulldoze: false, selectedId: -1, goalCard: true, piece: null, catalog: false, selectedPiece: -1 };
   const update = (v: Partial<HudView> = {}) => hud.update(s, { ...view, ...v });
-  return { s, root, calls, update };
+  return { s, root, calls, update, hud };
 }
 
 const q = (root: HTMLElement, sel: string) => root.querySelector<HTMLElement>(sel);
@@ -137,6 +138,23 @@ describe('catalog panel', () => {
     show('dockStorage');
     expect(q(panel, '[data-rotate]')).toBeNull();
     expect(q(panel, '.cat-help')!.textContent).toContain('Bot Dock');
+  });
+
+  it('comes back in the new language after a language switch, tool and all', () => {
+    const { root, update, hud } = setup();
+    update({ catalog: true, piece: { kind: 'gate', rot: 0 } });
+    setLang('it');
+    try {
+      hud.relabel();
+      update({ catalog: true, piece: { kind: 'gate', rot: 0 } });
+      const panel = q(root, '[data-catalog-panel]')!;
+      expect(panel.hidden).toBe(false);
+      expect(panel.querySelector('h3')!.textContent).toBe('Oggetti e moduli');
+      expect(q(panel, '[data-item="gate"]')!.classList.contains('active')).toBe(true);
+      expect(q(root, '[data-catalog]')!.textContent).toContain('Oggetti e moduli');
+    } finally {
+      setLang('en');
+    }
   });
 
   it('marks what the city cannot pay for, with what is missing', () => {
