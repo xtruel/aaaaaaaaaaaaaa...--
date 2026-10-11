@@ -463,6 +463,8 @@ export class GameSession implements PadTarget {
     // with a building or a piece in hand the ghost is what counts; a module goes on the building pointed at
     const placing = this.build || (this.piece && !isModuleKind(this.piece.kind));
     this.hoverId = placing ? -1 : this.renderer.pickBuilding(this.pointer.x, this.pointer.y);
+    // the bulldozer lights up what its click takes: the building it shows through a see-through one (src/ui/pick.ts)
+    if (this.bulldoze && this.hoverId >= 0) this.hoverId = pickAt(this.s, this.hoverId, this.hover.x, this.hover.y, { bulldoze: true, selected: -1, last: null, now: 0 }).building;
   }
 
   // The dragged row follows the tile under the pointer (also while the keys move the map), up to the map's edge.
