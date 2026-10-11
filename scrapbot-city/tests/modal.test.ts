@@ -2,7 +2,7 @@
 // Dialogs: Esc (and the controller's B, which sends Esc) goes back one step when a dialog was opened from
 // another one, never closes a dialog that asks a real question, and gives the focus back to what opened it.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeModal, isModalOpen, openModal } from '../src/ui/modal';
+import { closeModal, isModalOpen, modalClosedAt, openModal } from '../src/ui/modal';
 
 const esc = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 const title = () => document.querySelector('#modal-root h2')?.textContent ?? null;
@@ -54,5 +54,20 @@ describe('dialogs', () => {
     expect(opener.closest('.screen')!.hasAttribute('inert') || (opener.closest('.screen') as HTMLElement).inert).toBeTruthy();
     closeModal();
     expect(document.activeElement).toBe(opener);
+  });
+
+  it('remembers when the last dialog closed (a press on the map right after takes nothing: session.ts), not when one replaced another', () => {
+    let now = 5000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    openModal({ title: 'Event', body: '' });
+    const before = modalClosedAt();
+    now = 6000;
+    openModal({ title: 'Another', body: '' });
+    expect(modalClosedAt()).toBe(before);
+    now = 7000;
+    (document.querySelector('#modal-root .modal-x') as HTMLButtonElement).click();
+    expect(isModalOpen()).toBe(false);
+    expect(modalClosedAt()).toBe(7000);
+    vi.restoreAllMocks();
   });
 });

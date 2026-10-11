@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // The HUD side of increment 2's decorations (G2): the Decorations section of the catalog (with the lamp), the panel
-// of a selected decoration (Rotate where it turns, Remove with what it really gives back, kept up to date in place).
+// of a selected decoration (Rotate where it turns, Remove with what it really gives back, kept up to date in place),
+// and the catalog's guard against the second press of a double press after the list moved under the pointer.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { costText } from '../src/game/actions';
 import { MAP_W, T } from '../src/game/defs';
@@ -96,6 +97,36 @@ describe('catalog: the Decorations section', () => {
     expect(item('sculpture').classList.contains('cant')).toBe(true);
     expect(item('sculpture').querySelector('.cat-reason')!.textContent).toBe('Missing 15 scrap');
     expect(item('bench').classList.contains('cant')).toBe(false);
+  });
+
+  it('the second press of a double press, after the list moved under the pointer, picks nothing; a press after that does', () => {
+    const { root, calls, update } = setup();
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    update({ catalog: true });
+    const panel = q(root, '[data-catalog-panel]')!;
+    q(panel, '[data-item="bench"]')!.click();
+    // (the session takes the bench; the panel is redrawn with the tool box above the list)
+    now += 60;
+    q(panel, '[data-item="planter"]')!.click();
+    expect(calls).toEqual([['onPick', 'bench']]);
+    update({ catalog: true, piece: { kind: 'bench', rot: 0 } });
+    now += 100;
+    q(panel, '[data-item="pergola"]')!.click();
+    q(panel, '[data-done]')!.click();
+    q(panel, '[data-rotate]')!.click();
+    expect(calls).toEqual([['onPick', 'bench']]);
+    now += 400;
+    q(panel, '[data-rotate]')!.click();
+    q(panel, '[data-item="sign"]')!.click();
+    expect(calls).toEqual([['onPick', 'bench'], ['onRotate'], ['onPick', 'sign']]);
+    update({ catalog: true, piece: { kind: 'sign', rot: 0 } });
+    now += 400;
+    q(panel, '[data-done]')!.click();
+    now += 50;
+    q(panel, '[data-done]')!.click();
+    expect(calls.at(-1)).toEqual(['onPick', null]);
+    expect(calls.filter((c) => c[0] === 'onPick' && c[1] === null).length).toBe(1);
   });
 });
 

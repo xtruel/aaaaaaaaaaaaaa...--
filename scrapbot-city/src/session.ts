@@ -27,7 +27,7 @@ import type { DozeTarget } from './ui/catalog';
 import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
-import { closeModal, isModalOpen, openModal } from './ui/modal';
+import { closeModal, isModalOpen, modalClosedAt, openModal } from './ui/modal';
 import type { ModalAction } from './ui/modal';
 import { Tutorial } from './ui/tutorial';
 import type { Box } from './ui/tutorial';
@@ -51,6 +51,7 @@ interface Drag {
   far?: boolean; // a left-button drag that went too far to count as a click
   button: number;
   pointerType: string;
+  closedPanel?: boolean; // the press closed the smog panel: its release does nothing else
 }
 
 // A row of floor or fence dragged out with the left mouse button: ghosts while dragging, bought on release.
@@ -62,6 +63,11 @@ interface Row {
 }
 
 const PAN_SPEED = 260; // screen px per second
+// The owner's comfort rules for building: a press with a tool in hand within this many ms of the one before and this
+// close to it (screen px) is the second press of a double click, double tap or A A; and a press this soon after a
+// dialog or the smog panel closed is the end of the double press that closed it. Neither buys anything.
+const DOUBLE_PRESS = 350;
+const DOUBLE_DIST = 10;
 const CURSOR_SPEED = 900; // controller cursor, screen px per second at full tilt
 const PANEL_SCROLL = 700; // right stick over a side panel that scrolls, px per second
 // WASD by physical position: ZQSD on AZERTY keyboards.
@@ -92,7 +98,8 @@ export class GameSession implements PadTarget {
   private piece: { kind: CatalogKind; rot: number } | null = null;
   private pieceRot: Partial<Record<CatalogKind, number>> = {};
   private catalog = false;
-  private selectedPiece = -1; // tile index of the selected fence, gate, lamp or floor
+  private selectedPiece = -1; // tile index of the selected piece (fence, gate, lamp, decoration) or floor
+  private lastPress = { t: -Infinity, x: 0, y: 0, cam: '' }; // the last press on the map with a tool in hand (meantPress)
   private row: Row | null = null;
   private rotAcc = 0; // Shift+wheel, added up like the zoom
   private selectedId = -1;
@@ -549,6 +556,8 @@ export class GameSession implements PadTarget {
         moved: false,
         button: e.button,
         pointerType: e.pointerType,
+        // the HUD closed the smog panel on this very press, just before it reached the map
+        closedPanel: performance.now() - this.hud.smogClosedAt < 30,
       };
       // with floor or fence in hand the left mouse button drags out a row (a finger still moves the map)
       this.row = null;
@@ -639,6 +648,8 @@ export class GameSession implements PadTarget {
       // a left-button drag with no tool in hand is not a click (it used to move the map; now it does nothing)
       if (d.far && !this.build && !this.bulldoze && !this.piece) return;
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
+      // a press that closed the smog panel only closed it
+      if (d.closedPanel) return;
       if (d.button === 2) this.cancelTool();
       else if (d.button === 0 && row && row.tiles.length > 1) this.layRow(row.tiles);
       else if (d.button === 0) this.click(e.clientX, e.clientY);
@@ -779,6 +790,8 @@ export class GameSession implements PadTarget {
   private click(sx: number, sy: number): void {
     const s = this.s;
     if (s.outcome) return;
+    // with a tool in hand this press buys, demolishes or clears: only when it is meant
+    if ((this.piece || this.build || this.bulldoze) && !this.meantPress(sx, sy)) return;
     if (this.piece) {
       this.usePiece(sx, sy);
       return;
@@ -848,6 +861,21 @@ export class GameSession implements PadTarget {
     if (s.tiles[i] === T.JUNK) pushMessage(s, t(s.res.scrap >= s.derived.storage ? 'msg.junkInfoFull' : 'msg.junkInfo', { n: s.amount[i] }), 'info');
     else if (s.tiles[i] === T.SLUDGE) pushMessage(s, t('msg.sludgeInfo'), 'info');
     else if (s.tiles[i] === T.RUBBLE) pushMessage(s, t('msg.rubbleInfo'), 'info');
+  }
+
+  // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
+  // second press of a double click, double tap or A A (within DOUBLE_PRESS ms and DOUBLE_DIST px of the press before,
+  // the map not moved in between: on the same tile it would only be refused, across a tile edge it would buy a second
+  // piece), and for a press right after a dialog or the smog panel closed (the second press of the double press that
+  // closed it lands on the map).
+  private meantPress(sx: number, sy: number): boolean {
+    const now = performance.now();
+    const last = this.lastPress;
+    const r = this.renderer;
+    const cam = `${r.cam.x},${r.cam.y},${r.zoom}`;
+    this.lastPress = { t: now, x: sx, y: sy, cam };
+    if (now - last.t < DOUBLE_PRESS && cam === last.cam && Math.hypot(sx - last.x, sy - last.y) < DOUBLE_DIST) return false;
+    return now - Math.max(modalClosedAt(), this.hud.smogClosedAt) >= DOUBLE_PRESS;
   }
 
   // The bulldozer clears rubble, takes up a fence, gate, lamp or bare floor (half its price back) and selects a
@@ -1013,7 +1041,7 @@ export class GameSession implements PadTarget {
     return isRotatable(this.piece?.kind) || !!pieceInfo(this.s, this.selectedPiece)?.rotatable;
   }
 
-  // R, Shift+wheel: turns the fence, gate or lamp in hand, else the selected one on the map.
+  // R, Shift+wheel: turns the piece in hand (fence, gate, lamp, a decoration with directions), else the selected one.
   private rotate(dir: 1 | -1): void {
     if (!this.rotateTool(dir) && this.selectedPiece >= 0) this.rotatePiece(this.selectedPiece, dir);
   }
@@ -1143,17 +1171,19 @@ export class GameSession implements PadTarget {
     const p = f.pressed;
     if (p.has('a')) {
       audio.unlock();
-      // like a press of the mouse or a finger: anywhere but on the smog panel or its meter, it closes the panel
-      this.hud.closeSmogUnless(el);
-      if (overMap) this.click(c.x, c.y);
-      else (btn ?? el)?.click();
+      // like a press of the mouse or a finger: anywhere but on the smog panel or its meter, it closes the panel (and on
+      // the map does nothing else)
+      const closed = this.hud.closeSmogUnless(el);
+      if (overMap) {
+        if (!closed) this.click(c.x, c.y);
+      } else (btn ?? el)?.click();
     }
     if (p.has('b') && !this.hud.closeSmog()) {
       if (this.hasTool()) this.cancelTool();
       else if (this.catalog) this.closeCatalog();
     }
     if (p.has('x')) this.toggleBulldoze();
-    // Y turns the fence, gate or lamp in hand; otherwise it asks USA-9 for a hint
+    // Y turns the piece in hand (fence, gate, lamp, a decoration with directions); otherwise it asks USA-9 for a hint
     if (p.has('y') && !this.rotateTool(1)) this.askHint();
     if (p.has('lb') || p.has('rb')) {
       const dir = p.has('rb') ? 1 : -1;

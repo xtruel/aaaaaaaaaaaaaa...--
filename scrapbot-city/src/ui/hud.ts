@@ -178,6 +178,10 @@ export class Hud {
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
   private catalogKey = '';
+  private catalogShiftAt = -Infinity; // when the open catalog was redrawn for another tool (performance.now())
+  private catalogPressAt = -Infinity; // when an item or Done was last pressed in the catalog (performance.now())
+  // when the smog panel last closed (performance.now()): the map takes no purchase in the moments after (session)
+  smogClosedAt = -Infinity;
   private starsKey = '';
   private smogOpen = false; // the smog panel (a click on the smog meter opens and closes it)
   private smogKey = '';
@@ -610,9 +614,11 @@ export class Hud {
     return true;
   }
 
-  // A press (or the controller's A) on anything but the panel or the meter closes it.
-  closeSmogUnless(target: Element | null): void {
-    if (this.smogOpen && !(target && (this.el['smog-panel'].contains(target) || this.el['smog-meter'].contains(target)))) this.closeSmog();
+  // A press (or the controller's A) on anything but the panel or the meter closes it. True when it did: that press
+  // does nothing else (on the map it buys nothing with a tool in hand).
+  closeSmogUnless(target: Element | null): boolean {
+    if (this.smogOpen && !(target && (this.el['smog-panel'].contains(target) || this.el['smog-meter'].contains(target)))) return this.closeSmog();
+    return false;
   }
 
   get smogShown(): boolean {
@@ -620,6 +626,7 @@ export class Hud {
   }
 
   private showSmog(): void {
+    if (!this.smogOpen && !this.el['smog-panel'].hidden) this.smogClosedAt = performance.now();
     this.el['smog-panel'].hidden = !this.smogOpen;
     this.el['smog-meter'].setAttribute('aria-expanded', String(this.smogOpen));
     this.el['smog-meter'].classList.toggle('active', this.smogOpen);
@@ -683,8 +690,17 @@ export class Hud {
       this.markCatalog(s);
       return;
     }
+    // redrawn for another tool while open: the tool box above the list comes or goes and the list moves, so the
+    // second press of a double press (double click, double tap, A A) would land on another item or on Done
+    if (!opening) this.catalogShiftAt = performance.now();
     this.catalogKey = key;
     this.renderCatalog(s, active, opening);
+  }
+
+  // A press on the catalog right after an item or Done was pressed (before the panel is redrawn for the new tool), or
+  // right after it moved under the pointer, is the end of a double press: it does nothing.
+  private catalogSettled(): boolean {
+    return performance.now() - Math.max(this.catalogShiftAt, this.catalogPressAt) >= CONFIRM_DELAY;
   }
 
   // What can be had right now, written into the list in place: the greyed-out items and why.
@@ -753,12 +769,18 @@ export class Hud {
     });
     for (const btn of panel.querySelectorAll<HTMLElement>('[data-item]')) {
       btn.addEventListener('click', () => {
+        if (!this.catalogSettled()) return;
+        this.catalogPressAt = performance.now();
         audio.play('click');
         this.handlers.onPick(btn.dataset.item as CatalogKind);
       });
     }
-    panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotate());
+    panel.querySelector('[data-rotate]')?.addEventListener('click', () => {
+      if (this.catalogSettled()) this.handlers.onRotate();
+    });
     panel.querySelector('[data-done]')?.addEventListener('click', () => {
+      if (!this.catalogSettled()) return;
+      this.catalogPressAt = performance.now();
       audio.play('click');
       this.handlers.onPick(null);
     });
