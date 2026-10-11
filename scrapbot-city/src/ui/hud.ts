@@ -1,18 +1,42 @@
-// In-game DOM interface: resource bar, meters, goal, toolbar, inspector and message feed.
+// In-game DOM interface: resource bar, meters, goal, toolbar, inspector, Objects & modules panel and message feed.
 import { audio } from '../audio';
-import { buildCost, canAfford, costText, partsReserve, refundFor } from '../game/actions';
+import { buildCost, canAfford, costText, partsReserve } from '../game/actions';
 import { cityById, goalText } from '../game/cities';
 import { freeHintsLeft, hintPrice } from '../game/hints';
 import { BUILD_ORDER, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, PARTS_RESERVE, SMOG_DANGER, SMOG_LIMIT_SECONDS } from '../game/defs';
 import type { BuildingType, Cost } from '../game/defs';
+import { CATALOG_ORDER, MODULES, buildingStats, demolishRefund, installedModules, isModuleKind, isPieceKind, moduleRefund, pieceRefund } from '../game/pieces';
+import type { CatalogKind, ModuleKind } from '../game/pieces';
 import { dayPhase } from '../game/sim';
 import { day } from '../game/state';
 import type { Building, BuildingStatus, GameState, Message } from '../game/state';
 import { OBJECTIVES, objectiveHint, objectiveText, objectiveTools } from '../game/story';
+import { padMode } from '../gamepad';
 import { bDesc, bName, pathLabel, t, tk } from '../i18n';
-import { keyLabel } from '../keys';
+import { keyLabel, localizeKeys } from '../keys';
 import { iconUrl, pathColor, portraitUrl, toolThumb } from '../render/icons';
 import type { IconName } from '../render/icons';
+import { atlasImage, frame } from '../render/iso/atlas';
+import { PAL, makeCanvas } from '../render/sprites';
+import {
+  CONSTRUCTION,
+  MACHINE_MODULES,
+  catalogCost,
+  catalogEffect,
+  catalogLimit,
+  catalogName,
+  catalogState,
+  demolishStorageDrop,
+  installState,
+  isRotatable,
+  isRowKind,
+  moduleRows,
+  moduleStorageDrop,
+  pieceInfo,
+  rowLabel,
+  scrapLost,
+} from './catalog';
+import type { PieceInfo } from './catalog';
 import { esc } from './escape';
 
 export interface HudHandlers {
@@ -26,6 +50,13 @@ export interface HudHandlers {
   onCloseInspector(): void;
   onHint(): void;
   onRegion(): void;
+  onCatalog(): void; // open or close the Objects & modules panel
+  onPick(kind: CatalogKind | null): void; // take that catalog tool (again: put it away); null puts it away
+  onRotate(): void; // turn the fence, gate or lamp in hand
+  onInstall(id: number, kind: ModuleKind): void;
+  onRemoveModule(id: number, kind: ModuleKind): void;
+  onRotatePiece(i: number): void;
+  onRemovePiece(i: number): void;
 }
 
 export interface HudView {
@@ -34,6 +65,9 @@ export interface HudView {
   bulldoze: boolean;
   selectedId: number;
   goalCard: boolean; // false while the tutorial talks, so there is one card to read at a time
+  piece: { kind: CatalogKind; rot: number } | null; // the catalog tool in hand
+  catalog: boolean; // the Objects & modules panel is open (it takes the building panel's place)
+  selectedPiece: number; // tile index of the selected fence, gate, lamp or floor; -1 none
 }
 
 function statusText(s: GameState, b: Building): string {
@@ -75,6 +109,55 @@ function costChips(cost: Cost): string {
   return chips.join('') || `<span class="cost">${t('common.free')}</span>`;
 }
 
+// A module's Remove confirmation takes no click in its first moments (ms), so a double click on Remove does not
+// confirm it.
+const CONFIRM_DELAY = 350;
+
+// Catalog pictures: the item's icon frame from the atlas at its own size (30×35 up to 64×32), centred in one
+// 64×44 box, so the rows line up and the pixels stay crisp. Before the atlas has decoded the box stays empty.
+const PIC_W = 64;
+const PIC_H = 44;
+const pictures = new Map<string, string>();
+
+function catalogPicture(kind: CatalogKind): string {
+  const name = isPieceKind(kind) ? `pc/${kind}/icon` : `mod/${kind}/icon`;
+  const cached = pictures.get(name);
+  if (cached) return cached;
+  const [c, ctx] = makeCanvas(PIC_W, PIC_H);
+  const img = atlasImage();
+  const f = frame(name);
+  if (!img || !f) return c.toDataURL();
+  // a bigger icon would be scaled down to fit (none is today)
+  const k = Math.min(1, PIC_W / f.w, PIC_H / f.h);
+  const w = Math.round(f.w * k);
+  const h = Math.round(f.h * k);
+  ctx.drawImage(img, f.x, f.y, f.w, f.h, Math.round((PIC_W - w) / 2), Math.round((PIC_H - h) / 2), w, h);
+  const url = c.toDataURL();
+  pictures.set(name, url);
+  return url;
+}
+
+// The Objects & modules button: a traffic cone in the 8×8 style of the bulldozer's icon (at toolbar size a
+// lamp or a fence this small reads as a squiggle).
+const CONE = ['...KK...', '..KOOK..', '..KWWK..', '.KOOOOK.', '.KWWWWK.', 'KOOOOOOK', 'KKKKKKKK', '........'];
+const CONE_PAL: Record<string, string> = { K: PAL.ink, O: PAL.orange, W: PAL.white };
+
+function coneIcon(scale: number): string {
+  const key = `cone@${scale}`;
+  const cached = pictures.get(key);
+  if (cached) return cached;
+  const [c, ctx] = makeCanvas(8 * scale, 8 * scale);
+  CONE.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      if (!CONE_PAL[row[x]]) continue;
+      ctx.fillStyle = CONE_PAL[row[x]];
+      ctx.fillRect(x * scale, y * scale, scale, scale);
+    }
+  });
+  const url = c.toDataURL();
+  pictures.set(key, url);
+  return url;
+}
 
 export class Hud {
   private root: HTMLElement;
@@ -83,6 +166,9 @@ export class Hud {
   private toolButtons = new Map<BuildingType, HTMLButtonElement>();
   private inspectorKey = '';
   private confirmDemolish = false;
+  private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
+  private confirmRemoveAt = 0; // when it was asked for (performance.now())
+  private catalogKey = '';
   private starsKey = '';
   private s: GameState;
   private layout = new ResizeObserver(() => this.placePanels());
@@ -99,6 +185,7 @@ export class Hud {
     this.el = {};
     this.toolButtons.clear();
     this.inspectorKey = '';
+    this.catalogKey = '';
     this.starsKey = '';
     this.last = {};
     this.build();
@@ -185,6 +272,7 @@ export class Hud {
       <div class="feed" data-feed aria-live="polite"></div>
       <div class="smog-alert" data-smog-alert hidden></div>
       <aside class="inspector" data-inspector hidden></aside>
+      <aside class="inspector catalog" data-catalog-panel aria-label="${esc(t('hud.catalog'))}" hidden></aside>
       <div class="tooltip" data-tooltip hidden></div>
       <nav class="toolbar" data-toolbar aria-label="${t('hud.build')}"></nav>
     `;
@@ -192,7 +280,7 @@ export class Hud {
       const key = node.closest<HTMLElement>('[data-res]')!.dataset.res!;
       this.el[`${key}:${node.hasAttribute('data-v') ? 'v' : 'cap'}`] = node;
     }
-    for (const name of ['smog-bar', 'smog', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'tooltip', 'toolbar']) {
+    for (const name of ['smog-bar', 'smog', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'tooltip', 'toolbar']) {
       this.el[name] = this.root.querySelector(`[data-${name}]`)!;
     }
 
@@ -252,23 +340,40 @@ export class Hud {
       groupFor(type).append(b);
       this.toolButtons.set(type, b);
     }
+    // The Tools column holds the bulldozer and the Objects & modules catalog as two half-height cards, one above
+    // the other: the build bar keeps its width (it just fits a 1280 px window).
     const doze = document.createElement('button');
     doze.type = 'button';
-    doze.className = 'tool tool-doze';
+    doze.className = 'tool tool-mini tool-doze';
     doze.dataset.doze = '';
     doze.innerHTML = `
       <kbd>${keyLabel('KeyX', 'X')}</kbd>
-      <span class="tool-plate"><img src="${iconUrl('bulldoze', 8)}" alt="" /></span>
-      <span class="tool-name">${t('b.bulldoze')}</span>
-      <span class="tool-cost">${costChips({ credits: BULLDOZE_RUBBLE_COST })}</span>`;
+      <span class="tool-plate"><img src="${iconUrl('bulldoze', 3)}" alt="" /></span>
+      <span class="tool-text">
+        <span class="tool-name">${t('b.bulldoze')}</span>
+        <span class="tool-cost">${costChips({ credits: BULLDOZE_RUBBLE_COST })}</span>
+      </span>`;
     doze.addEventListener('click', () => {
       audio.play('click');
       this.handlers.onBulldoze();
     });
+    const catalog = document.createElement('button');
+    catalog.type = 'button';
+    catalog.className = 'tool tool-mini tool-catalog';
+    catalog.dataset.catalog = '';
+    catalog.setAttribute('aria-expanded', 'false');
+    catalog.innerHTML = `
+      <kbd>${keyLabel('KeyO', 'O')}</kbd>
+      <span class="tool-plate"><img src="${coneIcon(3)}" alt="" /></span>
+      <span class="tool-text"><span class="tool-name">${esc(t('hud.catalog'))}</span></span>`;
+    catalog.addEventListener('click', () => {
+      audio.play('click');
+      this.handlers.onCatalog();
+    });
     const tools = document.createElement('div');
     tools.className = 'tool-group group-tools-misc';
     tools.innerHTML = `<span class="group-label">${t('hud.group.tools')}</span><div class="group-tools"></div>`;
-    tools.querySelector('.group-tools')!.append(doze);
+    tools.querySelector('.group-tools')!.append(doze, catalog);
     toolbar.append(tools);
 
     this.layout.disconnect();
@@ -447,27 +552,176 @@ export class Hud {
       btn.classList.toggle('next', glow);
     }
     this.root.querySelector('[data-doze]')!.classList.toggle('active', view.bulldoze);
+    const catalog = this.root.querySelector('[data-catalog]')!;
+    catalog.classList.toggle('active', view.catalog);
+    catalog.setAttribute('aria-expanded', String(view.catalog));
 
-    this.updateInspector(s, view.selectedId);
+    this.updateCatalog(s, view);
+    this.updateInspector(s, view);
   }
 
-  private updateInspector(s: GameState, id: number): void {
+  // ---------- Objects & modules ----------
+
+  // The catalog panel. Rebuilt only when the tool in hand changes or a controller comes or goes, so a click on
+  // it is never lost to a rebuild: what can be had right now (money comes in with every tax tick, a Dock gets
+  // finished) is written in place.
+  private updateCatalog(s: GameState, view: HudView): void {
+    const panel = this.el['catalog-panel'];
+    const opening = panel.hidden && view.catalog;
+    panel.hidden = !view.catalog;
+    if (!view.catalog) {
+      this.catalogKey = '';
+      return;
+    }
+    const active = view.piece?.kind ?? null;
+    const key = `${active}|${padMode()}`;
+    if (key === this.catalogKey) {
+      this.markCatalog(s);
+      return;
+    }
+    this.catalogKey = key;
+    this.renderCatalog(s, active, opening);
+  }
+
+  // What can be had right now, written into the list in place: the greyed-out items and why.
+  private markCatalog(s: GameState): void {
+    const panel = this.el['catalog-panel'];
+    for (const kind of CATALOG_ORDER) {
+      const btn = panel.querySelector<HTMLElement>(`[data-item="${kind}"]`);
+      const reason = btn?.querySelector<HTMLElement>('.cat-reason');
+      if (!btn || !reason) continue;
+      const st = catalogState(s, kind);
+      btn.classList.toggle('cant', !st.ok);
+      const text = st.ok ? '' : (st.reason ?? '');
+      if (reason.textContent !== text) reason.textContent = text;
+      reason.hidden = st.ok;
+    }
+  }
+
+  private renderCatalog(s: GameState, active: CatalogKind | null, opening: boolean): void {
+    const panel = this.el['catalog-panel'];
+    // name and price, what it does, the limit (and why it cannot be had now: markCatalog)
+    const item = (kind: CatalogKind) => `
+        <button type="button" class="cat-item${kind === active ? ' active' : ''}" data-item="${kind}" aria-pressed="${kind === active}">
+          <span class="cat-pic"><img src="${catalogPicture(kind)}" alt="" /></span>
+          <span class="cat-text">
+            <span class="cat-top"><span class="cat-name">${esc(catalogName(kind))}</span><span class="tool-cost">${costChips(catalogCost(kind))}</span></span>
+            <span class="cat-effect">${esc(catalogEffect(kind))}</span>
+            <span class="cat-meta"><span class="cat-limit">${esc(catalogLimit(kind))}</span><span class="cat-reason" hidden></span></span>
+          </span>
+        </button>`;
+    // the list scrolls on small windows: it opens at the top, and a rebuild while open keeps its place
+    const scrolled = opening ? 0 : (panel.querySelector<HTMLElement>('.cat-scroll')?.scrollTop ?? 0);
+    panel.innerHTML = `
+      <div class="insp-head cat-head">
+        <span class="tool-plate"><img src="${coneIcon(4)}" alt="" /></span>
+        <div>
+          <p class="tag">${t('hud.group.tools')}</p>
+          <h3>${esc(t('hud.catalog'))}</h3>
+        </div>
+        <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
+      </div>
+      ${active ? this.toolHelp(active) : ''}
+      <div class="cat-scroll">
+        <h4 class="cat-section">${t('cat.construction')}</h4>
+        <p class="cat-note">${t('insp.decoration')}</p>
+        <div class="cat-list">${CONSTRUCTION.map(item).join('')}</div>
+        <h4 class="cat-section">${t('cat.modules')}</h4>
+        <div class="cat-list">${MACHINE_MODULES.map(item).join('')}</div>
+      </div>`;
+    this.markCatalog(s);
+    const list = panel.querySelector<HTMLElement>('.cat-scroll')!;
+    list.scrollTop = scrolled;
+    // the item in hand stays in sight when the tool box above the list takes its room
+    const chosen = panel.querySelector<HTMLElement>('.cat-item.active');
+    if (chosen) {
+      const r = chosen.getBoundingClientRect();
+      const l = list.getBoundingClientRect();
+      if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
+      else if (r.top < l.top) list.scrollTop -= l.top - r.top;
+    }
+    panel.querySelector('[data-close]')!.addEventListener('click', () => {
+      audio.play('click');
+      this.handlers.onCatalog();
+    });
+    for (const btn of panel.querySelectorAll<HTMLElement>('[data-item]')) {
+      btn.addEventListener('click', () => {
+        audio.play('click');
+        this.handlers.onPick(btn.dataset.item as CatalogKind);
+      });
+    }
+    panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotate());
+    panel.querySelector('[data-done]')?.addEventListener('click', () => {
+      audio.play('click');
+      this.handlers.onPick(null);
+    });
+  }
+
+  // While a catalog tool is in hand: what to do with it (in controller buttons when a pad is in use), and the
+  // buttons a finger needs (Rotate, Done).
+  private toolHelp(kind: CatalogKind): string {
+    const pad = padMode();
+    const building = isModuleKind(kind) ? bName(MODULES[kind].building) : '';
+    const what = isModuleKind(kind)
+      ? t(pad ? 'cat.help.modulePad' : 'cat.help.module', { building })
+      : pad
+        ? t('cat.help.pad')
+        : t(isRowKind(kind) ? 'cat.help.row' : 'cat.help.place');
+    const turn = isRotatable(kind) ? ` ${pad ? t('cat.help.rotatePad') : localizeKeys(t('cat.help.rotate'))}` : '';
+    return `
+      <div class="cat-tool">
+        <p class="cat-help"><b>${esc(catalogName(kind))}</b> · ${what}${turn}</p>
+        <div class="cat-tool-btns">
+          ${isRotatable(kind) ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
+          <button type="button" class="btn" data-done>${t('common.done')}</button>
+        </div>
+      </div>`;
+  }
+
+  // ---------- building and piece panel ----------
+
+  private updateInspector(s: GameState, view: HudView): void {
     const panel = this.el.inspector;
-    const b = s.buildings.find((o) => o.id === id);
-    if (!b) {
+    // the catalog takes this place while it is open
+    const b = view.catalog ? undefined : s.buildings.find((o) => o.id === view.selectedId);
+    const piece = b || view.catalog ? null : pieceInfo(s, view.selectedPiece);
+    if (!b && !piece) {
       panel.hidden = true;
       this.inspectorKey = '';
       this.confirmDemolish = false;
+      this.confirmRemove = null;
       return;
     }
-    if (!this.inspectorKey.startsWith(`${b.id}:`)) this.confirmDemolish = false;
+    panel.hidden = false;
+    if (piece) {
+      const key = `piece:${view.selectedPiece}:${piece.kind}:${piece.rotatable}:${piece.removable}`;
+      if (key !== this.inspectorKey) {
+        this.inspectorKey = key;
+        this.renderPiece(piece, view.selectedPiece);
+      }
+      return;
+    }
+    if (!b) return;
+    if (!this.inspectorKey.startsWith(`${b.id}:`)) {
+      this.confirmDemolish = false;
+      this.confirmRemove = null;
+    }
     // Rebuild only when the buttons change; status text updates in place so clicks are never lost.
-    const key = `${b.id}:${b.built >= 1}:${b.paused}:${this.confirmDemolish}`;
+    const key = `${b.id}:${b.built >= 1}:${b.paused}:${this.confirmDemolish}:${this.confirmRemove}:${installedModules(b).join()}`;
     if (key !== this.inspectorKey) {
       this.inspectorKey = key;
       this.renderInspector(s, b);
     }
-    panel.hidden = false;
+    // so does whether a module can go on now (money comes in with every tax tick)
+    for (const btn of panel.querySelectorAll<HTMLButtonElement>('[data-install]')) {
+      const st = installState(s, btn.dataset.install as ModuleKind, b);
+      btn.disabled = !st.ok;
+      const reason = btn.closest('.insp-mod')?.querySelector<HTMLElement>('.cat-reason');
+      if (!reason) continue;
+      const text = st.ok ? '' : (st.reason ?? '');
+      if (reason.textContent !== text) reason.textContent = text;
+      reason.hidden = st.ok;
+    }
     const def = BUILDINGS[b.type];
     const status = panel.querySelector<HTMLElement>('[data-status]');
     if (status) {
@@ -480,22 +734,36 @@ export class Hud {
       const p = b.built < 1 ? b.built : def.process ? b.timer / def.process.time : def.fuel ? Math.min(1, b.fuel / def.fuel.seconds) : 1;
       bar.style.width = `${Math.round(p * 100)}%`;
     }
+    // a confirmation that would leave less storage than the scrap in it says how much goes (bots keep
+    // bringing scrap, so this follows in place)
+    const loss = panel.querySelector<HTMLElement>('[data-loss]');
+    if (loss) {
+      const drop = this.confirmRemove ? moduleStorageDrop(b, this.confirmRemove) : demolishStorageDrop(b);
+      const lost = scrapLost(s, drop);
+      const text = lost > 0 ? t('insp.scrapLost', { n: Math.max(0, s.derived.storage - drop), lost }) : '';
+      if (loss.textContent !== text) loss.textContent = text;
+      loss.hidden = lost <= 0;
+    }
   }
 
   private renderInspector(s: GameState, b: Building): void {
     const def = BUILDINGS[b.type];
+    // energy, smog and storage with the installed modules
+    const stats = buildingStats(b);
     const rows: [string, string][] = [];
-    if (def.energy) rows.push([t('insp.energy'), `${def.energy > 0 ? '+' : ''}${def.energy}`]);
-    if (def.pollution) rows.push([t('insp.smog'), `${def.pollution > 0 ? '+' : ''}${(def.pollution * 60).toFixed(1)}`]);
+    if (stats.energy) rows.push([t('insp.energy'), `${stats.energy > 0 ? '+' : ''}${stats.energy}`]);
+    if (stats.pollution) rows.push([t('insp.smog'), `${stats.pollution > 0 ? '+' : ''}${(stats.pollution * 60).toFixed(1)}`]);
     if (def.process) rows.push([t('insp.cycle'), `${costText(def.process.input)} → ${costText(def.process.output)}`]);
     if (def.fuel) rows.push([t('insp.fuel'), t('insp.fuelValue', { n: def.fuel.scrap, s: def.fuel.seconds })]);
     if (def.housing) rows.push([t('insp.homes'), t('insp.homesValue', { n: def.housing })]);
-    if (def.storage) rows.push([t('insp.storage'), costText({ scrap: def.storage })]);
+    if (stats.storage) rows.push([t('insp.storage'), costText({ scrap: stats.storage })]);
     if (def.bots) rows.push([t('insp.bots'), `+${def.bots}`]);
     if (def.happiness) rows.push([t('insp.happiness'), `+${def.happiness}`]);
     if (def.cleanRadius) rows.push([t('insp.cleans'), t('insp.cleansValue', { n: def.cleanRadius })]);
-    const refund = costText(refundFor(s, b));
+    // the modules go with the building: their refunds are part of it
+    const refund = costText(demolishRefund(s, b));
     const pausable = b.built >= 1 && (def.process || def.fuel || def.cleanRadius);
+    const slots = MACHINE_MODULES.filter((k) => MODULES[k].building === b.type);
     const panel = this.el.inspector;
     panel.style.setProperty('--path', pathColor(b.type));
     panel.innerHTML = `
@@ -511,12 +779,13 @@ export class Hud {
       <div class="progress"><span data-progress></span></div>
       <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
       <p class="insp-desc">${esc(bDesc(b.type))}</p>
+      ${slots.length ? `<h4 class="cat-section">${t('insp.modules')}</h4>${slots.map((k) => this.moduleSlot(s, b, k)).join('')}` : ''}
       ${pausable ? `<div class="insp-actions"><button type="button" class="btn" data-pause>${b.paused ? t('insp.resume') : t('insp.pause')}</button></div>` : ''}
       ${
         b.type === 'hq'
           ? ''
           : this.confirmDemolish
-            ? `<div class="insp-actions"><button type="button" class="btn tone-danger" data-confirm>${t('insp.demolishConfirm', { refund })}</button><button type="button" class="btn" data-cancel>${t('insp.keep')}</button></div>`
+            ? `<p class="insp-warn" data-loss hidden></p><div class="insp-actions"><button type="button" class="btn tone-danger" data-confirm>${t('insp.demolishConfirm', { refund })}</button><button type="button" class="btn" data-cancel>${t('insp.keep')}</button></div>`
             : `<div class="insp-actions"><button type="button" class="btn" data-demolish>${t('insp.demolish')}</button></div>`
       }`;
     panel.querySelector('[data-close]')!.addEventListener('click', () => this.handlers.onCloseInspector());
@@ -527,6 +796,7 @@ export class Hud {
     panel.querySelector('[data-demolish]')?.addEventListener('click', () => {
       audio.play('click');
       this.confirmDemolish = true;
+      this.confirmRemove = null;
       this.inspectorKey = `${b.id}:`;
     });
     panel.querySelector('[data-cancel]')?.addEventListener('click', () => {
@@ -537,5 +807,92 @@ export class Hud {
       this.confirmDemolish = false;
       this.handlers.onDemolish(b.id);
     });
+    for (const btn of panel.querySelectorAll<HTMLButtonElement>('[data-install]')) {
+      btn.addEventListener('click', () => {
+        // one click, one module: the second click of a double click finds the button greyed out (it comes back
+        // with the next update if the module could not go on)
+        btn.disabled = true;
+        this.handlers.onInstall(b.id, btn.dataset.install as ModuleKind);
+      });
+    }
+    for (const btn of panel.querySelectorAll<HTMLElement>('[data-remove]')) {
+      btn.addEventListener('click', () => {
+        audio.play('click');
+        this.confirmRemove = btn.dataset.remove as ModuleKind;
+        this.confirmRemoveAt = performance.now();
+        this.confirmDemolish = false;
+        this.inspectorKey = `${b.id}:`;
+      });
+    }
+    panel.querySelector('[data-remove-cancel]')?.addEventListener('click', () => {
+      this.confirmRemove = null;
+      this.inspectorKey = `${b.id}:`;
+    });
+    panel.querySelector<HTMLElement>('[data-remove-confirm]')?.addEventListener('click', (e) => {
+      // the confirmation comes up where Remove was: the second click of a double click must not confirm it
+      if (performance.now() - this.confirmRemoveAt < CONFIRM_DELAY) return;
+      const kind = (e.currentTarget as HTMLElement).dataset.removeConfirm as ModuleKind;
+      this.confirmRemove = null;
+      this.inspectorKey = `${b.id}:`;
+      this.handlers.onRemoveModule(b.id, kind);
+    });
+  }
+
+  // One module slot of a Dock or Smelter: what it changes (before → after), its price, 0/1 or 1/1, and
+  // Install (greyed out with the reason) or Remove (with the refund, confirmed by a second click).
+  private moduleSlot(s: GameState, b: Building, kind: ModuleKind): string {
+    const def = MODULES[kind];
+    const installed = installedModules(b).includes(kind);
+    const check = installState(s, kind, b);
+    const fx = moduleRows(b.type, kind, installedModules(b));
+    const refund = costText(moduleRefund(kind));
+    let actions: string;
+    if (!installed) {
+      actions = `
+        <div class="insp-actions"><button type="button" class="btn" data-install="${kind}"${check.ok ? '' : ' disabled'}>${t('insp.install')}<span class="tool-cost">${costChips(def.cost)}</span></button></div>
+        <p class="cat-reason"${check.ok ? ' hidden' : ''}>${esc(check.reason ?? '')}</p>`;
+    } else if (this.confirmRemove === kind) {
+      actions = `
+        <p class="insp-warn" data-loss hidden></p>
+        <div class="insp-actions"><button type="button" class="btn tone-danger" data-remove-confirm="${kind}">${t('insp.remove', { refund })}</button><button type="button" class="btn" data-remove-cancel>${t('insp.keep')}</button></div>`;
+    } else {
+      actions = `<div class="insp-actions"><button type="button" class="btn" data-remove="${kind}">${t('insp.remove', { refund })}</button></div>`;
+    }
+    return `
+      <div class="insp-mod${installed ? ' on' : ''}" data-mod="${kind}">
+        <div class="mod-head">
+          <span class="cat-pic"><img src="${catalogPicture(kind)}" alt="" /></span>
+          <span class="mod-title">
+            <b>${esc(catalogName(kind))}</b>
+            <small>${t(def.slot === 'roof' ? 'insp.slotRoof' : 'insp.slotSide')} · <span class="mod-count">${installed ? 1 : 0}/${def.limit}</span></small>
+          </span>
+        </div>
+        <dl class="mod-fx">${fx.map((r) => `<dt>${rowLabel(r)}</dt><dd>${r.before} → <b>${r.after}</b></dd>`).join('')}</dl>
+        ${actions}
+      </div>`;
+  }
+
+  // A selected fence, gate, lamp or floor: what it is, that it is only for looks, Rotate and Remove.
+  private renderPiece(info: PieceInfo, i: number): void {
+    const panel = this.el.inspector;
+    panel.style.setProperty('--path', 'var(--muted)');
+    panel.innerHTML = `
+      <div class="insp-head">
+        <span class="tool-plate cat-plate"><img src="${catalogPicture(info.kind)}" alt="" /></span>
+        <div>
+          <p class="tag">${t('cat.construction')}</p>
+          <h3>${esc(catalogName(info.kind))}</h3>
+        </div>
+        <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
+      </div>
+      <p class="insp-status piece-note">${t('insp.decoration')}</p>
+      <p class="insp-desc">${esc(catalogEffect(info.kind))}</p>
+      <div class="insp-actions">
+        ${info.rotatable ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
+        ${info.removable ? `<button type="button" class="btn" data-remove-piece>${t('insp.remove', { refund: costText(pieceRefund(info.kind)) })}</button>` : ''}
+      </div>`;
+    panel.querySelector('[data-close]')!.addEventListener('click', () => this.handlers.onCloseInspector());
+    panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotatePiece(i));
+    panel.querySelector('[data-remove-piece]')?.addEventListener('click', () => this.handlers.onRemovePiece(i));
   }
 }

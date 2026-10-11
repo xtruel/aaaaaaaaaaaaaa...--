@@ -4,13 +4,15 @@ import { audio } from './audio';
 import { recordCity } from './campaign';
 import { bulldozeRubble, demolish, packsToBuild, placeBuilding, placeCheck } from './game/actions';
 import { cityById, cityDesc, cityTagline, cityTraits, goalText } from './game/cities';
-import { BUILDINGS, BUILD_ORDER, T, TILE } from './game/defs';
+import { BUILDINGS, BUILD_ORDER, MAP_H, MAP_W, T, TILE } from './game/defs';
 import type { BuildingType } from './game/defs';
 import { freeHintsLeft, hintPrice, suggest } from './game/hints';
 import type { Hint } from './game/hints';
+import { dragPath, floorAt, installModule, isModuleKind, isPieceKind, moduleCheck, normRot, pieceAt, pieceCheck, placePiece, removeModule, removePieceAt, rotatePieceAt } from './game/pieces';
+import type { CatalogKind, ModuleKind } from './game/pieces';
 import { advance, computeDerived, dayPhase } from './game/sim';
 import { canAutosave, day, idx, inBounds, pushMessage } from './game/state';
-import type { FxEvent, GameState } from './game/state';
+import type { Building, FxEvent, GameState } from './game/state';
 import { endingSubtitle, endingText, endingTitle, eventById } from './game/story';
 import { padMode } from './gamepad';
 import type { PadFrame, PadTarget } from './gamepad';
@@ -20,6 +22,7 @@ import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
+import { isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo } from './ui/catalog';
 import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
@@ -49,10 +52,27 @@ interface Drag {
   pointerType: string;
 }
 
+// A row of floor or fence dragged out with the left mouse button: ghosts while dragging, bought on release.
+interface Row {
+  x: number; // tile where the drag began
+  y: number;
+  xFirst: boolean | null; // which leg of an L comes first: set by the first move away from the start tile
+  tiles: { x: number; y: number }[];
+}
+
 const PAN_SPEED = 260; // screen px per second
 const CURSOR_SPEED = 900; // controller cursor, screen px per second at full tilt
+const PANEL_SCROLL = 700; // right stick over a side panel that scrolls, px per second
 // WASD by physical position: ZQSD on AZERTY keyboards.
 const PAN_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+
+// The part of the HUD under a point that scrolls and has more to show (a long side panel), or null.
+function scrollableAt(el: Element | null): HTMLElement | null {
+  for (let n = el instanceof HTMLElement ? el : null; n && !n.classList.contains('hud'); n = n.parentElement) {
+    if (n.scrollHeight > n.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(n).overflowY)) return n;
+  }
+  return null;
+}
 
 export class GameSession implements PadTarget {
   readonly s: GameState;
@@ -66,6 +86,14 @@ export class GameSession implements PadTarget {
   private lastSpeed = 1;
   private build: BuildingType | null = null;
   private bulldoze = false;
+  // Objects & modules: the catalog tool in hand (exclusive with build and bulldoze), the turn each piece had
+  // last (kept when it is picked again), the open panel, the selected piece and a row being dragged
+  private piece: { kind: CatalogKind; rot: number } | null = null;
+  private pieceRot: Partial<Record<CatalogKind, number>> = {};
+  private catalog = false;
+  private selectedPiece = -1; // tile index of the selected fence, gate, lamp or floor
+  private row: Row | null = null;
+  private rotAcc = 0; // Shift+wheel, added up like the zoom
   private selectedId = -1;
   private hover: { x: number; y: number } | null = null;
   private hoverId = -1; // building under the pointer (its visible pixels)
@@ -125,9 +153,26 @@ export class GameSession implements PadTarget {
           const b = this.s.buildings.find((o) => o.id === id);
           if (b) b.paused = !b.paused;
         },
-        onCloseInspector: () => (this.selectedId = -1),
+        onCloseInspector: () => {
+          this.selectedId = -1;
+          this.selectedPiece = -1;
+        },
         onHint: () => this.askHint(),
         onRegion: () => openTrade(this.s, () => this.autosave()),
+        onCatalog: () => this.toggleCatalog(),
+        onPick: (kind) => this.pickItem(kind),
+        onRotate: () => this.rotateTool(1),
+        onInstall: (id, kind) => this.install(id, kind),
+        onRemoveModule: (id, kind) => {
+          const b = this.s.buildings.find((o) => o.id === id);
+          if (b) removeModule(this.s, kind, b);
+        },
+        onRotatePiece: (i) => this.rotatePiece(i, 1),
+        onRemovePiece: (i) => {
+          // only the piece still selected: the second click of a double click, on the button before the panel
+          // follows, must not take up the floor under a lamp just removed
+          if (i === this.selectedPiece && removePieceAt(this.s, i % MAP_W, Math.floor(i / MAP_W))) this.selectedPiece = -1;
+        },
       },
       s,
     );
@@ -284,6 +329,9 @@ export class GameSession implements PadTarget {
 
     if (!modal) this.panCamera(dt);
     this.updateHover();
+    this.updateRow();
+    // a piece taken up meanwhile (bulldozer, a removal elsewhere) is no longer selected
+    if (this.selectedPiece >= 0 && !pieceInfo(s, this.selectedPiece)) this.selectedPiece = -1;
     // behind a dialog the world is paused and blurred: paint it once and let the GPU rest
     const hold = modal && this.held;
     this.held = modal;
@@ -297,6 +345,10 @@ export class GameSession implements PadTarget {
           selectedId: this.selectedId,
           hoverId: this.hoverId,
           reducedMotion: this.settings.reducedMotion,
+          piece: this.piece,
+          selectedPiece: this.selectedPiece,
+          pieceRow: this.row && this.row.tiles.length > 1 ? this.row.tiles : null,
+          pieceLabel: this.pieceLabel(),
         },
         dt,
         running,
@@ -307,7 +359,16 @@ export class GameSession implements PadTarget {
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.1;
       const goalCard = !this.tutorial || this.tutorial.showsGoal;
-      this.hud.update(s, { speed: this.speed, build: this.build, bulldoze: this.bulldoze, selectedId: this.selectedId, goalCard });
+      this.hud.update(s, {
+        speed: this.speed,
+        build: this.build,
+        bulldoze: this.bulldoze,
+        selectedId: this.selectedId,
+        goalCard,
+        piece: this.piece,
+        catalog: this.catalog,
+        selectedPiece: this.selectedPiece,
+      });
       // a tutorial step done by placing a building puts the build tool away, so the next step starts clean
       // instead of with a red "already there" ghost on the building just placed
       if (this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hq: this.hqBox() })) this.cancelTool();
@@ -382,12 +443,46 @@ export class GameSession implements PadTarget {
 
   private updateHover(): void {
     if (!this.pointer.inside || (this.drag && this.drag.moved)) {
-      this.hover = this.pointer.inside && this.build ? this.hover : null;
+      this.hover = this.pointer.inside && (this.build || this.piece) ? this.hover : null;
       this.hoverId = -1;
       return;
     }
     this.hover = this.renderer.screenToTile(this.pointer.x, this.pointer.y);
-    this.hoverId = this.build ? -1 : this.renderer.pickBuilding(this.pointer.x, this.pointer.y);
+    // with a building or a piece in hand the ghost is what counts; a module goes on the building pointed at
+    const placing = this.build || (this.piece && !isModuleKind(this.piece.kind));
+    this.hoverId = placing ? -1 : this.renderer.pickBuilding(this.pointer.x, this.pointer.y);
+  }
+
+  // The dragged row follows the tile under the pointer (also while the keys move the map), up to the map's edge.
+  private updateRow(): void {
+    const r = this.row;
+    if (!r || !this.hover) return;
+    const x = Math.max(0, Math.min(MAP_W - 1, this.hover.x));
+    const y = Math.max(0, Math.min(MAP_H - 1, this.hover.y));
+    // back on the start tile, the next move chooses again which way the row goes first
+    if (x === r.x && y === r.y) r.xFirst = null;
+    else if (r.xFirst === null) r.xFirst = Math.abs(x - r.x) >= Math.abs(y - r.y);
+    r.tiles = dragPath(r.x, r.y, x, y, r.xFirst ?? true);
+  }
+
+  // Next to the building the module tool points at: what the module would change there. Null lets the
+  // renderer show moduleCheck's reason instead (wrong building, already installed, too expensive).
+  private pieceLabel(): string | null {
+    const p = this.piece;
+    if (!p || !isModuleKind(p.kind) || !this.pointer.inside || !this.hover) return null;
+    const b = this.moduleTarget(this.pointer.x, this.pointer.y);
+    return b && moduleCheck(this.s, p.kind, b).ok ? moduleLabel(b, p.kind) : null;
+  }
+
+  // The building a module would go on: the one drawn under the point, else the one standing on that tile.
+  private moduleTarget(sx: number, sy: number): Building | null {
+    const s = this.s;
+    let id = this.renderer.pickBuilding(sx, sy);
+    if (id < 0) {
+      const tile = this.renderer.screenToTile(sx, sy);
+      id = inBounds(tile.x, tile.y) ? s.occ[idx(tile.x, tile.y)] : -1;
+    }
+    return id >= 0 ? (s.buildings.find((b) => b.id === id) ?? null) : null;
   }
 
   // ---------- input ----------
@@ -427,14 +522,27 @@ export class GameSession implements PadTarget {
         button: e.button,
         pointerType: e.pointerType,
       };
+      // with floor or fence in hand the left mouse button drags out a row (a finger still moves the map)
+      this.row = null;
+      if (e.button === 0 && e.pointerType === 'mouse' && isRowKind(this.piece?.kind) && !isModalOpen()) {
+        const tile = this.renderer.screenToTile(e.clientX, e.clientY);
+        if (inBounds(tile.x, tile.y)) this.row = { x: tile.x, y: tile.y, xFirst: null, tiles: [tile] };
+      }
     });
     this.listen(canvas, 'pointermove', (e) => {
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
       // a press that began before a dialog opened (a story event, an ending) must not pan or build behind it
       if (isModalOpen()) {
         this.drag = null;
+        this.row = null;
         this.pinch = null;
         this.pointers.clear();
+        return;
+      }
+      // the right button pressed while the left one is down (a chord) cancels, as a right click does: a row
+      // being dragged is not bought on release
+      if (e.pointerType === 'mouse' && e.button === 2 && this.drag?.button === 0) {
+        this.cancelTool();
         return;
       }
       if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -487,16 +595,25 @@ export class GameSession implements PadTarget {
       if (release(e)) return;
       const d = this.drag;
       this.drag = null;
+      if (this.row) {
+        // the row ends on the tile under the release point
+        this.hover = this.renderer.screenToTile(e.clientX, e.clientY);
+        this.updateRow();
+      }
+      const row = this.row;
+      this.row = null;
       if (!d || d.moved || isModalOpen()) return;
       // a left-button drag with no tool in hand is not a click (it used to move the map; now it does nothing)
-      if (d.far && !this.build && !this.bulldoze) return;
+      if (d.far && !this.build && !this.bulldoze && !this.piece) return;
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
       if (d.button === 2) this.cancelTool();
+      else if (d.button === 0 && row && row.tiles.length > 1) this.layRow(row.tiles);
       else if (d.button === 0) this.click(e.clientX, e.clientY);
     });
     this.listen(canvas, 'pointercancel', (e) => {
       release(e);
       this.drag = null;
+      this.row = null;
     });
     this.listen(canvas, 'pointerleave', () => {
       this.pointer.inside = false;
@@ -506,10 +623,20 @@ export class GameSession implements PadTarget {
       'wheel',
       (e) => {
         e.preventDefault();
+        const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1;
+        // Shift+wheel turns the fence, gate or lamp in hand (or the selected one). Many browsers send a
+        // Shift+wheel sideways, so either axis counts; small trackpad steps add up like the zoom's.
+        if (e.shiftKey && this.canRotate()) {
+          const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+          this.rotAcc += delta * unit;
+          if (Math.abs(this.rotAcc) < 50) return;
+          this.rotate(this.rotAcc > 0 ? 1 : -1);
+          this.rotAcc = 0;
+          return;
+        }
         // Trackpads send many small deltas: add them up so one gesture is one zoom step.
         // Mostly-sideways swipes are ignored; Ctrl+wheel is a trackpad pinch.
         if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-        const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1;
         this.wheelAcc += e.deltaY * unit * (e.ctrlKey ? 4 : 1);
         if (Math.abs(this.wheelAcc) < 90) return;
         this.renderer.setZoom(this.renderer.zoom + (this.wheelAcc < 0 ? 1 : -1), e.clientX, e.clientY);
@@ -570,8 +697,16 @@ export class GameSession implements PadTarget {
     }
     switch (code) {
       case 'Escape':
-        if (this.build || this.bulldoze || this.selectedId >= 0) this.cancelTool();
+        // one thing at a time: the tool or selection, then the Objects & modules panel, then the menu
+        if (this.hasTool()) this.cancelTool();
+        else if (this.catalog) this.closeCatalog();
         else this.openPause();
+        break;
+      case 'KeyO':
+        this.toggleCatalog();
+        break;
+      case 'KeyR':
+        this.rotate(e.shiftKey ? -1 : 1);
         break;
       case 'Space':
         e.preventDefault();
@@ -610,6 +745,10 @@ export class GameSession implements PadTarget {
   private click(sx: number, sy: number): void {
     const s = this.s;
     if (s.outcome) return;
+    if (this.piece) {
+      this.usePiece(sx, sy);
+      return;
+    }
     const tile = this.renderer.screenToTile(sx, sy);
     if (this.build) {
       const type = this.build;
@@ -637,7 +776,7 @@ export class GameSession implements PadTarget {
     // what you see is what you click: a building's roof or walls select it even over another tile
     const picked = this.renderer.pickBuilding(sx, sy);
     if (picked >= 0 && !(this.bulldoze && inBounds(tile.x, tile.y) && s.tiles[idx(tile.x, tile.y)] === T.RUBBLE && s.occ[idx(tile.x, tile.y)] === -1)) {
-      this.selectedId = picked;
+      this.selectBuilding(picked);
       audio.play('click');
       return;
     }
@@ -645,8 +784,18 @@ export class GameSession implements PadTarget {
       this.petCat();
       return;
     }
+    // then a fence, gate or lamp drawn there (else a floor): a click selects it, the bulldozer takes it up
+    const piece = this.renderer.pickPiece(sx, sy);
+    if (piece >= 0) {
+      if (!this.bulldoze) {
+        this.selectPiece(piece);
+        audio.play('click');
+        return;
+      }
+      if (removePieceAt(s, piece % MAP_W, Math.floor(piece / MAP_W))) return;
+    }
     if (!inBounds(tile.x, tile.y)) {
-      this.selectedId = -1;
+      this.selectBuilding(-1);
       return;
     }
     const i = idx(tile.x, tile.y);
@@ -654,15 +803,16 @@ export class GameSession implements PadTarget {
       if (s.tiles[i] === T.RUBBLE) {
         if (!bulldozeRubble(s, tile.x, tile.y)) audio.play('error');
       } else if (s.occ[i] !== -1) {
-        this.selectedId = s.occ[i];
+        this.selectBuilding(s.occ[i]);
         audio.play('click');
-      } else {
+      } else if (!removePieceAt(s, tile.x, tile.y)) {
+        // nothing to take up (a fence, gate or lamp, else a bare floor, goes with half its price back)
         pushMessage(s, t('msg.bulldozeHelp'), 'info');
       }
       return;
     }
     if (s.occ[i] !== -1) {
-      this.selectedId = s.occ[i];
+      this.selectBuilding(s.occ[i]);
       audio.play('click');
       return;
     }
@@ -671,7 +821,7 @@ export class GameSession implements PadTarget {
       this.petCat();
       return;
     }
-    this.selectedId = -1;
+    this.selectBuilding(-1);
     if (s.tiles[i] === T.JUNK) pushMessage(s, t(s.res.scrap >= s.derived.storage ? 'msg.junkInfoFull' : 'msg.junkInfo', { n: s.amount[i] }), 'info');
     else if (s.tiles[i] === T.SLUDGE) pushMessage(s, t('msg.sludgeInfo'), 'info');
     else if (s.tiles[i] === T.RUBBLE) pushMessage(s, t('msg.rubbleInfo'), 'info');
@@ -686,19 +836,158 @@ export class GameSession implements PadTarget {
 
   private selectBuild(type: BuildingType | null): void {
     this.bulldoze = false;
+    this.piece = null;
+    this.row = null;
     this.selectedId = -1;
+    this.selectedPiece = -1;
     this.build = this.build === type ? null : type;
   }
 
   private toggleBulldoze(): void {
     this.build = null;
+    this.piece = null;
+    this.row = null;
     this.bulldoze = !this.bulldoze;
   }
 
+  private hasTool(): boolean {
+    return !!this.build || this.bulldoze || !!this.piece || this.selectedId >= 0 || this.selectedPiece >= 0;
+  }
+
+  // Esc, right click, B: put the tool away and drop the selection. Nothing is paid for a ghost.
   private cancelTool(): void {
     this.build = null;
     this.bulldoze = false;
+    this.piece = null;
+    this.row = null;
     this.selectedId = -1;
+    this.selectedPiece = -1;
+    // a left-button press still held ends here too, so its release neither buys nor selects (the other buttons
+    // and a finger go on moving the map)
+    if (this.drag?.button === 0 && this.drag.pointerType === 'mouse') this.drag = null;
+  }
+
+  // A building (or nothing: -1) takes the right-hand panel, so the catalog closes.
+  private selectBuilding(id: number): void {
+    this.selectedId = id;
+    this.selectedPiece = -1;
+    if (id >= 0) this.closeCatalog();
+  }
+
+  private selectPiece(i: number): void {
+    this.selectedId = -1;
+    this.selectedPiece = i;
+    this.closeCatalog();
+  }
+
+  // ---------- Objects & modules ----------
+
+  // The panel sits where the building panel does: opening it closes that one.
+  private toggleCatalog(): void {
+    if (this.catalog) {
+      this.closeCatalog();
+      return;
+    }
+    this.catalog = true;
+    this.selectedId = -1;
+    this.selectedPiece = -1;
+  }
+
+  // Closing the panel puts its tool away too (the Rotate button a finger needs goes with it).
+  private closeCatalog(): void {
+    this.catalog = false;
+    this.piece = null;
+    this.row = null;
+  }
+
+  // Taking an item from the catalog: its tool replaces the building or bulldozer tool; the same item again,
+  // or null, puts it away.
+  private pickItem(kind: CatalogKind | null): void {
+    if (!kind || this.piece?.kind === kind) {
+      this.piece = null;
+      this.row = null;
+      return;
+    }
+    this.build = null;
+    this.bulldoze = false;
+    this.selectedId = -1;
+    this.selectedPiece = -1;
+    this.catalog = true;
+    this.piece = { kind, rot: this.pieceRot[kind] ?? 0 };
+  }
+
+  // One confirmation (click, tap, A) buys one piece or installs one module, paid on the spot.
+  private usePiece(sx: number, sy: number): void {
+    const s = this.s;
+    const { kind, rot } = this.piece!;
+    if (isModuleKind(kind)) {
+      const b = this.moduleTarget(sx, sy);
+      const check = b ? moduleCheck(s, kind, b) : { ok: false, reason: moduleNeeds(kind) };
+      if (b && check.ok) installModule(s, kind, b);
+      else this.refuse(check.reason);
+      return;
+    }
+    const tile = this.renderer.screenToTile(sx, sy);
+    const check = pieceCheck(s, kind, tile.x, tile.y, rot);
+    if (check.ok) placePiece(s, kind, tile.x, tile.y, rot);
+    else this.refuse(check.reason);
+  }
+
+  // A dragged row: each tile is a purchase of its own, made in order; a tile that is taken, or that the money
+  // no longer covers, is skipped and costs nothing. A row carries on over the same piece already there (a fence
+  // row over its fences and gates, as the map shows it, with no ghost): those tiles are neither laid nor skipped.
+  private layRow(tiles: { x: number; y: number }[]): void {
+    const s = this.s;
+    const p = this.piece;
+    if (!p || !isPieceKind(p.kind)) return;
+    const kind = p.kind;
+    const there = (q: { x: number; y: number }) => {
+      if (kind === 'floor') return floorAt(s, q.x, q.y);
+      const k = pieceAt(s, q.x, q.y)?.kind;
+      return k === kind || (kind === 'fence' && k === 'gate');
+    };
+    const todo = tiles.filter((q) => !there(q));
+    if (!todo.length) return;
+    let laid = 0;
+    for (const tile of todo) if (placePiece(s, kind, tile.x, tile.y, p.rot)) laid++;
+    if (laid === 0) this.refuse(pieceCheck(s, kind, todo[0].x, todo[0].y).reason);
+    else if (laid < todo.length) pushMessage(s, t('msg.rowPartial', { n: laid, total: todo.length }), 'info');
+  }
+
+  private install(id: number, kind: ModuleKind): void {
+    const b = this.s.buildings.find((o) => o.id === id);
+    if (!b) return;
+    const check = moduleCheck(this.s, kind, b);
+    if (check.ok) installModule(this.s, kind, b);
+    else this.refuse(check.reason);
+  }
+
+  private refuse(reason?: string): void {
+    audio.play('error');
+    pushMessage(this.s, reason ?? t('place.cannot'), 'bad');
+  }
+
+  private canRotate(): boolean {
+    return isRotatable(this.piece?.kind) || !!pieceInfo(this.s, this.selectedPiece)?.rotatable;
+  }
+
+  // R, Shift+wheel: turns the fence, gate or lamp in hand, else the selected one on the map.
+  private rotate(dir: 1 | -1): void {
+    if (!this.rotateTool(dir) && this.selectedPiece >= 0) this.rotatePiece(this.selectedPiece, dir);
+  }
+
+  private rotateTool(dir: 1 | -1): boolean {
+    const p = this.piece;
+    if (!p || !isPieceKind(p.kind) || !isRotatable(p.kind)) return false;
+    p.rot = normRot(p.kind, p.rot + dir);
+    this.pieceRot[p.kind] = p.rot;
+    audio.play('click');
+    return true;
+  }
+
+  private rotatePiece(i: number, dir: 1 | -1): void {
+    const info = pieceInfo(this.s, i);
+    if (info?.rotatable && rotatePieceAt(this.s, info.x, info.y, dir)) audio.play('click');
   }
 
   private setSpeed(v: number): void {
@@ -750,6 +1039,13 @@ export class GameSession implements PadTarget {
     c.y += f.ly * mag * CURSOR_SPEED * f.dt;
     let px = f.rx;
     let py = f.ry;
+    // over a side panel taller than the window (the catalog on a small screen), the right stick scrolls it
+    const list = f.rx || f.ry ? scrollableAt(document.elementFromPoint(c.x, c.y)) : null;
+    if (list) {
+      list.scrollTop += f.ry * PANEL_SCROLL * f.dt;
+      px = 0;
+      py = 0;
+    }
     if ((c.x < 1 && f.lx < 0) || (c.x > w - 2 && f.lx > 0)) px += f.lx;
     if ((c.y < 1 && f.ly < 0) || (c.y > h - 2 && f.ly > 0)) py += f.ly;
     c.x = Math.max(0, Math.min(w - 1, c.x));
@@ -799,7 +1095,7 @@ export class GameSession implements PadTarget {
       btn?.focus({ preventScroll: true });
     }
     this.padCursor.hidden = false;
-    this.padCursor.classList.toggle('building', !!this.build || this.bulldoze);
+    this.padCursor.classList.toggle('building', !!this.build || this.bulldoze || !!this.piece);
     this.padCursor.style.transform = `translate(${Math.round(c.x)}px, ${Math.round(c.y)}px)`;
 
     const p = f.pressed;
@@ -808,9 +1104,13 @@ export class GameSession implements PadTarget {
       if (overMap) this.click(c.x, c.y);
       else (btn ?? el)?.click();
     }
-    if (p.has('b') && (this.build || this.bulldoze || this.selectedId >= 0)) this.cancelTool();
+    if (p.has('b')) {
+      if (this.hasTool()) this.cancelTool();
+      else if (this.catalog) this.closeCatalog();
+    }
     if (p.has('x')) this.toggleBulldoze();
-    if (p.has('y')) this.askHint();
+    // Y turns the fence, gate or lamp in hand; otherwise it asks USA-9 for a hint
+    if (p.has('y') && !this.rotateTool(1)) this.askHint();
     if (p.has('lb') || p.has('rb')) {
       const dir = p.has('rb') ? 1 : -1;
       const n = BUILD_ORDER.length;

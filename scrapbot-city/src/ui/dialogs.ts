@@ -210,7 +210,7 @@ export function openExtras(): void {
       <h3 class="extras-h">${t('extras.howto')}</h3>
       <ul class="howto">${list('extras.howto', 7)}</ul>
       <h3 class="extras-h">${t('extras.controls')}</h3>
-      <ul class="howto keys">${localizeKeys(list('extras.controls', 4))}<li>${t('extras.controls.pad')}</li><li>${t('extras.controls.pad2')}</li></ul>`,
+      <ul class="howto keys">${localizeKeys(list('extras.controls', 5))}<li>${t('extras.controls.pad')}</li><li>${t('extras.controls.pad2')}</li><li>${t('extras.controls.pad3')}</li></ul>`,
     actions: [{ label: t('common.back'), primary: true, onClick: closeModal }],
   });
 }
