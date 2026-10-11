@@ -105,6 +105,15 @@ Raccordi (maschera N1 E2 S4 W8): recinzione e muro contano come vicini recinzion
 (cancello lungo x con i vicini E/W, lungo y con N/S): corregge il limite noto dell'incremento 1 (recinzione contro il fianco
 di un cancello). Pezzo isolato: si usa la rotazione (0 = lungo x, 1 = lungo y). Nessuna logistica, nessun effetto economico.
 
+## 3c. Spostare le decorazioni già acquistate
+
+Le sole **decorazioni** (§1: lampione, panchina, fioriera, insegna, pergola, casetta di Miso, scultura, albero, fontana, statua) si
+possono spostare: dal pannello dell'oggetto «Sposta», poi la nuova casella con la stessa anteprima e le stesse regole di
+posa. Nessun pagamento, nessun rimborso, nessun contatore incrementato (`stats.piecesPlaced` resta uguale); rotazione e
+varietà si conservano. Annullando, o scegliendo una casella non valida, l'oggetto resta dov'era. Costruzioni (pavimenti,
+basamenti, recinzioni, muri, pilastri, cancelli), moduli ed edifici non si spostano. API: `movePiece(s, fromX, fromY, toX, toY):
+boolean` (controlla come `pieceCheck` ma senza costo; atomica).
+
 ## 4. Sblocchi: progetti da scoprire
 
 I 18 elementi nuovi sono **progetti**. Si scoprono raggiungendo traguardi di gioco che usano statistiche già registrate dal
@@ -128,13 +137,23 @@ come prima. Nessun requisito circolare (nessun progetto richiede un altro proget
 | Insegna al neon | Costruisci 25 edifici | `stats.built` | sviluppo |
 | Braccio doppio | Guadagna 5.000 crediti | `stats.creditsEarned` | sviluppo |
 | Muro basso | Raccogli 1.000 rottami | `stats.scrapCollected` | sviluppo |
-| Pilastro d'angolo | Posa 20 pezzi del catalogo (pavimenti, recinzioni, cancelli, lampioni…) | `stats.piecesPlaced` | sviluppo |
+| Pilastro d'angolo | Posa 20 oggetti del catalogo (pavimenti, recinzioni, cancelli, lampioni…; non la risorsa «pezzi») | `stats.piecesPlaced` | sviluppo |
 | Pergola | Raggiungi 50 cittadini | `pop` | completamento |
 | Scultura di rottami | Completa la Guglia di Rottami (campagna o gioco libero) | `spireDone` | completamento |
 | Fontana | Guadagna 10.000 crediti | `stats.creditsEarned` | completamento |
 | Statua di USA-9 | Completa 40 edifici | `stats.built` | completamento |
 
-**Stati nel catalogo** (e per i moduli anche nel pannello dell'edificio):
+**Ambito dei traguardi.** Ogni traguardo si misura sulla **città corrente** (le sue statistiche salvate nella città). Il profilo
+conserva soltanto, per ogni traguardo, il **massimo raggiunto** in una città (un massimo: ricaricare la stessa città non somma
+niente due volte) e l'elenco dei progetti scoperti. Nessun totale cumulato tra città in questa consegna. Il catalogo mostra il
+progresso della città corrente e, se più alto, il massimo raggiunto altrove («120 / 400 in questa città · massimo 260»).
+
+**Primi minuti.** Da profilo nuovo, nei primi 5–10 minuti di una partita normale devono diventare usabili almeno tre elementi
+estetici utili a personalizzare il quartiere (con le soglie sopra: panchina, fioriera, basamento, albero, casetta di Miso se il
+giocatore accarezza il gatto). È un obiettivo da **misurare** (partite del pilota automatico e prova dall'interfaccia): se le
+soglie non lo raggiungono si propone un ritocco minimo delle sole soglie decorative, motivato, senza aumentare premi o risorse.
+
+**Stati nel catalogo** (e per i moduli anche nel pannello dell'edificio; ogni stato ha un'etichetta e un'icona, non solo un colore):
 1. **Da scoprire**: anteprima (icona attenuata), descrizione, requisito e progresso nella città corrente («Pezzi prodotti
    120 / 400»); non si può comprare.
 2. **Scoperto ma non acquistabile ora**: motivo («Mancano 20 crediti», «Serve una Fabbrica 2PM completata»).
@@ -159,6 +178,19 @@ nulla; raggiungibile con mouse, touch e controller.
 
 **Catalogo**: tre categorie (Costruzioni, Decorazioni, Moduli) e filtri (Tutti · Disponibili · Da scoprire); nessun pulsante
 nuovo nella barra degli strumenti.
+
+## 4b. Economia leggibile nel pannello (G1)
+
+Il pannello di ogni edificio legge i valori dalla simulazione (`buildingStats`, `effectiveStats`, `status`), senza formule proprie:
+valori nominali e effettivi, ingressi e uscite per ciclo, energia, effetto del modulo, e la **causa dello stato** con parole
+distinte: pausa volontaria; energia insufficiente; materiali mancanti (quali); riserva di pezzi tenuta per costruire; cantiere;
+funzionamento normale. Fumo, vapore e animazioni seguono lo stato reale. Verifica dei moduli insieme a propulsori, straordinari,
+carenza di energia, pausa e caricamento: nessun effetto duplicato.
+
+**Consigli di USA-9** (`src/game/hints.ts`): devono puntare al collo di bottiglia reale: niente deposito consigliato quando mancano
+crediti; niente nuovo Riciclatore consigliato senza controllare energia e rottami disponibili. **`npm run waits`** si riesegue con
+definizioni comparabili, separando verde rigoroso, industriale e prove ibride. Eventuali variazioni economiche si propongono a
+parte, con dati prima/dopo, e non si uniscono al catalogo.
 
 ## 5. Smog leggibile (G0)
 
