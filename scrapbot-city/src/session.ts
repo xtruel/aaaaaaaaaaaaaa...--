@@ -23,6 +23,8 @@ import { Renderer } from './render/renderer';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
 import { isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo } from './ui/catalog';
+import { pickAt } from './ui/pick';
+import type { LastPick } from './ui/pick';
 import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
@@ -95,6 +97,7 @@ export class GameSession implements PadTarget {
   private row: Row | null = null;
   private rotAcc = 0; // Shift+wheel, added up like the zoom
   private selectedId = -1;
+  private lastPick: LastPick | null = null; // the last click on a building (a second one there reaches what it hides)
   private hover: { x: number; y: number } | null = null;
   private hoverId = -1; // building under the pointer (its visible pixels)
   private pointer = { x: -1, y: -1, inside: false };
@@ -785,10 +788,16 @@ export class GameSession implements PadTarget {
     const ground = inBounds(tile.x, tile.y) ? idx(tile.x, tile.y) : -1;
     const clears = this.bulldoze && ground >= 0 && s.occ[ground] === -1 && (s.tiles[ground] === T.RUBBLE || s.solid[ground] !== 0);
     if (picked >= 0 && !clears) {
-      this.selectBuilding(picked);
+      // a building it hides on that tile: through the bulldozer's see-through, or on a second click (src/ui/pick.ts)
+      const now = performance.now();
+      const pick = pickAt(s, picked, tile.x, tile.y, { bulldoze: this.bulldoze, selected: this.selectedId, last: this.lastPick, now });
+      this.lastPick = { tile: ground, id: picked, at: now };
+      if (pick.piece >= 0) this.selectPiece(pick.piece);
+      else this.selectBuilding(pick.building);
       audio.play('click');
       return;
     }
+    this.lastPick = null;
     if (picked === -2 && !this.bulldoze) {
       this.petCat();
       return;

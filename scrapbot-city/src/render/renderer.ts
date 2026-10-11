@@ -19,7 +19,7 @@ import { drawPixelText, pixelTextWidth } from './pixelfont';
 import { PAL } from './sprites';
 import { atlasImage, buildingArt, citizenVariants, decorArt, frame, opaqueAt, variantArt, variantKey, whenAtlasReady } from './iso/atlas';
 import type { BuildingArtMeta, Frame } from './iso/atlas';
-import { DepthSorter } from './iso/depth';
+import { DepthSorter, standsInFront } from './iso/depth';
 import type { DepthItem } from './iso/depth';
 import { groundAt, tileAt, tileTop } from './iso/projection';
 import { Walkers, isCanal, isRoadCol, isRoadRow, placeScenery, ringKey } from './iso/life';
@@ -944,13 +944,7 @@ export class Renderer {
     if (!f) return false;
     if (sx >= f.sx1 || sy >= f.sy1 || sx + w <= f.sx0 || sy + h <= f.sy0) return false;
     const def = BUILDINGS[b.type];
-    const bx0 = b.x * TILE;
-    const by0 = b.y * TILE;
-    const bx1 = (b.x + def.w) * TILE;
-    const by1 = (b.y + def.h) * TILE;
-    const focusBehind = f.x1 <= bx0 || f.y1 <= by0;
-    const buildingBehind = bx1 <= f.x0 || by1 <= f.y0;
-    return focusBehind && !buildingBehind;
+    return standsInFront({ x0: b.x * TILE, y0: b.y * TILE, x1: (b.x + def.w) * TILE, y1: (b.y + def.h) * TILE }, f);
   }
 
   private resolvePulses(s: GameState, dt: number): void {
