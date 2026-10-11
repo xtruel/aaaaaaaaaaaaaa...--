@@ -370,6 +370,9 @@ export class Renderer {
   // Screen space covered by the HUD (CSS px), set by the session: the camera may scroll the map's edges
   // clear of the top bar and the build toolbar, so every tile can be shown over bare map.
   insets = { top: 0, bottom: 0 };
+  // More of the HUD that words on the map keep clear of (screen rectangles, CSS px), set by the session: an open
+  // side panel (the catalog stays open while a piece or module tool is in hand) and the goal card.
+  labelAvoid: { left: number; top: number; right: number; bottom: number }[] = [];
 
   clampCam(): void {
     // The centre of the part of the screen the HUD leaves free may go anywhere over the map diamond's bounding box
@@ -1727,15 +1730,49 @@ export class Renderer {
 
   // A line of words on the map in a dark box, centred on x (view px) with its top at y: why a placement is refused,
   // a module's effect. Kept inside the view, clear of the top bar and the build toolbar (insets): at a high zoom the
-  // label of a building in the middle of the screen would otherwise sit under the top bar.
+  // label of a building in the middle of the screen would otherwise sit under the top bar. A label under an open
+  // side panel or the goal card (labelAvoid) moves out of it the shortest way: beside it, above or below it.
   private drawLabel(text: string, x: number, y: number, color: string): void {
     const ctx = this.ctx;
+    const z = this.pxZoom;
     const w = pixelTextWidth(text);
     // (the box spans ly - 2 to ly + 7; the view is rounded up to whole art pixels, so keep one more off the bottom)
-    const top = Math.ceil(this.insets.top / this.pxZoom) + 2;
-    const bottom = this.viewH - Math.ceil(this.insets.bottom / this.pxZoom) - 8;
-    const lx = Math.max(2, Math.min(this.viewW - w - 2, Math.round(x - w / 2)));
-    const ly = Math.max(top, Math.min(bottom, Math.round(y)));
+    const top = Math.ceil(this.insets.top / z) + 2;
+    const bottom = this.viewH - Math.ceil(this.insets.bottom / z) - 8;
+    const right = this.viewW - w - 2;
+    let lx = Math.max(2, Math.min(right, Math.round(x - w / 2)));
+    let ly = Math.max(top, Math.min(bottom, Math.round(y)));
+    // the HUD rectangles in view px, one art pixel of air around them
+    const boxes = this.labelAvoid.map((r) => ({ l: Math.floor(r.left / z) - 1, t: Math.floor(r.top / z) - 1, r: Math.ceil(r.right / z) + 1, b: Math.ceil(r.bottom / z) + 1 }));
+    const under = (px: number, py: number) => boxes.find((o) => px + w + 2 > o.l && px - 2 < o.r && py + 7 > o.t && py - 2 < o.b);
+    // beside, above or below a rectangle, still inside the view
+    const out = (px: number, py: number, o: (typeof boxes)[number]) =>
+      [
+        { x: o.l - w - 2, y: py },
+        { x: o.r + 2, y: py },
+        { x: px, y: o.t - 7 },
+        { x: px, y: o.b + 2 },
+      ].filter((m) => m.x >= 2 && m.x <= right && m.y >= top && m.y <= bottom);
+    const first = under(lx, ly);
+    if (first) {
+      // the nearest spot clear of everything; one step out of the way may land on the other rectangle
+      let best: { x: number; y: number } | null = null;
+      let bestD = Infinity;
+      for (const m of out(lx, ly, first)) {
+        const next = under(m.x, m.y);
+        for (const n of next ? out(m.x, m.y, next) : [m]) {
+          const d = Math.abs(n.x - lx) + Math.abs(n.y - ly);
+          if (d < bestD && !under(n.x, n.y)) {
+            best = n;
+            bestD = d;
+          }
+        }
+      }
+      if (best) {
+        lx = best.x;
+        ly = best.y;
+      }
+    }
     ctx.fillStyle = 'rgba(13,11,22,0.85)';
     ctx.fillRect(lx - 2, ly - 2, w + 4, 9);
     drawPixelText(ctx, text, lx, ly, color);

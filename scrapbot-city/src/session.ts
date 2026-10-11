@@ -269,6 +269,11 @@ export class GameSession implements PadTarget {
       bottom: bar?.offsetParent ? Math.max(0, Math.round(window.innerHeight - bar.getBoundingClientRect().top)) : 0,
     };
     const r = this.renderer;
+    // words on the map (a module's effect, why a piece cannot go there) also keep clear of an open side panel and
+    // of the goal card; on a narrow window both sit across the bottom
+    r.labelAvoid = [...this.root.querySelectorAll<HTMLElement>('[data-inspector], [data-catalog-panel], [data-objective]')]
+      .filter((el) => el.offsetParent)
+      .map((el) => el.getBoundingClientRect());
     if (insets.top === r.insets.top && insets.bottom === r.insets.bottom) return;
     r.insets = insets;
     r.clampCam();
