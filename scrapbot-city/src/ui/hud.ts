@@ -178,7 +178,6 @@ export class Hud {
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
   private catalogKey = '';
-  private catalogShiftAt = -Infinity; // when the open catalog was redrawn for another tool (performance.now())
   private catalogPressAt = -Infinity; // when an item or Done was last pressed in the catalog (performance.now())
   // when the smog panel last closed (performance.now()): the map takes no purchase in the moments after (session)
   smogClosedAt = -Infinity;
@@ -690,17 +689,15 @@ export class Hud {
       this.markCatalog(s);
       return;
     }
-    // redrawn for another tool while open: the tool box above the list comes or goes and the list moves, so the
-    // second press of a double press (double click, double tap, A A) would land on another item or on Done
-    if (!opening) this.catalogShiftAt = performance.now();
     this.catalogKey = key;
     this.renderCatalog(s, active, opening);
   }
 
-  // A press on the catalog right after an item or Done was pressed (before the panel is redrawn for the new tool), or
-  // right after it moved under the pointer, is the end of a double press: it does nothing.
+  // An item or Done pressed redraws the panel for the new tool (the tool box above the list comes or goes, the list
+  // moves): a press on the catalog in the moments after is the second press of a double press (double click, double
+  // tap, A A), which would land on another item or on Done. It does nothing.
   private catalogSettled(): boolean {
-    return performance.now() - Math.max(this.catalogShiftAt, this.catalogPressAt) >= CONFIRM_DELAY;
+    return performance.now() - this.catalogPressAt >= CONFIRM_DELAY;
   }
 
   // What can be had right now, written into the list in place: the greyed-out items and why.

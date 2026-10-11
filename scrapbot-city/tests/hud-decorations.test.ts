@@ -99,7 +99,7 @@ describe('catalog: the Decorations section', () => {
     expect(item('bench').classList.contains('cant')).toBe(false);
   });
 
-  it('the second press of a double press, after the list moved under the pointer, picks nothing; a press after that does', () => {
+  it('the second press of a double press on an item or Done (the list moves under the pointer) picks nothing; a press after that does', () => {
     const { root, calls, update } = setup();
     let now = 1000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
@@ -127,6 +127,12 @@ describe('catalog: the Decorations section', () => {
     q(panel, '[data-done]')!.click();
     expect(calls.at(-1)).toEqual(['onPick', null]);
     expect(calls.filter((c) => c[0] === 'onPick' && c[1] === null).length).toBe(1);
+    // the panel redrawn for another reason (Esc put the tool away, a key took another one): the next press counts
+    now += 400;
+    update({ catalog: true, piece: { kind: 'gate', rot: 0 } });
+    update({ catalog: true, piece: null });
+    q(panel, '[data-item="cathouse"]')!.click();
+    expect(calls.at(-1)).toEqual(['onPick', 'cathouse']);
   });
 });
 
