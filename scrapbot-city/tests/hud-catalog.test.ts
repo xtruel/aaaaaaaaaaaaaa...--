@@ -320,6 +320,59 @@ describe('building panel modules', () => {
     }
   });
 
+  it('a double press up to 500 ms apart (Windows\' default double-click time) never confirms, nor buys back; a press of its own does', () => {
+    const { s, root, calls, update } = setup();
+    const rec = build(s, 'recycler');
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(100_000);
+    const at = (ms: number) => clock.mockReturnValue(100_000 + ms);
+    try {
+      update({ selectedId: rec.id });
+      const insp = q(root, '[data-inspector]')!;
+      expect(installModule(s, 'recyclerMagnet', rec)).toBe(true);
+      update({ selectedId: rec.id });
+      // Remove, then its confirmation pressed 352, 450 and 499 ms later (the second press of a slow double click,
+      // a double tap, A twice): no removal
+      at(1000);
+      q(insp, '[data-remove="recyclerMagnet"]')!.click();
+      update({ selectedId: rec.id });
+      for (const ms of [352, 450, 499]) {
+        at(1000 + ms);
+        q(insp, '[data-remove-confirm="recyclerMagnet"]')!.click();
+        expect(calls.some((c) => c[0] === 'onRemoveModule'), `${ms} ms`).toBe(false);
+      }
+      // a press of its own on the confirmation, once it has been up for 500 ms: removed
+      at(1500);
+      q(insp, '[data-remove-confirm="recyclerMagnet"]')!.click();
+      expect(calls.at(-1)).toEqual(['onRemoveModule', rec.id, 'recyclerMagnet']);
+      expect(removeModule(s, 'recyclerMagnet', rec)).not.toBeNull();
+      update({ selectedId: rec.id });
+      // Install comes up where the confirmation was: pressed 352-499 ms after the removal it buys nothing back
+      const n = calls.length;
+      for (const ms of [352, 450, 499]) {
+        at(1500 + ms);
+        update({ selectedId: rec.id });
+        q(insp, '[data-install="recyclerMagnet"]')!.click();
+        expect(calls.length, `${ms} ms`).toBe(n);
+      }
+      at(2000);
+      update({ selectedId: rec.id });
+      q(insp, '[data-install="recyclerMagnet"]')!.click();
+      expect(calls.at(-1)).toEqual(['onInstall', rec.id, 'recyclerMagnet']);
+      // Demolish, then its confirmation 450 ms later: the building stays; 500 ms later it goes
+      at(5000);
+      q(insp, '[data-demolish]')!.click();
+      update({ selectedId: rec.id });
+      at(5450);
+      q(insp, '[data-confirm]')!.click();
+      expect(calls.some((c) => c[0] === 'onDemolish')).toBe(false);
+      at(5500);
+      q(insp, '[data-confirm]')!.click();
+      expect(calls.at(-1)).toEqual(['onDemolish', rec.id]);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it('greys out Install with the reason, and the demolish refund counts the modules', () => {
     const { s, root, calls, update } = setup();
     const smelter = build(s, 'smelter');

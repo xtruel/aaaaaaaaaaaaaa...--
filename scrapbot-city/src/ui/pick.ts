@@ -11,8 +11,11 @@ import { idx, inBounds } from '../game/state';
 import type { GameState } from '../game/state';
 import { standsInFront } from '../render/iso/depth';
 
-// A second click this soon after the first is the end of a double click.
-export const DOUBLE_CLICK_MS = 350;
+// Two presses this close (ms) are one double press: a double click, a double tap, A pressed twice. 500 ms is Windows'
+// default double-click time. Its second press never counts as a press of its own: here it does not reach behind the
+// building; in the building panel (src/ui/hud.ts) it does not confirm a demolition or a module's removal that came up
+// where the first press was, nor buy back a module just taken off.
+export const DOUBLE_PRESS_MS = 500;
 
 function frontCovers(s: GameState, frontId: number, tx: number, ty: number): boolean {
   const b = s.buildings.find((o) => o.id === frontId);
@@ -56,7 +59,7 @@ export function pickAt(
 ): PickResult {
   const tile = inBounds(tx, ty) ? idx(tx, ty) : -1;
   const l = o.last;
-  const again = o.selected === picked && !!l && l.id === picked && l.tile === tile && o.now - l.at >= DOUBLE_CLICK_MS;
+  const again = o.selected === picked && !!l && l.id === picked && l.tile === tile && o.now - l.at >= DOUBLE_PRESS_MS;
   if (again) {
     const behind = buildingBehind(s, picked, tx, ty);
     if (behind >= 0) return { building: behind, piece: -1 };

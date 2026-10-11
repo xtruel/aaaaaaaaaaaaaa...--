@@ -47,6 +47,7 @@ import {
 } from './catalog';
 import type { ModuleState, PieceInfo, StatusLine } from './catalog';
 import { esc } from './escape';
+import { DOUBLE_PRESS_MS } from './pick';
 import { airReport, perDayText } from './smog';
 import type { AirRow } from './smog';
 
@@ -133,9 +134,9 @@ function costChips(cost: Cost): string {
   return chips.join('') || `<span class="cost">${t('common.free')}</span>`;
 }
 
-// A confirmation (Demolish, a module's Remove) takes no click in its first moments (ms): it comes up where the
-// button was, so the second click of a double click on that button does not confirm it.
-const CONFIRM_DELAY = 350;
+// A confirmation (Demolish, a module's Remove) takes no press in the first DOUBLE_PRESS_MS (500 ms) after the press
+// that brought it up: it comes up where that button was, so the second press of a double click, a double tap or a
+// double A press does not confirm it. A press of its own on the confirmation, later, does.
 
 // Catalog pictures: the item's icon frame from the atlas at its own size (30×35 up to 64×32), centred in one
 // 64×44 box, so the rows line up and the pixels stay crisp. Before the atlas has decoded the box stays empty.
@@ -1004,7 +1005,7 @@ export class Hud {
     });
     panel.querySelector('[data-confirm]')?.addEventListener('click', () => {
       // the building and its modules go only on a click of its own, not on the second click of a double click
-      if (performance.now() - this.confirmDemolishAt < CONFIRM_DELAY) return;
+      if (performance.now() - this.confirmDemolishAt < DOUBLE_PRESS_MS) return;
       this.confirmDemolish = false;
       this.handlers.onDemolish(b.id);
     });
@@ -1013,7 +1014,7 @@ export class Hud {
         // After a removal the slot is drawn again with Install where the confirmation was: the second click of a
         // double click, a double tap or a double A press on the confirmation must not buy the module back (it
         // cost the full price for half of it back).
-        if (performance.now() - this.slotChangedAt < CONFIRM_DELAY) return;
+        if (performance.now() - this.slotChangedAt < DOUBLE_PRESS_MS) return;
         // one click, one module: the second click of a double click finds the button greyed out (it comes back
         // with the next update if the module could not go on)
         btn.disabled = true;
@@ -1035,7 +1036,7 @@ export class Hud {
     });
     panel.querySelector<HTMLElement>('[data-remove-confirm]')?.addEventListener('click', (e) => {
       // the confirmation comes up where Remove was: the second click of a double click must not confirm it
-      if (performance.now() - this.confirmRemoveAt < CONFIRM_DELAY) return;
+      if (performance.now() - this.confirmRemoveAt < DOUBLE_PRESS_MS) return;
       const kind = (e.currentTarget as HTMLElement).dataset.removeConfirm as ModuleKind;
       this.confirmRemove = null;
       this.inspectorKey = `${b.id}:`;

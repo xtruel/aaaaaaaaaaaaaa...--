@@ -10,7 +10,7 @@ import { computeDerived } from '../src/game/sim';
 import { createGame, idx } from '../src/game/state';
 import { standsInFront } from '../src/render/iso/depth';
 import { dozeTarget } from '../src/ui/catalog';
-import { DOUBLE_CLICK_MS, buildingBehind, pickAt, pieceBehind } from '../src/ui/pick';
+import { DOUBLE_PRESS_MS, buildingBehind, pickAt, pieceBehind } from '../src/ui/pick';
 
 function spireCity() {
   const s = createGame({ seed: 91, cityName: 'Pick' });
@@ -55,12 +55,15 @@ describe('a click reaches what a building hides (map study §9)', () => {
     const tile = idx(1, 20);
     const first = pickAt(s, spire.id, 1, 20, { selected: -1, last: null, now: 1000 });
     expect(first).toEqual({ building: spire.id, piece: -1 });
-    const second = pickAt(s, spire.id, 1, 20, { selected: spire.id, last: { tile, id: spire.id, at: 1000 }, now: 1000 + DOUBLE_CLICK_MS + 50 });
+    const second = pickAt(s, spire.id, 1, 20, { selected: spire.id, last: { tile, id: spire.id, at: 1000 }, now: 1000 + DOUBLE_PRESS_MS + 50 });
     expect(second).toEqual({ building: garden.id, piece: -1 });
     const third = pickAt(s, spire.id, 1, 20, { selected: garden.id, last: { tile, id: spire.id, at: 1400 }, now: 2500 });
     expect(third).toEqual({ building: spire.id, piece: -1 });
-    // the second click of a double click does not count; nor does a click on another tile
-    expect(pickAt(s, spire.id, 1, 20, { selected: spire.id, last: { tile, id: spire.id, at: 1000 }, now: 1000 + DOUBLE_CLICK_MS - 50 })).toEqual({ building: spire.id, piece: -1 });
+    // the second click of a double click does not count, up to Windows' default double-click time (500 ms); nor does
+    // a click on another tile
+    expect(DOUBLE_PRESS_MS).toBe(500);
+    expect(pickAt(s, spire.id, 1, 20, { selected: spire.id, last: { tile, id: spire.id, at: 1000 }, now: 1450 })).toEqual({ building: spire.id, piece: -1 });
+    expect(pickAt(s, spire.id, 1, 20, { selected: spire.id, last: { tile, id: spire.id, at: 1000 }, now: 1000 + DOUBLE_PRESS_MS - 50 })).toEqual({ building: spire.id, piece: -1 });
     expect(pickAt(s, spire.id, 1, 20, { selected: spire.id, last: { tile: idx(2, 20), id: spire.id, at: 0 }, now: 5000 })).toEqual({ building: spire.id, piece: -1 });
   });
 

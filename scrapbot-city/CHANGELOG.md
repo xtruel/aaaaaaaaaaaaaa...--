@@ -1,5 +1,13 @@
 # Changelog
 
+## In lavorazione — incremento 2, integrazione (G0 + G1 + temi): correzioni dalla verifica di G1
+
+- **Doppio clic, doppio tocco, A premuto due volte**: fino a 500 ms tra le due pressioni (il tempo di doppio clic
+  predefinito di Windows) la seconda non conferma mai una demolizione o la rimozione di un modulo comparse dove era la
+  prima, e non ricompra un modulo appena tolto (prima la soglia era 350 ms: una rimozione seguita da «Installa» dopo
+  352–450 ms ricomprava il modulo a prezzo pieno contro metà rimborso). Una pressione a sé sulla conferma, dopo, funziona
+  come prima. La stessa soglia vale per il secondo clic che raggiunge l'edificio nascosto dietro un altro.
+
 ## In lavorazione — incremento 2: le città della campagna nei loro temi
 
 - **Rustbay, Neon Heights, Greenvale e 2PM Company Town** si disegnano con i loro temi (ruggine, neon, verde,
