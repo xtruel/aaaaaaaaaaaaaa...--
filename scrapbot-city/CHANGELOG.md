@@ -1,5 +1,30 @@
 # Changelog
 
+## In lavorazione — incremento 2, gruppo G0: smog leggibile
+
+- **Lo smog si vede sulla mappa.** Sopra ogni edificio che inquina in quel momento (Fonderia, Inceneritore, Fabbrica
+  2PM) si forma una nuvola che il vento porta via in una scia: tanto più grande e densa quanto più smog emette
+  l'edificio adesso (con l'energia che ha, con gli straordinari, con il filtro); un edificio in pausa, senza
+  combustibile o senza materiale non fa nuvola. La Fonderia col filtro fa una scia piccola accanto al suo vapore chiaro.
+  Sulla melma tossica strisciano fumi verdastri. Sopra il 10% la città si vela: polvere chiara verso il 20%, foschia
+  scura e spenta oltre il 50%, cielo coperto di nuvole basse oltre l'80%; sotto il 10% l'aria è limpida. Di notte le
+  nuvole prendono la luce della città e la foschia diventa un bagliore torbido. Con il movimento ridotto le nuvole
+  restano ferme. Il fumo dei camini e il vapore del filtro restano come prima.
+- **Da dove viene e dove va.** Un clic o un tocco sul misuratore dello smog (o il cursore del controller e `A`) apre un
+  pannello con le fonti per tipo di edificio e la melma, la pulizia (Purificatori, Giardini Pixel) e il ricambio
+  d'aria naturale, ciascuno al giorno, il totale al giorno, la soglia del 95% e, quando parte, il conto alla rovescia
+  dei 30 secondi; segnala anche gli straordinari e l'energia che manca. I numeri sono quelli della simulazione: le parti
+  sommano esattamente al ritmo con cui lo smog cambia. Si chiude con `Esc`, `B`, la × o un clic fuori. Misuratore,
+  freccia e allarme restano come prima. In 8 lingue.
+- **Corretto**: una fila di pavimenti o recinzioni trascinata col tasto sinistro e rilasciata sopra un pannello o la
+  barra degli strumenti non posa e non paga nulla (prima posava e faceva pagare caselle nascoste sotto il pannello);
+  finché il puntatore è sopra un pannello la fila non si vede. Lo stesso per un edificio: premuto sulla mappa e
+  rilasciato sulla barra non viene costruito. Rilasciare sulla mappa funziona come prima.
+- **Corretto**: con la ruspa, quando il clic toglierebbe un oggetto nascosto dietro un edificio, si illumina
+  quell'oggetto (con la sua casella), non l'edificio. In generale la ruspa evidenzia sempre ciò su cui agirà il clic.
+- Nessun numero del gioco è cambiato: `npm run balance` (con la stessa sequenza casuale) e `npm run waits` danno le
+  stesse uscite byte per byte; salvataggi invariati.
+
 ## 0.7.0-alpha.1 — costruzione modulare, incremento 1
 
 - **Sei elementi nuovi nel pannello «Oggetti e moduli»** (pulsante nella barra degli strumenti accanto alla ruspa, tasto
