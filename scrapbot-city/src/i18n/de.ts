@@ -664,7 +664,7 @@ export const de: Dict = {
   'cat.help.module': 'Klicke oder tippe auf ein fertiges Gebäude vom Typ {building}, um das Modul einzubauen.',
   'cat.help.rotate': '<kbd>R</kbd> oder <kbd>Shift</kbd> + Mausrad dreht.',
   'cat.help.rotatePad': '<kbd>Y</kbd> dreht.',
-  'cat.help.pad': '<kbd>A</kbd> setzt es auf das Feld unter dem Zeiger, <kbd>B</kbd> legt es weg.',
+  'cat.help.pad': '<kbd>A</kbd> setzt es auf das Feld unter dem Cursor, <kbd>B</kbd> legt es weg.',
   'cat.help.modulePad': '<kbd>A</kbd> auf einem fertigen Gebäude vom Typ {building} baut es ein, <kbd>B</kbd> legt es weg.',
   'pc.floor': 'Industrieboden',
   'pc.floor.effect': 'Gebäude können darauf stehen',
@@ -687,7 +687,7 @@ export const de: Dict = {
   'insp.remove': 'Entfernen (+{refund})',
   'insp.scrapLost': 'Das Lager sinkt auf {n}: {lost} Schrott gehen verloren.',
   'insp.decoration': 'Dekoration: keine Wirkung auf die Wirtschaft',
-  'msg.rowPartial': '{n} von {total} gesetzt: Die übrigen Felder waren belegt oder zu teuer.',
+  'msg.rowPartial': '{n} von {total} gesetzt: Die übrigen Felder waren belegt, oder das Geld reichte nicht.',
   'extras.controls.5': '<kbd>O</kbd>: Objekte & Module · <kbd>R</kbd>: drehen (<kbd>Shift</kbd>+<kbd>R</kbd>: andersherum) · mit der linken Taste ziehen: eine Reihe Boden oder Zaun',
   'extras.controls.pad3': '<kbd>Y</kbd> dreht beim Setzen auch Zaun, Tor oder Laterne.',
 };

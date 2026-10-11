@@ -685,9 +685,9 @@ export const fr: Dict = {
   'insp.slotSide': "Emplacement latéral",
   'insp.install': "Installer",
   'insp.remove': "Retirer (+{refund})",
-  'insp.scrapLost': "Le stockage descend à {n} : {lost} ferraille sera perdue.",
+  'insp.scrapLost': "Le stockage descend à {n} : tu perdras {lost} ferraille.",
   'insp.decoration': "Décoration : aucun effet sur l'économie",
-  'msg.rowPartial': "{n} sur {total} posés : les autres cases étaient prises ou trop chères.",
+  'msg.rowPartial': "{n} sur {total} posés : les autres cases étaient prises ou l'argent manquait.",
   'extras.controls.5': "<kbd>O</kbd> : objets et modules · <kbd>R</kbd> : tourner (<kbd>Maj</kbd>+<kbd>R</kbd> : dans l'autre sens) · glisser avec le bouton gauche : une rangée de sol ou de clôture",
   'extras.controls.pad3': "<kbd>Y</kbd> tourne aussi une clôture, un portail ou un lampadaire pendant la pose.",
 };
