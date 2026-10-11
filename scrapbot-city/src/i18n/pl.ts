@@ -696,4 +696,21 @@ export const pl: Dict = {
   'msg.rowPartial': 'Ułożono {n} z {total}: pozostałe pola były zajęte albo zabrakło pieniędzy.',
   'extras.controls.5': '<kbd>O</kbd>: obiekty i moduły · <kbd>R</kbd>: obrót (<kbd>Shift</kbd>+<kbd>R</kbd>: w drugą stronę) · przeciąganie lewym przyciskiem: rząd posadzki lub ogrodzenia',
   'extras.controls.pad3': '<kbd>Y</kbd> obraca też ogrodzenie, bramę lub latarnię podczas stawiania.',
+
+  // ---------- added in 0.7, increment 2: readable smog ----------
+  'hud.smog.more': 'Kliknij lub dotknij: skąd się bierze i dokąd znika.',
+  'smog.title': 'Skąd się bierze i dokąd znika',
+  'smog.sources': 'Źródła',
+  'smog.cleaning': 'Oczyszczanie',
+  'smog.perDay': 'na dzień',
+  'smog.none': 'Teraz brak',
+  'smog.sludge': 'Toksyczny szlam (pola: {n})',
+  'smog.sludge.one': 'Toksyczny szlam (pole: {n})',
+  'smog.renewal': 'Naturalna wymiana powietrza',
+  'smog.renewal.note': 'Im brudniejsze powietrze, tym szybciej samo się oczyszcza.',
+  'smog.net': 'Razem na dzień',
+  'smog.overtime': 'Nadgodziny: smog z przemysłu ×1,5 jeszcze przez {n} s.',
+  'smog.power': 'Energia: {n}%. Przemysł i oczyszczacze pracują wolniej.',
+  'smog.limit': 'Powyżej {limit}% przez {seconds} s miasto przepada.',
+  'smog.countdown': 'Powyżej {limit}%: miasto przepadnie za {n} s!',
 };

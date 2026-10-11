@@ -6,6 +6,7 @@ import { MAP_W, T } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { CATALOG_ORDER, MODULES, PIECES, buildingStats, buildingStatsWith, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, solidKind } from '../game/pieces';
 import type { BuildingStats, CatalogKind, ModuleKind, PieceKind } from '../game/pieces';
+import { idx, inBounds } from '../game/state';
 import type { Building, GameState } from '../game/state';
 import { t, tk } from '../i18n';
 import type { Key } from '../i18n';
@@ -173,4 +174,27 @@ export function pieceInfo(s: GameState, i: number): PieceInfo | null {
   // removePieceAt only takes up a bare floor (not under a building, junk, sludge or rubble)
   const removable = s.occ[i] === -1 && (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS);
   return { kind: 'floor', x, y, rotatable: false, removable };
+}
+
+// ---------- the bulldozer ----------
+
+// What a bulldozer click acts on: a building (selected: its panel demolishes it), rubble (cleared), a fence, gate,
+// lamp or bare floor (taken up), or nothing (the tile index, -1 off the map). Worked out from what is drawn under
+// the pointer (`picked`: the building whose pixels are there, else -1, or -2 for the cat; `drawnPiece`: the fence,
+// gate or lamp drawn there, else a piece or floor on the tile, else -1) and the ground tile under it. The click and
+// the highlight under the pointer both come from here, so what is highlighted is what the click does. A building
+// drawn there is the target unless the ground tile holds rubble or a fence, gate or lamp: a building in front can
+// hide those entirely (the bulldozer draws it see-through), and they are cleared instead.
+export type DozeTarget = { kind: 'building'; id: number } | { kind: 'rubble' | 'piece' | 'nothing'; i: number };
+
+export function dozeTarget(s: GameState, tx: number, ty: number, picked: number, drawnPiece: () => number): DozeTarget {
+  const ground = inBounds(tx, ty) ? idx(tx, ty) : -1;
+  const hidden = ground >= 0 && s.occ[ground] === -1 && (s.tiles[ground] === T.RUBBLE || s.solid[ground] !== 0);
+  if (picked >= 0 && !hidden) return { kind: 'building', id: picked };
+  const piece = drawnPiece();
+  if (piece >= 0) return { kind: 'piece', i: piece };
+  if (ground < 0) return { kind: 'nothing', i: -1 };
+  if (s.tiles[ground] === T.RUBBLE) return { kind: 'rubble', i: ground };
+  if (s.occ[ground] !== -1) return { kind: 'building', id: s.occ[ground] };
+  return { kind: pieceInfo(s, ground)?.removable ? 'piece' : 'nothing', i: ground };
 }

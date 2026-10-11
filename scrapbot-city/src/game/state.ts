@@ -65,6 +65,23 @@ export interface Derived {
   botTarget: number;
   happiness: number;
   pollutionRate: number;
+  air: AirBreakdown;
+}
+
+// Where the smog comes from and where it goes, per second, as the last step of the sim added it up into
+// pollutionRate (the smog panel shows it): what the buildings of each type put into the air (+) or take out of it
+// (-) and how many of them do so right now, the sludge pools, and the air renewing itself.
+export interface AirBreakdown {
+  byType: Record<BuildingType, number>;
+  count: Record<BuildingType, number>;
+  sludge: number;
+  sludgeTiles: number;
+  renewal: number; // 0 or less
+}
+
+export function emptyAir(): AirBreakdown {
+  const zero = () => Object.fromEntries(Object.keys(BUILDINGS).map((type) => [type, 0])) as Record<BuildingType, number>;
+  return { byType: zero(), count: zero(), sludge: 0, sludgeTiles: 0, renewal: 0 };
 }
 
 export type MessageTone = 'info' | 'good' | 'bad' | 'event';
@@ -191,6 +208,7 @@ export function emptyDerived(): Derived {
     botTarget: 0,
     happiness: 50,
     pollutionRate: 0,
+    air: emptyAir(),
   };
 }
 

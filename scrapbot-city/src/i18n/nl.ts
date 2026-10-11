@@ -693,4 +693,21 @@ export const nl: Dict = {
   'msg.rowPartial': '{n} van {total} neergezet: de andere vakjes waren bezet of het geld was op.',
   'extras.controls.5': '<kbd>O</kbd>: objecten & modules · <kbd>R</kbd>: draaien (<kbd>Shift</kbd>+<kbd>R</kbd>: de andere kant op) · slepen met de linkerknop: een rij vloer of hek',
   'extras.controls.pad3': '<kbd>Y</kbd> draait ook een hek, poort of lantaarnpaal terwijl je die neerzet.',
+
+  // ---------- added in 0.7, increment 2: readable smog ----------
+  'hud.smog.more': 'Klik of tik: waar de smog vandaan komt en heen gaat.',
+  'smog.title': 'Waar de smog vandaan komt en heen gaat',
+  'smog.sources': 'Bronnen',
+  'smog.cleaning': 'Zuivering',
+  'smog.perDay': 'per dag',
+  'smog.none': 'Nu geen',
+  'smog.sludge': 'Gifslib ({n} vakjes)',
+  'smog.sludge.one': 'Gifslib ({n} vakje)',
+  'smog.renewal': 'Natuurlijke luchtverversing',
+  'smog.renewal.note': 'Hoe vuiler de lucht, hoe sneller die vanzelf opklaart.',
+  'smog.net': 'Totaal per dag',
+  'smog.overtime': 'Overwerk: industriesmog ×1,5, nog {n}s.',
+  'smog.power': 'Energie op {n}%: industrie en Zuiveraars werken trager.',
+  'smog.limit': 'Staat de smog {seconds} seconden boven {limit}%, dan is de stad verloren.',
+  'smog.countdown': 'Boven {limit}%: over {n}s is de stad verloren!',
 };

@@ -694,4 +694,21 @@ export const it: Dict = {
   'msg.rowPartial': "Posati {n} su {total}: le altre caselle erano occupate o fuori budget.",
   'extras.controls.5': "<kbd>O</kbd>: oggetti e moduli · <kbd>R</kbd>: ruota (<kbd>Shift</kbd>+<kbd>R</kbd>: al contrario) · trascina col tasto sinistro: una fila di pavimento o recinzione",
   'extras.controls.pad3': "<kbd>Y</kbd> ruota anche recinzioni, cancelli e lampioni mentre li posi.",
+
+  // ---------- added in 0.7, increment 2: readable smog ----------
+  'hud.smog.more': "Clicca o tocca per vedere da dove viene e dove va.",
+  'smog.title': "Da dove viene e dove va",
+  'smog.sources': "Fonti",
+  'smog.cleaning': "Pulizia",
+  'smog.perDay': "al giorno",
+  'smog.none': "Nessuna in questo momento",
+  'smog.sludge': "Melma tossica ({n} caselle)",
+  'smog.sludge.one': "Melma tossica ({n} casella)",
+  'smog.renewal': "Ricambio d'aria naturale",
+  'smog.renewal.note': "Più l'aria è sporca, più in fretta si pulisce da sola.",
+  'smog.net': "Totale al giorno",
+  'smog.overtime': "Straordinari: smog dell'industria ×1,5 ancora per {n}s.",
+  'smog.power': "Energia al {n}%: industria e Purificatori lavorano più piano.",
+  'smog.limit': "Se resta sopra il {limit}% per {seconds} secondi, la città è perduta.",
+  'smog.countdown': "Sopra il {limit}%: la città è perduta tra {n}s!",
 };

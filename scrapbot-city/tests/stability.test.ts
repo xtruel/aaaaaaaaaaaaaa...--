@@ -29,7 +29,11 @@ function checkInvariants(s: GameState, label: string): void {
     expect(v, `${label} res.${k}`).toBeGreaterThanOrEqual(-1e-6);
   }
   for (const k of ['pop', 'pollution', 'alignment', 'happyMod', 'time', 'waste', 'smog'] as const) expect(Number.isFinite(s[k]), `${label} ${k} = ${s[k]}`).toBe(true);
-  for (const [k, v] of Object.entries(s.derived)) expect(Number.isFinite(v), `${label} derived.${k} = ${v}`).toBe(true);
+  const { air, ...derived } = s.derived;
+  for (const [k, v] of Object.entries(derived)) expect(Number.isFinite(v), `${label} derived.${k} = ${v}`).toBe(true);
+  // the smog breakdown too
+  const parts: [string, number][] = [...Object.entries(air.byType), ...Object.entries(air.count), ['sludge', air.sludge], ['renewal', air.renewal]];
+  for (const [k, v] of parts) expect(Number.isFinite(v), `${label} derived.air.${k} = ${v}`).toBe(true);
   expect(s.alignment).toBeGreaterThanOrEqual(-100);
   expect(s.alignment).toBeLessThanOrEqual(100);
   expect(s.pollution).toBeGreaterThanOrEqual(0);
