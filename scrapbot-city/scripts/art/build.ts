@@ -29,6 +29,31 @@ import { BLIMP_FRAMES, blimpModel } from './models/blimp';
 import { fenceIcon, fenceModel, floorIcon, floorTiles, gateIcon, gateModel, lampHead, lampIcon, pieceLampModel, withLightPool } from './models/pieces';
 import type { FenceShape } from './models/pieces';
 import { dockStorageIcon, smelterFilterIcon, variantName } from './models/modules';
+import { factoryArmIcon, podsCapsuleIcon, purifierNozzleIcon, recyclerMagnetIcon, recyclerSorterIcon, solarTrackerIcon, withMist } from './models/catalog-modules';
+import {
+  FOUNTAIN_FRAMES,
+  SIGN_MOTIFS,
+  TREE_KINDS,
+  baseIcon,
+  baseTiles,
+  benchPiece,
+  catHousePiece,
+  fitIcon,
+  fountainPiece,
+  pergolaPiece,
+  pillarIcon,
+  pillarPiece,
+  planterPiece,
+  sculpturePiece,
+  signPiece,
+  statuePiece,
+  treePiece,
+  wallIcon,
+  wallPiece,
+} from './models/catalog-pieces';
+import type { WallShape } from './models/catalog-pieces';
+import { THEMES, THEME_FAMILIES, themeEdges, themeTiles } from './models/city-terrain';
+import { THEME_SCENERY, THEME_SETUP } from './models/city-scenery';
 
 // npm runs scripts from the package root; fall back to walking up from this file
 function projectRoot(): string {
@@ -134,6 +159,13 @@ for (const type of Object.keys(BUILDINGS) as BuildingType[]) {
 const VARIANTS: { type: BuildingType; modules: string[] }[] = [
   { type: 'dock', modules: ['dockStorage'] },
   { type: 'smelter', modules: ['smelterFilter'] },
+  // increment 2 (catalog-modules.ts); kept after the first two so the lazily registered materials keep their ids
+  { type: 'recycler', modules: ['recyclerMagnet'] },
+  { type: 'recycler', modules: ['recyclerSorter'] },
+  { type: 'factory', modules: ['factoryArm'] },
+  { type: 'pods', modules: ['podsCapsule'] },
+  { type: 'solar', modules: ['solarTracker'] },
+  { type: 'purifier', modules: ['purifierNozzle'] },
 ];
 const variants: Record<string, BuildingMeta> = {};
 for (const { type, modules } of VARIANTS) {
@@ -145,7 +177,8 @@ for (const { type, modules } of VARIANTS) {
   for (let f = 0; f < art.frames; f++) {
     const v = art.model(f, true, modules);
     if (v.w !== def.w * 16 || v.d !== def.h * 16) throw new Error(`${name}: model footprint ${v.w}×${v.d} does not match ${def.w * 16}×${def.h * 16}`);
-    const r = render(v);
+    // the Purifier's extended nozzle sprays a half-transparent mist in its work frames
+    const r = modules.includes('purifierNozzle') ? withMist(render(v), f) : render(v);
     addRendered(`b/${name}/w${f}`, r);
     glow.push(r.hasGlow);
     height = Math.max(height, r.height);
@@ -250,6 +283,80 @@ for (const [name, v] of icons) {
   add(name, r.img, r.ax, r.ay);
 }
 
+// ---------- catalogue, increment 2: decorations, constructions and their icons (catalog-pieces.ts) ----------
+// Same conventions as increment 1's pieces: solid pieces anchored on the tile's back corner with a /shadow frame,
+// /g where something is lit (sign tubes, pillar lamps, the eyes of the sculpture and of the statue); the concrete
+// base is a ground tile like the floor. Rendered after every older frame, so their materials come last.
+const bases = baseTiles();
+for (const [name, img] of Object.entries(bases)) add(name, img, 16, 0);
+for (let dir = 0; dir < 4; dir++) addPiece(`pc/bench/${dir}`, benchPiece(dir));
+for (let k = 0; k < 2; k++) addPiece(`pc/planter/${k}`, planterPiece(k));
+for (let m = 0; m < SIGN_MOTIFS; m++) for (let dir = 0; dir < 4; dir++) addPiece(`pc/sign/${m}/${dir}`, signPiece(m, dir));
+for (const axis of ['x', 'y'] as const) addPiece(`pc/pergola/${axis}`, pergolaPiece(axis));
+for (let dir = 0; dir < 4; dir++) addPiece(`pc/cathouse/${dir}`, catHousePiece(dir));
+for (let dir = 0; dir < 4; dir++) addPiece(`pc/sculpture/${dir}`, sculpturePiece(dir));
+for (let k = 0; k < TREE_KINDS; k++) addPiece(`pc/tree/${k}`, treePiece(k));
+for (let f = 0; f < FOUNTAIN_FRAMES; f++) addPiece(`pc/fountain/${f}`, fountainPiece(f));
+for (let dir = 0; dir < 4; dir++) addPiece(`pc/statue/${dir}`, statuePiece(dir));
+const wallShapes: WallShape[] = ['x', 'y'];
+for (let mask = 1; mask < 16; mask++) wallShapes.push(mask);
+for (const shape of wallShapes) addPiece(`pc/wall/${shape}`, wallPiece(shape));
+for (let mask = 0; mask < 16; mask++) addPiece(`pc/pillar/${mask}`, pillarPiece(mask));
+const baseIco = baseIcon(bases);
+add('pc/base/icon', baseIco.img, baseIco.ax, baseIco.ay);
+const icons2: [string, Vox][] = [
+  ['pc/bench/icon', fitIcon(benchPiece(1))],
+  ['pc/planter/icon', fitIcon(planterPiece(1))],
+  ['pc/sign/icon', fitIcon(signPiece(2, 0))],
+  ['pc/pergola/icon', fitIcon(pergolaPiece('x'))],
+  ['pc/cathouse/icon', fitIcon(catHousePiece(1))],
+  ['pc/sculpture/icon', fitIcon(sculpturePiece(1))],
+  ['pc/tree/icon', fitIcon(treePiece(0))],
+  ['pc/fountain/icon', fitIcon(fountainPiece(2))],
+  ['pc/statue/icon', fitIcon(statuePiece(1))],
+  ['pc/wall/icon', wallIcon()],
+  ['pc/pillar/icon', fitIcon(pillarIcon())],
+  ['mod/recyclerMagnet/icon', fitIcon(recyclerMagnetIcon())],
+  ['mod/recyclerSorter/icon', fitIcon(recyclerSorterIcon())],
+  ['mod/factoryArm/icon', fitIcon(factoryArmIcon())],
+  ['mod/podsCapsule/icon', fitIcon(podsCapsuleIcon())],
+  ['mod/solarTracker/icon', fitIcon(solarTrackerIcon())],
+  ['mod/purifierNozzle/icon', fitIcon(purifierNozzleIcon())],
+];
+for (const [name, v] of icons2) {
+  const r = render(v);
+  if (r.img.w > 64 || r.img.h > 44) throw new Error(`${name}: icon ${r.img.w}×${r.img.h} does not fit the catalogue's 64×44 box`);
+  add(name, r.img, r.ax, r.ay);
+}
+
+// ---------- city themes, increment 2 (city-terrain.ts, city-scenery.ts) ----------
+// Rustbay, Neon Heights, Greenvale and the 2PM Company Town get their own ground and border scenery; Scrapbot City
+// keeps the frames above. Terrain: t/<theme>/<family>/... twins of every t/<family>/... frame the terrain cache
+// paints, same size and anchor. Scenery: sc/<theme>/<name>/<f> (+ /g), the same metadata as the decor frames.
+// Rendered last, so their materials are registered after every older model's.
+interface ThemeMeta {
+  terrain: string[]; // families with a t/<theme>/<family>/... twin
+  scenery: Record<string, { w: number; d: number; frames: number; fps: number; tall: boolean }>;
+  decor: string[]; // the existing d/<name> scenery that suits the theme, to mix into its border ring
+  light: { day: [number, number, number]; night: [number, number, number]; dark: number };
+}
+const themes: Record<string, ThemeMeta> = {};
+for (const theme of THEMES) {
+  for (const [name, img] of Object.entries(themeTiles(theme))) add(name, img, 16, 0);
+  for (const [name, img] of Object.entries(themeEdges(theme))) add(name, img, name.includes('/edge/l/') ? 16 : 0, -8);
+  const scenery: ThemeMeta['scenery'] = {};
+  for (const d of THEME_SCENERY[theme]) {
+    for (let f = 0; f < d.frames; f++) {
+      const m = d.model(f);
+      if (m.w !== d.w * 16 || m.d !== d.d * 16) throw new Error(`scenery ${theme}/${d.name}: model ${m.w}×${m.d} does not match ${d.w * 16}×${d.d * 16}`);
+      addRendered(`sc/${theme}/${d.name}/${f}`, render(m));
+    }
+    scenery[d.name] = { w: d.w, d: d.d, frames: d.frames, fps: d.fps, tall: d.tall };
+  }
+  for (const name of THEME_SETUP[theme].decor) if (!decor[name]) throw new Error(`theme ${theme}: unknown decor ${name}`);
+  themes[theme] = { terrain: [...THEME_FAMILIES], scenery, decor: [...THEME_SETUP[theme].decor], light: THEME_SETUP[theme].light };
+}
+
 // ---------- hand-made overrides ----------
 const safe = (name: string) => name.replace(/\//g, '_');
 const overrideDir = join(PROJECT, 'art/overrides');
@@ -297,7 +404,7 @@ for (const f of frames) {
 const outDir = join(PROJECT, 'src/assets/iso');
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'atlas.png'), encodePNG(atlas));
-writeFileSync(join(outDir, 'atlas.json'), JSON.stringify({ w: ATLAS_W, h: atlasH, frames: frameMeta, buildings, decor, variants }) + '\n');
+writeFileSync(join(outDir, 'atlas.json'), JSON.stringify({ w: ATLAS_W, h: atlasH, frames: frameMeta, buildings, decor, variants, themes }) + '\n');
 
 // ---------- individual sprites + contact sheet ----------
 const spriteDir = join(PROJECT, 'art/sprites');

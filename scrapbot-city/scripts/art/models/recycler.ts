@@ -3,13 +3,15 @@
 import { M } from '../palette';
 import { footprint, plate, recycleY } from './common';
 import type { BuildingArt } from './common';
+import { recyclerMagnet, recyclerSorter } from './catalog-modules';
+import { hasModule } from './modules';
 
 const SCRAP = [M.rust, M.steelL, M.rustD, M.pinkD, M.steel];
 
 export const recycler: BuildingArt = {
   frames: 4,
   fps: 6,
-  model(frame, working) {
+  model(frame, working, modules) {
     const v = footprint(2, 2, 40);
     plate(v);
     // hopper tower at the back
@@ -57,6 +59,8 @@ export const recycler: BuildingArt = {
     v.box(20, 26, 22, 22, 28, 25, working ? M.limeLit : M.steelD);
     v.point('light', 21, 27, 25);
     v.point('spark', 10, 10, 31);
+    if (hasModule(modules, 'recyclerMagnet')) recyclerMagnet(v, frame, working);
+    if (hasModule(modules, 'recyclerSorter')) recyclerSorter(v, frame, working);
     return v;
   },
 };

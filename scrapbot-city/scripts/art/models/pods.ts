@@ -9,6 +9,8 @@ import { M } from '../palette';
 import type { Vox } from '../voxel';
 import { footprint, hash, hazardBand, plate } from './common';
 import type { BuildingArt } from './common';
+import { podsCapsule } from './catalog-modules';
+import { hasModule } from './modules';
 
 // A box with rounded vertical edges (radius r) and a softened top and bottom layer: a capsule home.
 function capsule(v: Vox, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, m: number, r = 3): void {
@@ -91,7 +93,7 @@ const CAB = [0, 4, 8, 12, 16, 20, 24, 20, 16, 12, 8, 4];
 export const pods: BuildingArt = {
   frames: CAB.length,
   fps: 6,
-  model(frame, working) {
+  model(frame, working, modules) {
     const v = footprint(2, 2, 48);
     plate(v);
     const f = working ? frame % CAB.length : 0;
@@ -191,6 +193,7 @@ export const pods: BuildingArt = {
     // front-right yard: a plain pink planter
     v.box(25, 25, 3, 29, 29, 5, M.pink);
     v.box(26, 26, 4, 28, 28, 5, M.green);
+    if (hasModule(modules, 'podsCapsule')) podsCapsule(v, frame, working);
     return v;
   },
 };
