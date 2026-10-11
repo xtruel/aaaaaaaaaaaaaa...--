@@ -1,15 +1,16 @@
 // In-game DOM interface: resource bar, meters, goal, toolbar, inspector, Objects & modules panel and message feed.
 import { audio } from '../audio';
-import { buildCost, canAfford, costText, partsReserve } from '../game/actions';
+import { buildCost, canAfford, costText } from '../game/actions';
 import { cityById, goalText } from '../game/cities';
 import { freeHintsLeft, hintPrice } from '../game/hints';
 import { BUILD_ORDER, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, PARTS_RESERVE, SMOG_DANGER, SMOG_LIMIT_SECONDS } from '../game/defs';
 import type { BuildingType, Cost } from '../game/defs';
+import { scrapWaiting } from '../game/economy';
 import { CATALOG_ORDER, MODULES, buildingStats, demolishRefund, installedModules, isModuleKind, isPieceKind, moduleRefund, pieceRefund } from '../game/pieces';
 import type { CatalogKind, ModuleKind } from '../game/pieces';
 import { dayPhase } from '../game/sim';
 import { day } from '../game/state';
-import type { Building, BuildingStatus, GameState, Message } from '../game/state';
+import type { Building, GameState, Message } from '../game/state';
 import { OBJECTIVES, objectiveHint, objectiveText, objectiveTools } from '../game/story';
 import { padMode } from '../gamepad';
 import { bDesc, bName, pathLabel, t, tk } from '../i18n';
@@ -21,22 +22,30 @@ import { PAL, makeCanvas } from '../render/sprites';
 import {
   CONSTRUCTION,
   MACHINE_MODULES,
+  buildingRows,
   catalogCost,
   catalogEffect,
   catalogLimit,
   catalogName,
   catalogState,
+  demolishHousingDrop,
   demolishStorageDrop,
-  installState,
+  homesLost,
   isRotatable,
   isRowKind,
-  moduleRows,
+  moduleHousingDrop,
+  moduleRowsOn,
+  moduleState,
   moduleStorageDrop,
+  overtimeLeft,
   pieceInfo,
+  powerShortAfter,
   rowLabel,
   scrapLost,
+  slotModules,
+  statusLine,
 } from './catalog';
-import type { PieceInfo } from './catalog';
+import type { ModuleState, PieceInfo, StatusLine } from './catalog';
 import { esc } from './escape';
 import { airReport, perDayText } from './smog';
 import type { AirRow } from './smog';
@@ -72,13 +81,21 @@ export interface HudView {
   selectedPiece: number; // tile index of the selected fence, gate, lamp or floor; -1 none
 }
 
-function statusText(s: GameState, b: Building): string {
-  const def = BUILDINGS[b.type];
-  if (b.status === 'noInput' && def.process) {
-    return t('status.waiting', { what: costText(def.process.input) });
-  }
-  if (b.status === 'reserve') return t('status.reserve', { n: partsReserve(s) });
-  return tk(`status.${b.status satisfies BuildingStatus}`);
+// The cause of a building's state: its words, with an icon so it never reads by colour alone.
+function statusHtml(line: StatusLine): string {
+  return `<img src="${iconUrl(line.icon)}" alt="" data-status-icon /><span data-status-text>${esc(line.text)}</span>`;
+}
+
+const STATE_ICON: Record<ModuleState, IconName> = { installed: 'check', slotTaken: 'lock', available: 'plus', cantBuy: 'cross' };
+const STATE_TEXT = {
+  installed: 'insp.modInstalled',
+  slotTaken: 'insp.modSlotTaken',
+  available: 'insp.modAvailable',
+  cantBuy: 'insp.modCantBuy',
+} as const satisfies Record<ModuleState, Parameters<typeof t>[0]>;
+
+function stateHtml(state: ModuleState): string {
+  return `<img src="${iconUrl(STATE_ICON[state])}" alt="" /><span>${esc(t(STATE_TEXT[state]))}</span>`;
 }
 
 // Physical keys (KeyboardEvent.code), so the top number row works on AZERTY and other layouts too.
@@ -176,6 +193,8 @@ export class Hud {
   private confirmDemolishAt = 0; // when it was asked for (performance.now())
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
+  private slotChangedAt = -Infinity; // when the last module removal was confirmed (performance.now())
+  private renderedId = -1; // the building whose panel was drawn last (a piece's panel: -1)
   private catalogKey = '';
   private starsKey = '';
   private smogOpen = false; // the smog panel (a click on the smog meter opens and closes it)
@@ -236,7 +255,7 @@ export class Hud {
       <div class="res" data-res="${key}" title="${label}" style="--c:${color}">
         <span class="res-ico"><img src="${iconUrl(icon)}" alt="" /></span>
         <span class="res-label">${label}</span>
-        <span class="res-num"><b data-v></b><small data-cap></small></span>
+        <span class="res-num"><b data-v></b>${key === 'scrap' ? '<span class="res-sub"><small data-cap></small><small class="res-wait" data-wait hidden></small></span>' : '<small data-cap></small>'}</span>
       </div>`;
     this.root.innerHTML = `
       <div class="hud-top">
@@ -311,6 +330,7 @@ export class Hud {
     for (const name of ['smog-bar', 'smog', 'smog-meter', 'smog-panel', 'smog-level', 'smog-body', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'tooltip', 'toolbar']) {
       this.el[name] = this.root.querySelector(`[data-${name}]`)!;
     }
+    this.el.wait = this.root.querySelector('[data-wait]')!; // "+N waiting" next to the scrap
 
     this.root.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -517,6 +537,21 @@ export class Hud {
     };
     set('scrap:v', fmt(s.res.scrap));
     set('scrap:cap', `/${fmt(d.storage)}`);
+    // scrap the bots brought back that waits for room in storage: "+N waiting", explained on hover
+    const waiting = scrapWaiting(s);
+    const wait = this.el.wait;
+    if (wait.hidden !== waiting <= 0) wait.hidden = waiting <= 0;
+    if (waiting > 0) {
+      set('wait', t('hud.scrapWaiting', { n: fmt(waiting) }));
+      const tip = t('hud.scrapWaiting.title', { n: fmt(waiting) });
+      if (wait.title !== tip) {
+        wait.title = tip;
+        wait.closest<HTMLElement>('[data-res]')!.title = tip;
+      }
+    } else if (wait.title) {
+      wait.title = '';
+      wait.closest<HTMLElement>('[data-res]')!.title = t('res.scrap');
+    }
     const rate = this.rates(s);
     set('parts:v', fmt(s.res.parts));
     set('parts:cap', rate.parts >= 1 ? t('hud.perMinute', { n: fmt(rate.parts) }) : '');
@@ -735,13 +770,14 @@ export class Hud {
     this.markCatalog(s);
     const list = panel.querySelector<HTMLElement>('.cat-scroll')!;
     list.scrollTop = scrolled;
-    // the item in hand stays in sight when the tool box above the list takes its room
+    // the item in hand stays in sight when the tool box above the list takes its room: all of it, or from its top
+    // (name and price) when the list is shorter than the item (a short window: a module's effect takes lines)
     const chosen = panel.querySelector<HTMLElement>('.cat-item.active');
     if (chosen) {
       const r = chosen.getBoundingClientRect();
       const l = list.getBoundingClientRect();
-      if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
-      else if (r.top < l.top) list.scrollTop -= l.top - r.top;
+      if (r.top < l.top || r.height > l.height) list.scrollTop -= l.top - r.top;
+      else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
     }
     panel.querySelector('[data-close]')!.addEventListener('click', () => {
       audio.play('click');
@@ -791,6 +827,7 @@ export class Hud {
     if (!b && !piece) {
       panel.hidden = true;
       this.inspectorKey = '';
+      this.renderedId = -1;
       this.confirmDemolish = false;
       this.confirmRemove = null;
       return;
@@ -809,65 +846,121 @@ export class Hud {
       this.confirmDemolish = false;
       this.confirmRemove = null;
     }
-    // Rebuild only when the buttons change; status text updates in place so clicks are never lost.
+    // Rebuild only when the buttons or the rows change; everything that moves with the city (the cause of the state,
+    // the values now, whether a module can go on: money comes in with every tax tick) is written in place, so a
+    // click is never lost to a rebuild.
     const key = `${b.id}:${b.built >= 1}:${b.paused}:${this.confirmDemolish}:${this.confirmRemove}:${installedModules(b).join()}`;
     if (key !== this.inspectorKey) {
       this.inspectorKey = key;
       this.renderInspector(s, b);
     }
-    // so does whether a module can go on now (money comes in with every tax tick)
-    for (const btn of panel.querySelectorAll<HTMLButtonElement>('[data-install]')) {
-      const st = installState(s, btn.dataset.install as ModuleKind, b);
-      btn.disabled = !st.ok;
-      const reason = btn.closest('.insp-mod')?.querySelector<HTMLElement>('.cat-reason');
-      if (!reason) continue;
-      const text = st.ok ? '' : (st.reason ?? '');
-      if (reason.textContent !== text) reason.textContent = text;
-      reason.hidden = st.ok;
-    }
-    const def = BUILDINGS[b.type];
+    const write = (el: Element | null, text: string) => {
+      if (el && el.textContent !== text) el.textContent = text;
+    };
+    // why it is in its state, in words and with its icon
     const status = panel.querySelector<HTMLElement>('[data-status]');
     if (status) {
-      const text = statusText(s, b);
-      if (status.textContent !== text) status.textContent = text;
-      status.className = `insp-status status-${b.status}`;
+      const line = statusLine(s, b);
+      if (status.dataset.cause !== line.cause) {
+        status.dataset.cause = line.cause;
+        status.className = `insp-status cause-${line.cause}`;
+        status.innerHTML = statusHtml(line);
+      } else {
+        write(status.querySelector('[data-status-text]'), line.text);
+      }
     }
+    const def = BUILDINGS[b.type];
     const bar = panel.querySelector<HTMLElement>('[data-progress]');
     if (bar) {
-      const p = b.built < 1 ? b.built : def.process ? b.timer / def.process.time : def.fuel ? Math.min(1, b.fuel / def.fuel.seconds) : 1;
+      // (the cycle with the module installed: the magnet's 1.5 s, the sorter's 3 s)
+      const p = b.built < 1 ? b.built : def.process ? b.timer / buildingStats(b).cycle : def.fuel ? Math.min(1, b.fuel / def.fuel.seconds) : 1;
       bar.style.width = `${Math.round(p * 100)}%`;
     }
-    // a confirmation that would leave less storage than the scrap in it says how much goes (bots keep
-    // bringing scrap, so this follows in place)
+    // the values now, next to the nominal ones
+    for (const row of buildingRows(s, b)) {
+      if (row.now !== null) write(panel.querySelector(`[data-now="${row.key}"]`), row.now);
+    }
+    const ot = panel.querySelector<HTMLElement>('[data-overtime]');
+    if (ot) {
+      const left = overtimeLeft(s, b);
+      write(ot, left > 0 ? t('insp.overtime', { n: left }) : '');
+      ot.hidden = left <= 0;
+    }
+    // each module of the slot: can it go on now (and why not), its values now once installed
+    for (const card of panel.querySelectorAll<HTMLElement>('[data-mod]')) {
+      const kind = card.dataset.mod as ModuleKind;
+      const st = moduleState(s, b, kind);
+      const chip = card.querySelector<HTMLElement>('[data-mod-state]');
+      if (chip && chip.dataset.state !== st.state) {
+        chip.dataset.state = st.state;
+        chip.className = `mod-state state-${st.state}`;
+        chip.innerHTML = stateHtml(st.state);
+      }
+      const btn = card.querySelector<HTMLButtonElement>('[data-install]');
+      if (btn) btn.disabled = st.state !== 'available';
+      const reason = card.querySelector<HTMLElement>('.cat-reason');
+      if (reason) {
+        write(reason, st.reason ?? '');
+        reason.hidden = !st.reason;
+      }
+      if (st.state === 'installed') {
+        for (const r of moduleRowsOn(s, b, kind)) if (r.now !== undefined) write(card.querySelector(`[data-mod-now="${r.stat}${r.res ? `.${r.res}` : ''}"]`), r.now);
+      }
+      // installing it would leave the city short of power: said before the click
+      const warn = card.querySelector<HTMLElement>('[data-power-warn]');
+      if (warn) {
+        const short = st.state === 'available' || st.state === 'cantBuy' ? powerShortAfter(s, b, [kind]) : null;
+        write(warn, short ? t('insp.powerShort', short) : '');
+        warn.hidden = !short;
+      }
+    }
+    // a confirmation that would leave less storage than the scrap in it, fewer homes than citizens, or the city short
+    // of power says so (bots keep bringing scrap and citizens keep coming, so this follows in place)
     const loss = panel.querySelector<HTMLElement>('[data-loss]');
     if (loss) {
-      const drop = this.confirmRemove ? moduleStorageDrop(b, this.confirmRemove) : demolishStorageDrop(b);
-      const lost = scrapLost(s, drop);
-      const text = lost > 0 ? t('insp.scrapLost', { n: Math.max(0, s.derived.storage - drop), lost }) : '';
-      if (loss.textContent !== text) loss.textContent = text;
-      loss.hidden = lost <= 0;
+      const lines: string[] = [];
+      const kind = this.confirmRemove;
+      const storageDrop = kind ? moduleStorageDrop(b, kind) : demolishStorageDrop(b);
+      const lost = scrapLost(s, storageDrop);
+      if (lost > 0) lines.push(t('insp.scrapLost', { n: Math.max(0, s.derived.storage - storageDrop), lost }));
+      const homesDrop = kind ? moduleHousingDrop(b, kind) : demolishHousingDrop(b);
+      const leaving = homesLost(s, homesDrop);
+      const homesLeft = Math.max(0, s.derived.housing - homesDrop);
+      if (leaving > 0) lines.push(leaving === 1 ? t('insp.homesLost.one', { n: homesLeft }) : t('insp.homesLost', { n: homesLeft, lost: leaving }));
+      const short = powerShortAfter(s, b, kind ? installedModules(b).filter((k) => k !== kind) : null);
+      if (short) lines.push(t('insp.powerShort', short));
+      write(loss, lines.join(' '));
+      loss.hidden = lines.length === 0;
     }
   }
 
   private renderInspector(s: GameState, b: Building): void {
     const def = BUILDINGS[b.type];
-    // energy, smog and storage with the installed modules
-    const stats = buildingStats(b);
-    const rows: [string, string][] = [];
-    if (stats.energy) rows.push([t('insp.energy'), `${stats.energy > 0 ? '+' : ''}${stats.energy}`]);
-    if (stats.pollution) rows.push([t('insp.smog'), `${stats.pollution > 0 ? '+' : ''}${(stats.pollution * 60).toFixed(1)}`]);
-    if (def.process) rows.push([t('insp.cycle'), `${costText(def.process.input)} → ${costText(def.process.output)}`]);
-    if (def.fuel) rows.push([t('insp.fuel'), t('insp.fuelValue', { n: def.fuel.scrap, s: def.fuel.seconds })]);
-    if (def.housing) rows.push([t('insp.homes'), t('insp.homesValue', { n: def.housing })]);
-    if (stats.storage) rows.push([t('insp.storage'), costText({ scrap: stats.storage })]);
-    if (def.bots) rows.push([t('insp.bots'), `+${def.bots}`]);
-    if (def.happiness) rows.push([t('insp.happiness'), `+${def.happiness}`]);
-    if (def.cleanRadius) rows.push([t('insp.cleans'), t('insp.cleansValue', { n: def.cleanRadius })]);
+    // every number from the sim: nominal (buildingStats, with the module) and now (effectiveStats)
+    const all = buildingRows(s, b);
+    // what a cycle takes and makes, and the fuel, are sentences: a line each across the whole width, above the columns
+    // of numbers (a cell spanning the label column too does not widen the number columns), so the labels keep their room
+    const wide = all.filter((r) => r.key === 'process' || r.key === 'fuel');
+    const rows = all.filter((r) => !wide.includes(r));
+    const withNow = rows.some((r) => r.now !== null);
+    const head = withNow ? `<dt class="rows-head"></dt><dd class="rows-head">${esc(t('insp.nominal'))}</dd><dd class="rows-head">${esc(t('insp.now'))}</dd>` : '';
+    const body = rows
+      .map((r) =>
+        r.now === null
+          ? `<dt>${esc(r.label)}</dt><dd class="span">${esc(r.nominal)}</dd>`
+          : `<dt>${esc(r.label)}</dt><dd>${esc(r.nominal)}</dd><dd class="now" data-now="${r.key}">${esc(r.now)}</dd>`,
+      )
+      .join('');
+    const lines = wide.map((r) => `<div class="insp-line"><dt>${esc(r.label)}</dt><dd>${esc(r.nominal)}</dd></div>`).join('');
     // the modules go with the building: their refunds are part of it
     const refund = costText(demolishRefund(s, b));
     const pausable = b.built >= 1 && (def.process || def.fuel || def.cleanRadius);
-    const slots = MACHINE_MODULES.filter((k) => MODULES[k].building === b.type);
+    const slots = slotModules(b.type);
+    const line = statusLine(s, b);
     const panel = this.el.inspector;
+    // another building's panel opens at its top; the same one keeps its place (a module installed down the list)
+    const fresh = this.renderedId !== b.id;
+    this.renderedId = b.id;
     panel.style.setProperty('--path', pathColor(b.type));
     panel.innerHTML = `
       <div class="insp-head">
@@ -878,11 +971,12 @@ export class Hud {
         </div>
         <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
       </div>
-      <p class="insp-status status-${b.status}" data-status>${statusText(s, b)}</p>
+      <p class="insp-status cause-${line.cause}" data-status data-cause="${line.cause}">${statusHtml(line)}</p>
       <div class="progress"><span data-progress></span></div>
-      <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+      <dl class="insp-rows${withNow ? '' : ' no-now'}">${lines}${head}${body}</dl>
+      <p class="insp-note" data-overtime hidden></p>
       <p class="insp-desc">${esc(bDesc(b.type))}</p>
-      ${slots.length ? `<h4 class="cat-section">${t('insp.modules')}</h4>${slots.map((k) => this.moduleSlot(s, b, k)).join('')}` : ''}
+      ${slots.length ? this.moduleSection(s, b, slots) : ''}
       ${pausable ? `<div class="insp-actions"><button type="button" class="btn" data-pause>${b.paused ? t('insp.resume') : t('insp.pause')}</button></div>` : ''}
       ${
         b.type === 'hq'
@@ -891,6 +985,7 @@ export class Hud {
             ? `<p class="insp-warn" data-loss hidden></p><div class="insp-actions"><button type="button" class="btn tone-danger" data-confirm>${t('insp.demolishConfirm', { refund })}</button><button type="button" class="btn" data-cancel>${t('insp.keep')}</button></div>`
             : `<div class="insp-actions"><button type="button" class="btn" data-demolish>${t('insp.demolish')}</button></div>`
       }`;
+    if (fresh) panel.scrollTop = 0;
     panel.querySelector('[data-close]')!.addEventListener('click', () => this.handlers.onCloseInspector());
     panel.querySelector('[data-pause]')?.addEventListener('click', () => {
       audio.play('click');
@@ -915,6 +1010,10 @@ export class Hud {
     });
     for (const btn of panel.querySelectorAll<HTMLButtonElement>('[data-install]')) {
       btn.addEventListener('click', () => {
+        // After a removal the slot is drawn again with Install where the confirmation was: the second click of a
+        // double click, a double tap or a double A press on the confirmation must not buy the module back (it
+        // cost the full price for half of it back).
+        if (performance.now() - this.slotChangedAt < CONFIRM_DELAY) return;
         // one click, one module: the second click of a double click finds the button greyed out (it comes back
         // with the next update if the module could not go on)
         btn.disabled = true;
@@ -940,23 +1039,43 @@ export class Hud {
       const kind = (e.currentTarget as HTMLElement).dataset.removeConfirm as ModuleKind;
       this.confirmRemove = null;
       this.inspectorKey = `${b.id}:`;
+      this.slotChangedAt = performance.now();
       this.handlers.onRemoveModule(b.id, kind);
     });
   }
 
-  // One module slot of a Dock or Smelter: what it changes (before → after), its price, 0/1 or 1/1, and
-  // Install (greyed out with the reason) or Remove (with the refund, confirmed by a second click).
+  // The building's module slot: one module at a time (the Recycler's magnet or sorter), each with its state.
+  private moduleSection(s: GameState, b: Building, kinds: ModuleKind[]): string {
+    const shared = kinds.length > 1 ? `<p class="mod-slot">${esc(t('insp.slotShared'))}</p>` : '';
+    return `<h4 class="cat-section">${t('insp.modules')}</h4>${shared}${kinds.map((k) => this.moduleSlot(s, b, k)).join('')}`;
+  }
+
+  // One module of the slot: its state (installed, slot taken by the other one, can go on, cannot now and why), price
+  // and refund, what it changes before → after at full power and, installed, its values now; Install (greyed out
+  // with the reason) or Remove (with the refund, confirmed by a second click, saying what goes with it).
   private moduleSlot(s: GameState, b: Building, kind: ModuleKind): string {
     const def = MODULES[kind];
-    const installed = installedModules(b).includes(kind);
-    const check = installState(s, kind, b);
-    const fx = moduleRows(b.type, kind, installedModules(b));
+    const fitted = installedModules(b);
+    const installed = fitted.includes(kind);
+    const st = moduleState(s, b, kind);
+    const fx = moduleRowsOn(s, b, kind);
     const refund = costText(moduleRefund(kind));
+    const withNow = fx.some((r) => r.now !== undefined);
+    const head = withNow ? `<dt class="rows-head"></dt><dd class="rows-head">${esc(t('insp.nominal'))}</dd><dd class="rows-head">${esc(t('insp.now'))}</dd>` : '';
+    const rows = fx
+      .map((r) => {
+        const nom = `${esc(r.before)} → <b>${esc(r.after)}</b>`;
+        if (!withNow) return `<dt>${esc(rowLabel(r))}</dt><dd>${nom}</dd>`;
+        const now = r.now === undefined ? '' : esc(r.now);
+        return `<dt>${esc(rowLabel(r))}</dt><dd>${nom}</dd><dd class="now" data-mod-now="${r.stat}${r.res ? `.${r.res}` : ''}">${now}</dd>`;
+      })
+      .join('');
     let actions: string;
     if (!installed) {
       actions = `
-        <div class="insp-actions"><button type="button" class="btn" data-install="${kind}"${check.ok ? '' : ' disabled'}>${t('insp.install')}<span class="tool-cost">${costChips(def.cost)}</span></button></div>
-        <p class="cat-reason"${check.ok ? ' hidden' : ''}>${esc(check.reason ?? '')}</p>`;
+        <p class="insp-warn" data-power-warn hidden></p>
+        <div class="insp-actions"><button type="button" class="btn" data-install="${kind}"${st.state === 'available' ? '' : ' disabled'}>${t('insp.install')}<span class="tool-cost">${costChips(def.cost)}</span></button></div>
+        <p class="cat-reason"${st.reason ? '' : ' hidden'}>${esc(st.reason ?? '')}</p>`;
     } else if (this.confirmRemove === kind) {
       actions = `
         <p class="insp-warn" data-loss hidden></p>
@@ -970,10 +1089,12 @@ export class Hud {
           <span class="cat-pic"><img src="${catalogPicture(kind)}" alt="" /></span>
           <span class="mod-title">
             <b>${esc(catalogName(kind))}</b>
-            <small>${t(def.slot === 'roof' ? 'insp.slotRoof' : 'insp.slotSide')} · <span class="mod-count">${installed ? 1 : 0}/${def.limit}</span></small>
+            <small>${t(def.slot === 'roof' ? 'insp.slotRoof' : 'insp.slotSide')} · <span class="mod-count">${fitted.length}/${def.limit}</span></small>
           </span>
         </div>
-        <dl class="mod-fx">${fx.map((r) => `<dt>${rowLabel(r)}</dt><dd>${r.before} → <b>${r.after}</b></dd>`).join('')}</dl>
+        <p class="mod-state state-${st.state}" data-mod-state data-state="${st.state}">${stateHtml(st.state)}</p>
+        ${installed ? '' : `<p class="mod-price">${esc(t('insp.modPrice', { cost: costText(def.cost), refund }))}</p>`}
+        <dl class="mod-fx${withNow ? ' with-now' : ''}">${head}${rows}</dl>
         ${actions}
       </div>`;
   }
@@ -981,6 +1102,8 @@ export class Hud {
   // A selected fence, gate, lamp or floor: what it is, that it is only for looks, Rotate and Remove.
   private renderPiece(info: PieceInfo, i: number): void {
     const panel = this.el.inspector;
+    this.renderedId = -1;
+    panel.scrollTop = 0;
     panel.style.setProperty('--path', 'var(--muted)');
     panel.innerHTML = `
       <div class="insp-head">

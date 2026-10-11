@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { placeBuilding, placeCheck } from '../src/game/actions';
 import { MAP_H, MAP_W, T } from '../src/game/defs';
 import type { BuildingType } from '../src/game/defs';
-import { installModule, placePiece } from '../src/game/pieces';
+import { installModule, placePiece, removeModule } from '../src/game/pieces';
 import type { CatalogKind, ModuleKind } from '../src/game/pieces';
 import { computeDerived } from '../src/game/sim';
 import { createGame, idx } from '../src/game/state';
@@ -84,6 +84,15 @@ function setup(s = city()) {
 
 const q = (root: HTMLElement, sel: string) => root.querySelector<HTMLElement>(sel);
 
+// A row of the building panel's numbers: [at full power, now] (a value that does not change with power: [value]).
+function row(insp: HTMLElement, label: string): string[] {
+  const dt = [...insp.querySelectorAll('.insp-rows dt')].find((d) => d.textContent === label);
+  if (!dt) throw new Error(`no row ${label}`);
+  const out: string[] = [];
+  for (let el = dt.nextElementSibling; el && el.tagName === 'DD'; el = el.nextElementSibling) out.push(el.textContent!);
+  return out;
+}
+
 describe('toolbar', () => {
   it('keeps every tutorial target and adds Objects & modules (key O) next to the bulldozer', () => {
     const { root, calls, update } = setup();
@@ -110,7 +119,20 @@ describe('catalog panel', () => {
     expect(q(root, '[data-inspector]')!.hidden).toBe(true);
     expect(q(root, '[data-catalog]')!.classList.contains('active')).toBe(true);
     const items = [...panel.querySelectorAll<HTMLElement>('[data-item]')];
-    expect(items.map((b) => b.dataset.item)).toEqual(['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter']);
+    expect(items.map((b) => b.dataset.item)).toEqual([
+      'floor',
+      'fence',
+      'gate',
+      'lamp',
+      'dockStorage',
+      'smelterFilter',
+      'recyclerMagnet',
+      'recyclerSorter',
+      'factoryArm',
+      'podsCapsule',
+      'solarTracker',
+      'purifierNozzle',
+    ]);
     expect(panel.textContent).toContain('Construction');
     expect(panel.textContent).toContain('Machine modules');
     // no Dock yet: the module says why it cannot be had
@@ -189,6 +211,34 @@ describe('catalog panel', () => {
 });
 
 describe('building panel modules', () => {
+  it('the building rows read the numbers the sim uses with the module: cycle output, homes, sludge radius; one slot', () => {
+    const { s, root, update } = setup();
+    const rec = build(s, 'recycler');
+    const pods = build(s, 'pods');
+    const pur = build(s, 'purifier');
+    const insp = q(root, '[data-inspector]')!;
+    const rows = () => insp.querySelector('dl')!.textContent!;
+    update({ selectedId: rec.id });
+    expect(rows()).toContain('3 scrap → 2 parts');
+    expect(installModule(s, 'recyclerSorter', rec)).toBe(true);
+    update({ selectedId: rec.id });
+    expect(rows()).toContain('3 scrap → 3 parts');
+    // the magnet shares the slot: greyed out, with the reason in words
+    const magnet = q(insp, '[data-mod="recyclerMagnet"]')!;
+    expect(q(magnet, '[data-install]')!.hasAttribute('disabled')).toBe(true);
+    expect(magnet.querySelector('.cat-reason')!.textContent).toBe('Slot taken by Precision sorter: remove it first');
+    update({ selectedId: pods.id });
+    expect(row(insp, 'Homes')).toEqual(['6', '6']);
+    installModule(s, 'podsCapsule', pods);
+    update({ selectedId: pods.id });
+    expect(row(insp, 'Homes')).toEqual(['9', '9']);
+    update({ selectedId: pur.id });
+    expect(row(insp, 'Sludge radius (tiles)')).toEqual(['5']);
+    installModule(s, 'purifierNozzle', pur);
+    update({ selectedId: pur.id });
+    expect(row(insp, 'Sludge radius (tiles)')).toEqual(['8']);
+  });
+
   it('shows the slot, before -> after, 0/1 and Install; then 1/1 and Remove with a second click', () => {
     const { s, root, calls, update } = setup();
     const dock = build(s, 'dock');
@@ -210,7 +260,7 @@ describe('building panel modules', () => {
     const on = q(insp, '[data-mod="dockStorage"]')!;
     expect(on.querySelector('.mod-count')!.textContent).toBe('1/1');
     // the building rows now show the storage with the module
-    expect(insp.querySelector('dl')!.textContent).toContain('180 scrap');
+    expect(row(insp, 'Storage')).toEqual(['180', '180']);
     const clock = vi.spyOn(performance, 'now').mockReturnValue(10_000);
     try {
       q(on, '[data-remove]')!.click();
@@ -235,6 +285,41 @@ describe('building panel modules', () => {
     }
   });
 
+  it('a removal confirmed with a double click does not buy the module back (Install comes up where the confirmation was)', () => {
+    const { s, root, calls, update } = setup();
+    const rec = build(s, 'recycler');
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(50_000);
+    try {
+      update({ selectedId: rec.id });
+      const insp = q(root, '[data-inspector]')!;
+      q(insp, '[data-install="recyclerMagnet"]')!.click();
+      expect(calls.at(-1)).toEqual(['onInstall', rec.id, 'recyclerMagnet']);
+      expect(installModule(s, 'recyclerMagnet', rec)).toBe(true);
+      update({ selectedId: rec.id });
+      // Remove, then the confirmation with a click of its own...
+      clock.mockReturnValue(51_000);
+      q(insp, '[data-remove="recyclerMagnet"]')!.click();
+      update({ selectedId: rec.id });
+      clock.mockReturnValue(52_000);
+      q(insp, '[data-remove-confirm="recyclerMagnet"]')!.click();
+      expect(calls.at(-1)).toEqual(['onRemoveModule', rec.id, 'recyclerMagnet']);
+      expect(removeModule(s, 'recyclerMagnet', rec)).not.toBeNull();
+      update({ selectedId: rec.id });
+      // ...whose second click lands on the Install drawn where the confirmation was: nothing is bought again
+      const n = calls.length;
+      clock.mockReturnValue(52_150);
+      q(insp, '[data-install="recyclerMagnet"]')!.click();
+      expect(calls.length).toBe(n);
+      // a click of its own installs
+      clock.mockReturnValue(53_000);
+      update({ selectedId: rec.id });
+      q(insp, '[data-install="recyclerSorter"]')!.click();
+      expect(calls.at(-1)).toEqual(['onInstall', rec.id, 'recyclerSorter']);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it('greys out Install with the reason, and the demolish refund counts the modules', () => {
     const { s, root, calls, update } = setup();
     const smelter = build(s, 'smelter');
@@ -249,9 +334,10 @@ describe('building panel modules', () => {
     s.res.parts = 1000;
     expect(installModule(s, 'smelterFilter', smelter)).toBe(true);
     update({ selectedId: smelter.id });
-    // effective numbers with the filter: energy -3, smog 0.8 a day
-    expect(insp.querySelector('dl')!.textContent).toContain('-3');
-    expect(insp.querySelector('dl')!.textContent).toContain('+0.8');
+    // the numbers with the filter: energy -3, smog 0.8 a day (at full power and now)
+    expect(row(insp, 'Energy')).toEqual(['-3', '-3']);
+    expect(row(insp, 'Smog / day')[0]).toBe('+0.8');
+    expect(insp.querySelector('.insp-line')!.textContent).toBe('Cycle3 scrap → 9 credits');
     const clock = vi.spyOn(performance, 'now').mockReturnValue(20_000);
     try {
       q(insp, '[data-demolish]')!.click();

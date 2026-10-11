@@ -1,16 +1,19 @@
-// Modular building, increment 1 (docs/MODULAR-INC1.md): the rules for the six catalog items.
+// Modular building, increments 1 and 2 (docs/MODULAR-INC1.md, docs/MODULAR-INC2.md): the rules for the catalog.
 // Pieces on the map: industrial floor (a surface under everything), fence, gate and lamp (solid objects, one
-// per tile, kept in s.solid and never in s.occ). Modules on buildings: extra storage for a Bot Dock, a filter
-// for a Smelter. Everything is paid once, when the player confirms; checks and previews cost nothing.
+// per tile, kept in s.solid and never in s.occ). Modules on buildings, one slot each: extra storage for a Bot Dock,
+// a filter for a Smelter, a magnet or a sorter for a Recycler, a double arm for a 2PM Factory, a capsule for Bot
+// Pods, tracking panels for a Solar Array, a nozzle for a Purifier. Everything is paid once, when the player
+// confirms; checks and previews cost nothing.
 // No DOM here. The data and the pure helpers (PIECES, MODULES, buildingStats...) come from piecedefs.ts and
 // are re-exported, so the UI and the renderer only need this module.
-import { t } from '../i18n';
+import { t, tk } from '../i18n';
 import { T, TILE } from './defs';
 import type { Cost, Resource } from './defs';
 import { canAfford, computeStorage, costText, pay, solidReason } from './actions';
 import type { PlaceCheck } from './actions';
-import { MODULES, PIECES, installedModules, isModuleKind, isPieceKind, moduleRefund, normRot, pieceRefund, solidCode, solidKind } from './piecedefs';
+import { MODULES, PIECES, buildingStats, installedModules, isModuleKind, isPieceKind, moduleRefund, normRot, pieceRefund, solidCode, solidKind } from './piecedefs';
 import type { ModuleKind, PieceKind } from './piecedefs';
+import { computeDerived } from './sim';
 import { buildingCenter, idx, inBounds } from './state';
 import type { Building, GameState } from './state';
 
@@ -159,41 +162,71 @@ export function floorAt(s: GameState, x: number, y: number): boolean {
 const NEEDS: Record<ModuleKind, () => string> = {
   dockStorage: () => t('place.modDock'),
   smelterFilter: () => t('place.modSmelter'),
+  recyclerMagnet: () => t('place.modRecycler'),
+  recyclerSorter: () => t('place.modRecycler'),
+  factoryArm: () => t('place.modFactory'),
+  podsCapsule: () => t('place.modPods'),
+  solarTracker: () => t('place.modSolar'),
+  purifierNozzle: () => t('place.modPurifier'),
 };
 
-// Can `kind` be installed on b? Only on a finished building of the right type (paused is fine), one of each
-// kind; costOnly when only the price is missing.
+// Where a module can go, in words: "Only on a finished Recycler".
+export function moduleNeeds(kind: ModuleKind): string {
+  return isModuleKind(kind) ? NEEDS[kind]() : t('place.cannot');
+}
+
+// Can `kind` be installed on b? Only on a finished building of the right type (paused is fine) whose single module
+// slot is free: the same module again is "already installed", another one (the Recycler's magnet and sorter share
+// the slot) is "slot taken by X: remove it first". costOnly when only the price is missing.
 export function moduleCheck(s: GameState, kind: ModuleKind, b: Building): PlaceCheck {
   if (!isModuleKind(kind)) return { ok: false, reason: t('place.cannot') };
   const def = MODULES[kind];
   if (!s.buildings.includes(b) || b.type !== def.building || b.built < 1) return { ok: false, reason: NEEDS[kind]() };
-  if (installedModules(b).filter((k) => k === kind).length >= def.limit) return { ok: false, reason: t('place.modInstalled') };
+  const fitted = installedModules(b);
+  if (fitted.includes(kind)) return { ok: false, reason: t('place.modInstalled') };
+  if (fitted.length) return { ok: false, reason: t('place.modSlot', { name: tk(`mod.${fitted[0]}`) }) };
   if (!canAfford(s, def.cost)) return { ok: false, reason: t('place.costs', { cost: costText(def.cost) }), costOnly: true };
   return { ok: true };
+}
+
+// A module that changes the length of a cycle keeps the cycle's progress as a share: a Recycler 1 s into its 2 s
+// cycle is 0.75 s into the magnet's 1.5 s one (the progress bar does not jump, and no work is made up or lost).
+function keepCycleShare(b: Building, before: number): void {
+  const after = buildingStats(b).cycle;
+  if (before > 0 && after > 0 && after !== before) b.timer = Math.min(after, (b.timer * after) / before);
+}
+
+// The city's numbers (power, homes, storage) follow a module at once, not at the next step.
+function refreshCity(s: GameState): void {
+  computeDerived(s);
+  computeStorage(s);
 }
 
 // Buys and installs a module (paid once). The effect is immediate.
 export function installModule(s: GameState, kind: ModuleKind, b: Building): boolean {
   if (!moduleCheck(s, kind, b).ok) return false;
+  const cycle = buildingStats(b).cycle;
   pay(s, MODULES[kind].cost);
-  b.modules = installedModules({ type: b.type, modules: [...(b.modules ?? []), kind] });
+  b.modules = [kind];
+  keepCycleShare(b, cycle);
   s.stats.modulesInstalled++;
-  computeStorage(s);
+  refreshCity(s);
   s.fx.push({ kind: 'placed', ...buildingCenter(b) });
   return true;
 }
 
 // Takes a module off (the building stays) and gives back half its price. Scrap above the storage that is
-// left is lost, as when a Dock is demolished. Null when the module is not there.
+// left is lost, as when a Dock is demolished; citizens above the homes that are left move out at the next step,
+// as when Bot Pods are demolished. Null when the module is not there.
 export function removeModule(s: GameState, kind: ModuleKind, b: Building): Cost | null {
   // only a module that really counts on this building (as in demolishRefund) is refunded
   if (!s.buildings.includes(b) || !b.modules || !installedModules(b).includes(kind)) return null;
-  const left = b.modules.filter((k) => k !== kind);
-  if (left.length) b.modules = left;
-  else delete b.modules;
+  const cycle = buildingStats(b).cycle;
+  delete b.modules; // one slot: nothing else can be on it
+  keepCycleShare(b, cycle);
   const refund = moduleRefund(kind);
   giveBack(s, refund);
-  computeStorage(s);
+  refreshCity(s);
   s.fx.push({ kind: 'demolish', ...buildingCenter(b), text: `+${costText(refund)}` });
   return refund;
 }

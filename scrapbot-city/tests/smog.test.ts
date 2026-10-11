@@ -121,6 +121,27 @@ describe('where the smog comes from and where it goes', () => {
     expect(airReport(s).notes).toHaveLength(2);
   });
 
+  it('with the increment-2 modules (the double arm\'s extra smog, the nozzle) the parts still add up exactly', () => {
+    const s = industrialCity();
+    const factory = s.buildings.find((b) => b.type === 'factory')!;
+    const purifier = s.buildings.find((b) => b.type === 'purifier')!;
+    expect(installModule(s, 'factoryArm', factory)).toBe(true);
+    expect(installModule(s, 'purifierNozzle', purifier)).toBe(true);
+    for (const b of s.buildings.filter((o) => o.type === 'solar')) expect(installModule(s, 'solarTracker', b)).toBe(true);
+    let steps = 0;
+    run(s, DAY_LENGTH / 2, () => {
+      steps++;
+      expect(Math.abs(partsSum(s) - s.derived.pollutionRate), `step ${steps}`).toBeLessThan(1e-12);
+    });
+    // the arm's Factory puts 0.09 a second into the air at full power (0.06 without it); the nozzle cleans the air
+    // as before (it widens the sludge radius only)
+    expect(factory.status).toBe('ok');
+    expect(s.derived.efficiency).toBe(1);
+    expect(s.derived.air.byType.factory).toBeCloseTo(0.09, 12);
+    expect(s.derived.air.byType.factory).toBe(airEffect(s, factory));
+    expect(s.derived.air.byType.purifier).toBeCloseTo(-0.08, 12);
+  });
+
   it('clean air: nothing to renew at 0%', () => {
     const s = createGame({ seed: 71 });
     s.pollution = 0;

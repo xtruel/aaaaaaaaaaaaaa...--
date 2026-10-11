@@ -22,6 +22,7 @@ const ICON_PAL: Record<string, string> = {
   V: PAL.purple,
   N: PAL.green,
   B: PAL.sky,
+  X: PAL.red,
 };
 
 const ICONS = {
@@ -42,6 +43,15 @@ const ICONS = {
   blimp: ['........', '.KKKKKK.', 'KPWWWWPK', 'KPWPPWPK', 'KPWWWWPK', '.KKKKKK.', '...KSK..', '...KKK..'],
   lock: ['..KKKK..', '.KK..KK.', '.K....K.', 'KKKKKKKK', 'KYYYYYYK', 'KYYKKYYK', 'KYYYYYYK', 'KKKKKKKK'],
   gear: ['..KKKK..', 'KKOOOOKK', 'KOOKKOOK', 'KOKSSKOK', 'KOKSSKOK', 'KOOKKOOK', 'KKOOOOKK', '..KKKK..'],
+  // why a building is in its state, next to the words of the building panel (0.7): built, paused, no power, waiting
+  wrench: ['KKKKK...', 'KSSSSK..', 'KSSSSK..', 'KKKOKK..', '...KOK..', '...KOK..', '...KOK..', '...KKK..'],
+  pause: ['KKK..KKK', 'KWK..KWK', 'KWK..KWK', 'KWK..KWK', 'KWK..KWK', 'KWK..KWK', 'KWK..KWK', 'KKK..KKK'],
+  nopower: ['X...KKK.', '.X.KwwK.', '..XwwK..', '.KwXwwK.', '.KKKXwK.', '..KwwX..', '.KwK..X.', '.KK....X'],
+  wait: ['KKKKKKKK', '.KYYYYK.', '..KYYK..', '...KK...', '...KK...', '..KwYK..', '.KYYYYK.', 'KKKKKKKK'],
+  // a module's state in the building panel: installed, cannot be had now, can be installed
+  check: ['.......K', '......KG', '.....KGK', 'K...KGK.', 'GK.KGK..', 'KGKGK...', '.KGK....', '..K.....'],
+  cross: ['KK....KK', 'KXK..KXK', '.KXKKXK.', '..KXXK..', '..KXXK..', '.KXKKXK.', 'KXK..KXK', 'KK....KK'],
+  plus: ['..KKKK..', '..KGGK..', 'KKKGGKKK', 'KGGGGGGK', 'KGGGGGGK', 'KKKGGKKK', '..KGGK..', '..KKKK..'],
 } satisfies Record<string, string[]>;
 
 export type IconName = keyof typeof ICONS;

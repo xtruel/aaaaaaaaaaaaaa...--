@@ -20,10 +20,14 @@ import { t } from './i18n';
 import { localizeKeys } from './keys';
 import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
+import type { ViewState } from './render/renderer';
+import { buildingArt } from './render/iso/atlas';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
 import { dozeTarget, isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo } from './ui/catalog';
 import type { DozeTarget } from './ui/catalog';
+import { pickAt } from './ui/pick';
+import type { LastPick, PickResult } from './ui/pick';
 import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
@@ -96,6 +100,8 @@ export class GameSession implements PadTarget {
   private row: Row | null = null;
   private rotAcc = 0; // Shift+wheel, added up like the zoom
   private selectedId = -1;
+  private lastPick: LastPick | null = null; // the last click on a building (a second one there reaches what it hides)
+  private revealed: PickResult | null = null; // a selection reached behind another building (drawn through it)
   private hover: { x: number; y: number } | null = null;
   private hoverId = -1; // building under the pointer (its visible pixels)
   private dozeTile = -1; // with the bulldozer: the tile its click acts on when that is not a building (-1 none)
@@ -358,6 +364,7 @@ export class GameSession implements PadTarget {
           // a row dragged over a panel or the toolbar is not laid there: its ghosts go until it is back on the map
           pieceRow: this.row && this.row.tiles.length > 1 && this.pointer.inside ? this.row.tiles : null,
           pieceLabel: this.pieceLabel(),
+          reveal: this.revealArea(),
         },
         dt,
         running,
@@ -470,10 +477,13 @@ export class GameSession implements PadTarget {
     this.hoverId = placing ? -1 : this.renderer.pickBuilding(this.pointer.x, this.pointer.y);
   }
 
-  private dozeTarget(sx: number, sy: number): DozeTarget {
+  // What a bulldozer click at this screen point acts on (also what lights up under the pointer), and the building
+  // drawn there: the target differs from it when the click reaches a building shown through it.
+  private dozeTarget(sx: number, sy: number): DozeTarget & { picked: number } {
     const r = this.renderer;
     const tile = r.screenToTile(sx, sy);
-    return dozeTarget(this.s, tile.x, tile.y, r.pickBuilding(sx, sy), () => r.pickPiece(sx, sy));
+    const picked = r.pickBuilding(sx, sy);
+    return { ...dozeTarget(this.s, tile.x, tile.y, picked, () => r.pickPiece(sx, sy)), picked };
   }
 
   // The map is what a press at this screen point reaches, not a panel, the toolbar or other HUD over it.
@@ -500,6 +510,24 @@ export class GameSession implements PadTarget {
     if (!p || !isModuleKind(p.kind) || !this.pointer.inside || !this.hover) return null;
     const b = this.moduleTarget(this.pointer.x, this.pointer.y);
     return b && moduleCheck(this.s, p.kind, b).ok ? moduleLabel(b, p.kind) : null;
+  }
+
+  // The ground area of a selection reached behind another building, while it is still the selection.
+  private revealArea(): ViewState['reveal'] {
+    const r = this.revealed;
+    if (!r) return null;
+    if (r.building >= 0 && r.building === this.selectedId) {
+      const b = this.s.buildings.find((o) => o.id === r.building);
+      if (!b) return null;
+      const def = BUILDINGS[b.type];
+      return { x0: b.x, y0: b.y, x1: b.x + def.w, y1: b.y + def.h, height: buildingArt[b.type]?.height ?? 24 };
+    }
+    if (r.piece >= 0 && r.piece === this.selectedPiece) {
+      const x = r.piece % MAP_W;
+      const y = Math.floor(r.piece / MAP_W);
+      return { x0: x, y0: y, x1: x + 1, y1: y + 1, height: 22 };
+    }
+    return null;
   }
 
   // The building a module would go on: the one drawn under the point, else the one standing on that tile.
@@ -814,10 +842,19 @@ export class GameSession implements PadTarget {
     // what you see is what you click: a building's roof or walls select it even over another tile
     const picked = this.renderer.pickBuilding(sx, sy);
     if (picked >= 0) {
-      this.selectBuilding(picked);
+      // a second click there reaches the building or piece it hides on that tile (src/ui/pick.ts)
+      const ground = inBounds(tile.x, tile.y) ? idx(tile.x, tile.y) : -1;
+      const now = performance.now();
+      const pick = pickAt(s, picked, tile.x, tile.y, { selected: this.selectedId, last: this.lastPick, now });
+      this.lastPick = { tile: ground, id: picked, at: now };
+      if (pick.piece >= 0) this.selectPiece(pick.piece);
+      else this.selectBuilding(pick.building);
+      // reached behind the building drawn there: that one turns see-through while the selection lasts
+      this.revealed = pick.building === picked ? null : pick;
       audio.play('click');
       return;
     }
+    this.lastPick = null;
     if (picked === -2) {
       this.petCat();
       return;
@@ -855,8 +892,11 @@ export class GameSession implements PadTarget {
   private doze(sx: number, sy: number): void {
     const s = this.s;
     const target = this.dozeTarget(sx, sy);
+    this.lastPick = null;
     if (target.kind === 'building') {
       this.selectBuilding(target.id);
+      // a building shown through the one drawn there (the Garden behind the Spire): that one stays see-through
+      this.revealed = target.picked >= 0 && target.id !== target.picked ? { building: target.id, piece: -1 } : null;
       audio.play('click');
     } else if (target.kind === 'rubble') {
       if (!bulldozeRubble(s, target.i % MAP_W, Math.floor(target.i / MAP_W))) audio.play('error');

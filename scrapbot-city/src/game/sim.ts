@@ -31,6 +31,8 @@ const TAX_PER_CITIZEN = 0.05;
 const BASE_INCOME = 0.25;
 const WASTE_PER_CITIZEN = 0.012;
 const WASTE_CHUNK = 6;
+// A Purifier cleans one sludge tile every 6 s at full power (its module widens the radius, never this pace).
+export const CLEAN_EVERY = 6;
 
 export function step(s: GameState, dt: number): void {
   if (s.outcome || s.pendingEvent) return;
@@ -39,7 +41,7 @@ export function step(s: GameState, dt: number): void {
 
   burnFuel(s, dt);
   computeDerived(s);
-  const overtime = s.time < s.overtimeUntil ? 1.5 : 1;
+  const overtime = overtimeFactor(s);
 
   // Recyclers go first: parts are what everything is built with, so they get the scrap before Smelters do.
   for (const b of s.buildings) if (b.type === 'recycler') tickBuilding(s, b, dt, overtime);
@@ -85,6 +87,11 @@ export function step(s: GameState, dt: number): void {
   if (day(s) !== dayBefore) pushMessage(s, t('msg.newDay', { n: day(s) }), 'info');
 }
 
+// The overtime event: production, industry smog and the bots x1.5 while it lasts (60 s), else 1.
+export function overtimeFactor(s: GameState): number {
+  return s.time < s.overtimeUntil ? 1.5 : 1;
+}
+
 // Advances the city by realDt seconds of wall time at the given speed, in fixed SIM_STEP steps.
 // Returns the leftover time to carry into the next frame. At most 16 steps run per frame (a very slow
 // frame drops the rest instead of freezing the game); a pending event or an ending stops the steps.
@@ -126,10 +133,11 @@ export function computeDerived(s: GameState): void {
   for (const b of s.buildings) {
     if (b.built < 1) continue;
     const def = BUILDINGS[b.type];
-    const st = buildingStats(b); // energy and storage with the modules installed
-    if (st.energy > 0 && (!def.fuel || b.fuel > 0)) d.energyProd += st.energy;
-    if (st.energy < 0 && !b.paused) d.energyUse -= st.energy;
-    d.housing += def.housing ?? 0;
+    const st = buildingStats(b); // energy, homes and storage with the module installed
+    const energy = energyEffect(b);
+    if (energy > 0) d.energyProd += energy;
+    else if (energy < 0) d.energyUse -= energy;
+    d.housing += st.housing;
     d.storage += st.storage;
     d.botTarget += def.bots ?? 0;
     happy += def.happiness ?? 0;
@@ -137,6 +145,15 @@ export function computeDerived(s: GameState): void {
   d.efficiency = d.energyUse === 0 ? 1 : Math.min(1, d.energyProd / d.energyUse);
   const shortage = d.efficiency < 1 ? 10 : 0;
   d.happiness = clamp(55 - s.pollution * 0.5 + Math.min(25, happy) + s.happyMod + s.mods.happiness - shortage, 0, 100);
+}
+
+// What a finished building adds to the city's power (+) or takes from it (-) right now: a plant while it runs (a
+// Burner only while it has fuel), a consumer unless paused. computeDerived adds these up; the building panel shows them.
+export function energyEffect(b: Building): number {
+  if (b.built < 1) return 0;
+  const st = buildingStats(b);
+  if (st.energy > 0) return !BUILDINGS[b.type].fuel || b.fuel > 0 ? st.energy : 0;
+  return st.energy < 0 && !b.paused ? st.energy : 0;
 }
 
 function tickBuilding(s: GameState, b: Building, dt: number, overtime: number): void {
@@ -157,15 +174,20 @@ function tickBuilding(s: GameState, b: Building, dt: number, overtime: number): 
   } else {
     b.status = 'ok';
   }
-  if (def.cleanRadius && !b.paused) cleanSludge(s, b, dt * d.efficiency);
+  if (buildingStats(b).cleanRadius > 0 && !b.paused) cleanSludge(s, b, dt * d.efficiency);
   if (b.type === 'garden') growGrass(s, b, dt);
+}
+
+// How fast a building goes up (1 = its normal build time). The Spire is built by the whole city: it slows down
+// without power, to a quarter at worst.
+export function buildRate(s: GameState, b: Building): number {
+  return b.type === 'spire' ? Math.max(0.25, s.derived.efficiency) : 1;
 }
 
 function updateConstruction(s: GameState, b: Building, dt: number): void {
   const def = BUILDINGS[b.type];
   b.status = 'building';
-  // The Spire is built by the whole city: it slows down without power.
-  const rate = b.type === 'spire' ? Math.max(0.25, s.derived.efficiency) : 1;
+  const rate = buildRate(s, b);
   b.built = Math.min(1, b.built + (dt * rate) / Math.max(0.1, def.buildTime));
   if (b.built >= 1) {
     b.status = 'ok';
@@ -184,7 +206,7 @@ function updateConstruction(s: GameState, b: Building, dt: number): void {
 }
 
 function runProcess(s: GameState, b: Building, work: number): void {
-  const p = BUILDINGS[b.type].process!;
+  const p = buildingStats(b); // seconds, input and output of a cycle, with the module installed
   if (work <= 0) {
     b.status = 'noPower';
     return;
@@ -193,13 +215,13 @@ function runProcess(s: GameState, b: Building, work: number): void {
   if (!canAfford(s, p.input) || s.res.parts - (p.input.parts ?? 0) < keep) {
     // Hold the finished cycle until inputs show up (parts makers leave a reserve for building).
     b.status = canAfford(s, p.input) ? 'reserve' : 'noInput';
-    b.timer = Math.min(b.timer + work, p.time);
+    b.timer = Math.min(b.timer + work, p.cycle);
     return;
   }
   b.status = 'ok';
   b.timer += work;
-  if (b.timer >= p.time) {
-    b.timer -= p.time;
+  if (b.timer >= p.cycle) {
+    b.timer -= p.cycle;
     pay(s, p.input);
     gain(s, p.output);
     b.lastWork = s.time;
@@ -214,7 +236,7 @@ function runProcess(s: GameState, b: Building, work: number): void {
 // What a building puts into the air (+) or takes out of it (-) per second right now: industry while it runs (slower
 // without enough power, faster on overtime), a Burner while it has fuel, a Purifier or a Garden unless paused.
 // updatePollution adds these up; the smog panel and the clouds on the map show the same numbers.
-export function airEffect(s: GameState, b: Building, overtime = s.time < s.overtimeUntil ? 1.5 : 1): number {
+export function airEffect(s: GameState, b: Building, overtime = overtimeFactor(s)): number {
   if (b.built < 1) return 0;
   const st = buildingStats(b); // a Smelter filter lowers the Smelter's pollution
   if (st.pollution > 0) {
@@ -283,9 +305,9 @@ function updateCitizens(s: GameState, dt: number): void {
 function cleanSludge(s: GameState, b: Building, dt: number): void {
   const def = BUILDINGS[b.type];
   b.cleanTimer += dt;
-  if (b.cleanTimer < 6) return;
+  if (b.cleanTimer < CLEAN_EVERY) return;
   b.cleanTimer = 0;
-  const r = def.cleanRadius ?? 0;
+  const r = buildingStats(b).cleanRadius; // the nozzle widens the reach, the pace stays one tile every 6 s
   const cx = b.x + def.w / 2;
   const cy = b.y + def.h / 2;
   let best = -1;

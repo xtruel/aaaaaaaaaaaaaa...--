@@ -119,8 +119,9 @@ function wealth(s: GameState): Record<Resource, number> {
 }
 
 describe('catalog data (the owner-approved table)', () => {
-  it('has exactly the six items with the agreed prices, refunds and effects', () => {
-    expect(CATALOG_ORDER).toEqual(['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter']);
+  it('has the six items of increment 1 with the agreed prices, refunds and effects (increment 2 modules follow)', () => {
+    // increment 2 appends its six modules (tests/modules.test.ts); the first six stay as they were
+    expect(CATALOG_ORDER.slice(0, 6)).toEqual(['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter']);
     expect(PIECES.floor).toMatchObject({ layer: 'surface', cost: { credits: 3 }, rotations: 1 });
     expect(PIECES.fence).toMatchObject({ layer: 'solid', cost: { credits: 4 }, rotations: 2, joins: true });
     expect(PIECES.gate).toMatchObject({ layer: 'solid', cost: { credits: 12 }, rotations: 2 });
@@ -138,7 +139,16 @@ describe('catalog data (the owner-approved table)', () => {
   it('without modules every building keeps its 0.6 numbers (cities play exactly as before)', () => {
     for (const type of Object.keys(BUILDINGS) as BuildingType[]) {
       const def = BUILDINGS[type];
-      expect(buildingStats({ type })).toEqual({ energy: def.energy, pollution: def.pollution, storage: def.storage ?? 0 });
+      expect(buildingStats({ type })).toEqual({
+        energy: def.energy,
+        pollution: def.pollution,
+        storage: def.storage ?? 0,
+        housing: def.housing ?? 0,
+        cycle: def.process?.time ?? 0,
+        input: def.process?.input ?? {},
+        output: def.process?.output ?? {},
+        cleanRadius: def.cleanRadius ?? 0,
+      });
       expect(buildingStats({ type, modules: [] })).toEqual(buildingStats({ type }));
     }
   });

@@ -8,7 +8,7 @@ import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { costText, placeCheck } from '../game/actions';
 import type { PlaceCheck } from '../game/actions';
-import { MODULES, PIECES, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
+import { MODULES, PIECES, buildingStats, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
 import type { CatalogKind, ModuleKind, PieceKind, SolidKind } from '../game/pieces';
 import { airEffect, dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
@@ -19,7 +19,7 @@ import { drawPixelText, pixelTextWidth } from './pixelfont';
 import { PAL } from './sprites';
 import { atlasImage, buildingArt, citizenVariants, decorArt, frame, opaqueAt, variantArt, variantKey, whenAtlasReady } from './iso/atlas';
 import type { BuildingArtMeta, Frame } from './iso/atlas';
-import { DepthSorter } from './iso/depth';
+import { DepthSorter, standsInFront } from './iso/depth';
 import type { DepthItem } from './iso/depth';
 import { groundAt, tileAt, tileTop } from './iso/projection';
 import { Walkers, isCanal, isRoadCol, isRoadRow, placeScenery, ringKey } from './iso/life';
@@ -63,6 +63,9 @@ export interface ViewState {
   selectedPiece?: number;
   pieceRow?: { x: number; y: number }[] | null;
   pieceLabel?: string | null;
+  // a selection reached behind a building (src/ui/pick.ts): its ground area, tiles [x0, x1) x [y0, y1), and how tall
+  // it stands; the buildings in front of it are drawn see-through so it shows. Left out = none
+  reveal?: { x0: number; y0: number; x1: number; y1: number; height: number } | null;
 }
 
 interface BotVis {
@@ -1009,6 +1012,21 @@ export class Renderer {
   }
 
   private updateFocus(view: ViewState): void {
+    const r = view.reveal;
+    if (r && !view.build && !view.bulldoze && !view.piece) {
+      // a building or piece selected behind another one: what stands in front of it turns see-through
+      this.focus = {
+        x0: r.x0 * TILE,
+        x1: r.x1 * TILE,
+        y0: r.y0 * TILE,
+        y1: r.y1 * TILE,
+        sx0: (r.x0 - r.y1) * TILE,
+        sx1: (r.x1 - r.y0) * TILE,
+        sy0: ((r.x0 + r.y0) * TILE) / 2 - r.height,
+        sy1: ((r.x1 + r.y1) * TILE) / 2,
+      };
+      return;
+    }
     if (!view.build && this.ghosts.length && view.piece && isPieceKind(view.piece.kind)) {
       // pieces being laid, one or a dragged row: the box around their ghosts
       let x0 = Infinity;
@@ -1073,13 +1091,7 @@ export class Renderer {
     if (!f) return false;
     if (sx >= f.sx1 || sy >= f.sy1 || sx + w <= f.sx0 || sy + h <= f.sy0) return false;
     const def = BUILDINGS[b.type];
-    const bx0 = b.x * TILE;
-    const by0 = b.y * TILE;
-    const bx1 = (b.x + def.w) * TILE;
-    const by1 = (b.y + def.h) * TILE;
-    const focusBehind = f.x1 <= bx0 || f.y1 <= by0;
-    const buildingBehind = bx1 <= f.x0 || by1 <= f.y0;
-    return focusBehind && !buildingBehind;
+    return standsInFront({ x0: b.x * TILE, y0: b.y * TILE, x1: (b.x + def.w) * TILE, y1: (b.y + def.h) * TILE }, f);
   }
 
   private resolvePulses(s: GameState, dt: number): void {
@@ -1509,7 +1521,8 @@ export class Renderer {
 
   private drawGroundMarks(s: GameState, view: ViewState, camX: number, camY: number): void {
     const selected = view.selectedId >= 0 ? s.buildings.find((b) => b.id === view.selectedId) : undefined;
-    if (selected && BUILDINGS[selected.type].cleanRadius) this.drawRadius(selected.x, selected.y, selected.type, camX, camY);
+    // the radius the sim cleans: 8 tiles with the Purifier's nozzle
+    if (selected && BUILDINGS[selected.type].cleanRadius) this.drawRadius(selected.x, selected.y, selected.type, camX, camY, buildingStats(selected).cleanRadius);
     if (view.piece?.kind === 'floor') this.drawFloorGhosts(camX, camY);
     const h = view.hover;
     // a catalog tool shows its own preview (drawPiecePreview)
@@ -1824,9 +1837,9 @@ export class Renderer {
     }
   }
 
-  private drawRadius(tx: number, ty: number, type: BuildingType, camX: number, camY: number): void {
+  private drawRadius(tx: number, ty: number, type: BuildingType, camX: number, camY: number, radius = BUILDINGS[type].cleanRadius ?? 0): void {
     const def = BUILDINGS[type];
-    const r = (def.cleanRadius ?? 0) * TILE;
+    const r = radius * TILE;
     const cx = (tx + def.w / 2) * TILE;
     const cy = (ty + def.h / 2) * TILE;
     const ctx = this.ctx;
@@ -2117,26 +2130,53 @@ export class Renderer {
       if (!art) continue;
       const working = isWorking(s, b);
       const top = tileTop(b.x, b.y);
+      // Smoke and steam follow what the building puts into the air right now (the sim's airEffect: slower on a power
+      // shortage, x1.5 on overtime, none when it stops). The plain building's chimneys keep their 6 puffs a second at
+      // full power; a module's extra point (the double arm's exhaust) adds the module's extra smoke on top, so two
+      // points never halve the chimney's smoke.
       const smoke = art.points.smoke;
-      if (working && smoke && Math.random() < dt * 6) {
-        const p = smoke[Math.floor(Math.random() * smoke.length)];
+      if (working && smoke) {
+        const st = buildingStats(b);
+        const pace = st.pollution > 0 ? airEffect(s, b) / st.pollution : 1; // power share x overtime
+        const mul = BUILDINGS[b.type].pollution > 0 ? st.pollution / BUILDINGS[b.type].pollution : 1; // the module's
+        const own = Math.min(smoke.length, buildingArt[b.type]?.points.smoke?.length ?? smoke.length);
         const dirty = s.pollution > 60 ? '#4a3c32' : '#6d6878';
-        this.spawn(top.X + p[0], top.Y + p[1], 4 + Math.random() * 6, -8 - Math.random() * 6, 2.6, 2, dirty, 1.4);
+        for (let k = 0; k < smoke.length; k++) {
+          const rate = k < own ? (6 * pace * Math.min(1, mul)) / own : (6 * pace * Math.max(0, mul - 1)) / (smoke.length - own);
+          if (Math.random() >= dt * rate) continue;
+          const p = smoke[k];
+          this.spawn(top.X + p[0], top.Y + p[1], 4 + Math.random() * 6, -8 - Math.random() * 6, 2.6, 2, dirty, 1.4);
+        }
       }
-      // light, thin steam, much sparser than smoke
+      // light, thin steam, much sparser than smoke (as much as the filtered smoke it stands for)
       const steam = art.points.steam;
-      if (working && steam && Math.random() < dt * 2) {
-        const p = steam[0];
-        this.spawn(top.X + p[0] + (Math.random() - 0.5) * 3, top.Y + p[1], 2 + Math.random() * 4, -9 - Math.random() * 5, 1.6, 1, Math.random() < 0.5 ? '#e4e2ee' : '#c3c0d4', 1.2);
+      if (working && steam) {
+        const st = buildingStats(b);
+        const pace = st.pollution > 0 ? airEffect(s, b) / st.pollution : 1;
+        if (Math.random() < dt * 2 * pace) {
+          const p = steam[0];
+          this.spawn(top.X + p[0] + (Math.random() - 0.5) * 3, top.Y + p[1], 2 + Math.random() * 4, -9 - Math.random() * 5, 1.6, 1, Math.random() < 0.5 ? '#e4e2ee' : '#c3c0d4', 1.2);
+        }
       }
       const spark = art.points.spark;
       if (working && spark && Math.random() < dt * 3) {
         const p = spark[0];
         this.spawn(top.X + p[0] + (Math.random() - 0.5) * 6, top.Y + p[1], (Math.random() - 0.5) * 10, -12 - Math.random() * 8, 0.8, 1, PAL.lime, 0);
       }
-      if (b.type === 'purifier' && s.derived.efficiency > 0 && Math.random() < dt * 2) {
+      // a Purifier's droplets and its nozzle's mist only while it cleans (not paused, not without power), as fast as
+      // the power it gets lets it
+      if (b.type === 'purifier' && working && Math.random() < dt * 2 * s.derived.efficiency) {
         const def = BUILDINGS[b.type];
         this.spawn(top.X + ((def.w - def.h) * TILE) / 2, top.Y - (art.height - 4), (Math.random() - 0.5) * 6, -10, 1.2, 1, PAL.cyan, 0);
+      }
+      // the extended nozzle's spray: pale specks drifting down from its head
+      const mist = art.points.mist;
+      if (mist && working) {
+        const p = mist[0];
+        for (let n = 0; n < 2; n++) {
+          if (Math.random() >= dt * 4 * s.derived.efficiency) continue;
+          this.spawn(top.X + p[0] + (Math.random() - 0.5) * 4, top.Y + p[1] + 2, (Math.random() - 0.5) * 8, 6 + Math.random() * 6, 1.1, 1, Math.random() < 0.5 ? '#dff6f4' : '#a9e8ec', 0.5);
+        }
       }
       if (b.type === 'garden' && s.pollution < 50 && Math.random() < dt * 0.4) {
         this.spawn(top.X, top.Y + 2, 6, 4, 2, 1, PAL.greenL, 0);

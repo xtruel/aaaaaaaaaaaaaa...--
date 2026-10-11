@@ -77,9 +77,11 @@ function row3(s: GameState): { x: number; y: number }[] {
 }
 
 describe('catalog wording', () => {
-  it('lists the four construction pieces, then the two machine modules, each with a name, effect and limit', () => {
+  it('lists the four construction pieces, then the machine modules, each with a name, effect and limit', () => {
     expect(CONSTRUCTION).toEqual(['floor', 'fence', 'gate', 'lamp']);
-    expect(MACHINE_MODULES).toEqual(['dockStorage', 'smelterFilter']);
+    expect(MACHINE_MODULES).toEqual(['dockStorage', 'smelterFilter', 'recyclerMagnet', 'recyclerSorter', 'factoryArm', 'podsCapsule', 'solarTracker', 'purifierNozzle']);
+    // every module has its name (the "slot taken by" reason uses it)
+    for (const kind of MACHINE_MODULES) expect(catalogName(kind), kind).not.toMatch(/^mod\./);
     for (const kind of [...CONSTRUCTION, ...MACHINE_MODULES]) {
       for (const text of [catalogName(kind), catalogEffect(kind), catalogLimit(kind)]) {
         expect(text, kind).not.toMatch(/^(pc|mod|cat)\./);
@@ -102,8 +104,9 @@ describe('catalog wording', () => {
       { stat: 'smog', before: '+2.1', after: '+0.8' },
       { stat: 'energy', before: '-2', after: '-3' },
     ]);
-    // a module that is already there is not counted twice in its own "before"
-    expect(moduleRows('dock', 'dockStorage', ['dockStorage'])).toEqual([{ stat: 'storage', before: '80', after: '180' }]);
+    // one slot: the "before" is always the plain building, whatever is installed (the sorter's numbers do not
+    // change when the magnet holds the slot)
+    expect(moduleRows('recycler', 'recyclerSorter')[0]).toEqual({ stat: 'output', res: 'parts', before: '2', after: '3' });
     expect(catalogEffect('dockStorage')).toBe('Bot Dock storage 80 → 180 scrap');
     expect(catalogEffect('smelterFilter')).toBe('Smelter smog +2.1 → +0.8 per day, energy -2 → -3, same output');
   });
@@ -141,6 +144,19 @@ describe('what can be bought now', () => {
     s.res.parts = 0;
     expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, reason: 'Missing 15 parts' });
     expect(catalogState(s, 'smelterFilter')).toEqual({ ok: false, reason: t('place.modSmelter') });
+  });
+
+  it('the Recycler slot: the sorter is not on offer where every Recycler has the magnet, and says why', () => {
+    const s = city();
+    const a = build(s, 'recycler');
+    const b = build(s, 'recycler');
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: true });
+    installModule(s, 'recyclerMagnet', a);
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: true }); // the second Recycler is free
+    installModule(s, 'recyclerMagnet', b);
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: false, reason: 'Slot taken by Magnetic separator: remove it first' });
+    expect(catalogState(s, 'recyclerMagnet')).toEqual({ ok: false, reason: t('place.modInstalled') });
+    expect(installState(s, 'recyclerSorter', a)).toEqual({ ok: false, reason: 'Slot taken by Magnetic separator: remove it first' });
   });
 
   it('on one building: moduleCheck, with what is missing instead of the whole price', () => {
