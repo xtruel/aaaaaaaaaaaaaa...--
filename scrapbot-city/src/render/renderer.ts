@@ -1082,7 +1082,9 @@ export class Renderer {
 
   private updateFocus(view: ViewState): void {
     const r = view.reveal;
-    if (r && !view.build && !view.bulldoze && !view.piece) {
+    // (the bulldozer over the map shows through to the tile under the pointer instead, below; off the map, on the
+    // panel that demolishes what it selected behind another building, that one stays shown)
+    if (r && !view.build && !view.piece && !(view.bulldoze && view.hover)) {
       // a building or piece selected behind another one: what stands in front of it turns see-through
       this.focus = {
         x0: r.x0 * TILE,
