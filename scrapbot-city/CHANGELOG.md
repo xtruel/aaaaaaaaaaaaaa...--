@@ -19,7 +19,11 @@
     una riga quando una parte non può tornare) e la rimozione paga esattamente quella, ruspa compresa.
 - Si ruotano come il lampione (`R`, `Shift`+rotella, il pulsante «⟳ Ruota», `Y` sul controller), prima di posarle o dal
   loro pannello; l'anteprima mostra già direzione e aspetto (fiori, simbolo) che avranno. Il pannello di una decorazione
-  selezionata dice «Decorazioni», «Decorazione: nessun effetto sull'economia», «Ruota» se ruota e «Rimuovi (+rimborso)».
+  selezionata dice «Decorazioni», «Decorazione: nessun effetto sull'economia», «Ruota» se ruota e «Rimuovi (+rimborso)»
+  (i pulsanti prima della descrizione, così su una finestra bassa restano in vista).
+- **Si clicca quello che si vede**: un lampione o una decorazione davanti a un edificio prende il clic sui propri pixel
+  (selezione, ruspa, evidenziazione); prima metà di un'insegna davanti al Quartier Generale selezionava l'edificio.
+  Recinzioni e cancelli restano «trasparenti» al clic come nell'incremento 1.
 - **Nessun effetto su economia, felicità, smog, allineamento, stelle o achievement**: una città con decine di
   decorazioni gioca byte per byte come la stessa città senza (test con il pilota automatico). Salvataggi: codici 4
   panchina … 9 scultura, in coda a recinzione 1, cancello 2, lampione 3; i salvataggi vecchi si caricano come prima.
