@@ -60,6 +60,9 @@ export interface ViewState {
   selectedPiece?: number;
   pieceRow?: { x: number; y: number }[] | null;
   pieceLabel?: string | null;
+  // a selection reached behind a building (src/ui/pick.ts): its ground area, tiles [x0, x1) x [y0, y1), and how tall
+  // it stands; the buildings in front of it are drawn see-through so it shows. Left out = none
+  reveal?: { x0: number; y0: number; x1: number; y1: number; height: number } | null;
 }
 
 interface BotVis {
@@ -880,6 +883,21 @@ export class Renderer {
   }
 
   private updateFocus(view: ViewState): void {
+    const r = view.reveal;
+    if (r && !view.build && !view.bulldoze && !view.piece) {
+      // a building or piece selected behind another one: what stands in front of it turns see-through
+      this.focus = {
+        x0: r.x0 * TILE,
+        x1: r.x1 * TILE,
+        y0: r.y0 * TILE,
+        y1: r.y1 * TILE,
+        sx0: (r.x0 - r.y1) * TILE,
+        sx1: (r.x1 - r.y0) * TILE,
+        sy0: ((r.x0 + r.y0) * TILE) / 2 - r.height,
+        sy1: ((r.x1 + r.y1) * TILE) / 2,
+      };
+      return;
+    }
     if (!view.build && this.ghosts.length && view.piece && isPieceKind(view.piece.kind)) {
       // pieces being laid, one or a dragged row: the box around their ghosts
       let x0 = Infinity;

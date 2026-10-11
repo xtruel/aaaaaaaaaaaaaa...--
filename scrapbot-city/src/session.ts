@@ -20,11 +20,13 @@ import { t } from './i18n';
 import { localizeKeys } from './keys';
 import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
+import type { ViewState } from './render/renderer';
+import { buildingArt } from './render/iso/atlas';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
 import { isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo } from './ui/catalog';
 import { pickAt } from './ui/pick';
-import type { LastPick } from './ui/pick';
+import type { LastPick, PickResult } from './ui/pick';
 import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
@@ -98,6 +100,7 @@ export class GameSession implements PadTarget {
   private rotAcc = 0; // Shift+wheel, added up like the zoom
   private selectedId = -1;
   private lastPick: LastPick | null = null; // the last click on a building (a second one there reaches what it hides)
+  private revealed: PickResult | null = null; // a selection reached behind another building (drawn through it)
   private hover: { x: number; y: number } | null = null;
   private hoverId = -1; // building under the pointer (its visible pixels)
   private pointer = { x: -1, y: -1, inside: false };
@@ -357,6 +360,7 @@ export class GameSession implements PadTarget {
           selectedPiece: this.selectedPiece,
           pieceRow: this.row && this.row.tiles.length > 1 ? this.row.tiles : null,
           pieceLabel: this.pieceLabel(),
+          reveal: this.revealArea(),
         },
         dt,
         running,
@@ -480,6 +484,24 @@ export class GameSession implements PadTarget {
     if (!p || !isModuleKind(p.kind) || !this.pointer.inside || !this.hover) return null;
     const b = this.moduleTarget(this.pointer.x, this.pointer.y);
     return b && moduleCheck(this.s, p.kind, b).ok ? moduleLabel(b, p.kind) : null;
+  }
+
+  // The ground area of a selection reached behind another building, while it is still the selection.
+  private revealArea(): ViewState['reveal'] {
+    const r = this.revealed;
+    if (!r) return null;
+    if (r.building >= 0 && r.building === this.selectedId) {
+      const b = this.s.buildings.find((o) => o.id === r.building);
+      if (!b) return null;
+      const def = BUILDINGS[b.type];
+      return { x0: b.x, y0: b.y, x1: b.x + def.w, y1: b.y + def.h, height: buildingArt[b.type]?.height ?? 24 };
+    }
+    if (r.piece >= 0 && r.piece === this.selectedPiece) {
+      const x = r.piece % MAP_W;
+      const y = Math.floor(r.piece / MAP_W);
+      return { x0: x, y0: y, x1: x + 1, y1: y + 1, height: 22 };
+    }
+    return null;
   }
 
   // The building a module would go on: the one drawn under the point, else the one standing on that tile.
@@ -794,6 +816,8 @@ export class GameSession implements PadTarget {
       this.lastPick = { tile: ground, id: picked, at: now };
       if (pick.piece >= 0) this.selectPiece(pick.piece);
       else this.selectBuilding(pick.building);
+      // reached behind the building drawn there: that one turns see-through while the selection lasts
+      this.revealed = pick.building === picked ? null : pick;
       audio.play('click');
       return;
     }
