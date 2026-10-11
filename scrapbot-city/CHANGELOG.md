@@ -37,7 +37,8 @@
   il Dock con i silos del deposito sul tetto, la Fonderia con la torre del filtro (niente fumo scuro, vapore chiaro).
   I cittadini girano attorno a recinzioni, cancelli e lampioni; i bot ci volano sopra.
 - Le scritte sulla mappa (effetto di un modulo, motivo di un rifiuto) restano fuori dal pannello laterale aperto e dalla
-  carta dell'obiettivo. I prezzi con quantità 1 sono al singolare in tutte le 8 lingue («1 credito», «1 pezzo», in
+  carta dell'obiettivo quando nella finestra c'è posto (su una finestra piccola a zoom alto una scritta lunga può
+  restarci sotto). I prezzi con quantità 1 sono al singolare in tutte le 8 lingue («1 credito», «1 pezzo», in
   polacco «1 część»).
 - **Salvataggi**: stesso formato (versione 2, con campi nuovi facoltativi); i salvataggi della 0.6 si caricano senza
   cambiamenti.
