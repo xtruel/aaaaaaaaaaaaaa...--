@@ -186,7 +186,7 @@ export class Hud {
   private confirmDemolishAt = 0; // when it was asked for (performance.now())
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
-  private slotChangedAt = 0; // when the last module removal was confirmed (performance.now())
+  private slotChangedAt = -Infinity; // when the last module removal was confirmed (performance.now())
   private renderedId = -1; // the building whose panel was drawn last (a piece's panel: -1)
   private catalogKey = '';
   private starsKey = '';
