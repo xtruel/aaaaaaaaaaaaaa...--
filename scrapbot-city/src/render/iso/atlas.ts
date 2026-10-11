@@ -2,6 +2,7 @@
 import atlasUrl from '../../assets/iso/atlas.png';
 import data from '../../assets/iso/atlas.json';
 import type { BuildingType } from '../../game/defs';
+import type { CityId } from '../../game/cities';
 
 export interface Frame {
   x: number;
@@ -71,6 +72,14 @@ export function variantKey(type: BuildingType, modules?: readonly string[]): str
 
 // City themes (see ThemeArtMeta). Scrapbot City has none and keeps the plain frames.
 export const themeArt: Record<string, ThemeArtMeta> = raw.themes ?? {};
+
+// The theme a city is drawn with, from its campaign id alone (nothing saved): Scrapbot City, free play and the tutorial
+// (no campaign id) have none and look exactly as before themes.
+const CITY_THEMES: Record<CityId, string | null> = { home: null, rustbay: 'rust', neon: 'neon', greenvale: 'green', company: 'corp' };
+export function cityTheme(cityId: string | null | undefined): string | null {
+  const theme = cityId && Object.prototype.hasOwnProperty.call(CITY_THEMES, cityId) ? CITY_THEMES[cityId as CityId] : null;
+  return theme && Object.prototype.hasOwnProperty.call(themeArt, theme) ? theme : null;
+}
 
 // The terrain frame to paint for a city theme: t/<theme>/<rest> when the theme has a twin of t/<rest>, otherwise the
 // frame itself (no theme, or a frame every city shares: sludge, floors, bases, junk, rubble, lamps).

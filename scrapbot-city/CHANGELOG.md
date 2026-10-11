@@ -1,5 +1,14 @@
 # Changelog
 
+## In lavorazione — incremento 2: le città della campagna nei loro temi
+
+- **Rustbay, Neon Heights, Greenvale e 2PM Company Town** si disegnano con i loro temi (ruggine, neon, verde,
+  aziendale): terreno, strade, acqua e bordi della mappa, scenario attorno alla mappa con i pezzi tipici della città
+  (i più alti solo dietro), e la loro luce: un colore del giorno cotto nel terreno e un velo notturno del loro colore.
+  Di notte le finestre dello scenario dietro la mappa si accendono senza trasparire attraverso gli edifici davanti.
+  Scrapbot City, il gioco libero e il tutorial restano come prima. Lo smog di notte prende il buio della città.
+- Solo grafica: nessun numero cambia, niente nel salvataggio (il tema viene dalla città della campagna).
+
 ## In lavorazione — incremento 2, gruppo G1: sei moduli ed economia leggibile
 
 - **Sei moduli nuovi**, nella sezione «Moduli macchina» del catalogo (con la loro icona) e nel pannello dell'edificio.
