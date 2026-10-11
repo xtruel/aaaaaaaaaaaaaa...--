@@ -93,8 +93,15 @@ function writeNotices(context) {
     const base = path.join(root, 'node_modules', '@fontsource', pkg);
     const meta = JSON.parse(fs.readFileSync(path.join(base, 'package.json'), 'utf8'));
     const text = fs.readFileSync(path.join(base, 'LICENSE'), 'utf8');
-    const copyright = (text.match(/^Copyright[^\n]*/m) ?? [''])[0].trim();
-    fs.writeFileSync(path.join(dir, 'fonts', `${pkg}-LICENSE.txt`), text);
+    // OFL files open with the copyright line; the Apache 2.0 text of Permanent Marker has none, and its notice
+    // ("Copyright (c) 2010 by Font Diner, Inc.") is in the package README: Apache 2.0 section 4 asks to keep it.
+    const readme = path.join(base, 'README.md');
+    const copyright = (
+      text.match(/^Copyright[^\n]*/m) ??
+      (fs.existsSync(readme) ? fs.readFileSync(readme, 'utf8').match(/^Copyright[^\n]*/m) : null) ?? ['']
+    )[0].trim();
+    const noticeInText = /^Copyright/m.test(text);
+    fs.writeFileSync(path.join(dir, 'fonts', `${pkg}-LICENSE.txt`), noticeInText || !copyright ? text : `${copyright}\n\n${text}`);
     lines.push(`  ${family} - ${meta.license}${copyright ? ` - ${copyright}` : ''} - fonts/${pkg}-LICENSE.txt`);
   }
   const sw = path.join(root, 'node_modules', 'steamworks.js');

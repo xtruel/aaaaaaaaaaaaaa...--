@@ -36,6 +36,9 @@ Che cosa **non** è come per un giocatore, da sapere:
 - le città sono state giocate dal pilota automatico, non da una persona (le scelte degli eventi seguono il suo piano
   verde o industriale);
 - il profilo ha già tutti gli achievement, perché le notifiche non coprano le scene;
+- le stelle della mappa della regione sono quelle guadagnate **da due partite per città** (piano verde e piano
+  industriale, tenute insieme come fa il gioco: le stelle non si perdono), quindi più di quante ne darebbe una sola
+  partita; la città salvata è una sola delle due;
 - impostazioni: inglese, suoni a zero (le riprese sono mute comunque), **filtro CRT spento** (le sue righe, compresse
   nel video, fanno moiré): è un'opzione del gioco;
 - il browser è Chromium senza GPU (rendering software): il gioco gira a 20–40 fotogrammi al secondo invece dei 60 di un
@@ -55,7 +58,10 @@ e `npx playwright install chromium`, oppure un Playwright installato globalmente
    `scripts/trailer/run.sh <percorso del checkout della build finale> /tmp/scrapbot-trailer`.
 2. Leggi l'uscita di `record`: deve dire `page errors: none` e non deve avvisare `scenes not captured`.
 3. Guarda **tutto** `trailer.mp4` e il foglio `.contact.jpg`. Se una scena non ti piace, rilancia: le partite del pilota
-   automatico e gli eventi cambiano un po' a ogni giro.
+   automatico e gli eventi cambiano un po' a ogni giro. Da cercare in particolare: le scritte rosse del gioco quando
+   un posto è occupato («Something is already there», «… is in the way»). Il puntatore lascia subito recinzioni e
+   lampioni appena posati (corretto l'11/10/2026 in revisione), ma se il primo posto scelto per il Giardino Pixel nel
+   frattempo è stato occupato, il rifiuto si vede per meno di un secondo nella scena «build».
 4. Scegli gli screenshot tra `rec/stills/` (servono almeno 5, solo gameplay; le dimensioni 1920×1080 sono già giuste).
 5. Aggiungi l'audio (sezione 4) e carica il trailer in Steamworks → *Store Page → Trailers* (lo fai tu).
 
@@ -86,3 +92,8 @@ errore nella pagina. Video di prova dell'ultimo giro: 54,2 s, 1920×1080, 30 fps
 più 11 schermate in `rec/stills/` — **non è nel repository** (è nello scratchpad della sessione) e mostra la
 0.7.0-alpha.1, **non** la build finale. Durata di un giro su questa macchina (4 core, senza GPU): ~2 minuti di riprese,
 ~3 minuti di codifica.
+
+**Revisione dell'11 ottobre 2026** (stessa build e stessi salvataggi, `record.mjs` corretto): le scritte rosse
+«a fence / lamp post is in the way» nelle scene delle decorazioni passano da 33 fotogrammi (oltre un secondo) a 3
+fotogrammi isolati; resta il rifiuto del primo posto per il Giardino Pixel nella scena «build» (circa 0,4 s), da
+controllare a occhio a ogni giro (passo 3). Video di 55,4 s, 1920×1080, 30 fps, 9,2 Mbit/s, nessun errore nella pagina.

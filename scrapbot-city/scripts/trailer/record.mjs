@@ -451,6 +451,9 @@ await scene('build-decorate-night', async () => {
       await page.mouse.move(b.x, b.y, { steps: 24 });
       await sleep(200);
       await page.mouse.up();
+      // off the row at once: a pointer left on a fence it just placed shows the game's red "a fence is in the way"
+      // (the ghost is hidden while the pointer is over a panel)
+      await page.mouse.move(W - 4, H / 2, { steps: 2 });
       await sleep(600);
       return !stopped() && (await credits()) < before ? r : null;
     });
@@ -472,6 +475,8 @@ await scene('build-decorate-night', async () => {
       await page.mouse.move(p.x, p.y, { steps: 2 });
       await sleep(300);
       await page.mouse.click(p.x, p.y);
+      // off the lamp at once, as for the fences: resting on it shows "a lamp post is in the way"
+      await page.mouse.move(W - 4, H / 2, { steps: 2 });
       await sleep(350);
       if ((await credits()) < before) placed.push(l);
       if (placed.length >= 2) break;
