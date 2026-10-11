@@ -181,8 +181,9 @@ export function recyclerSorter(v: Vox, frame: number, working: boolean): void {
 
 // ---------- 2PM Factory: double arm ----------
 // The Factory's single yellow arm (front right, between the belt's end and the pallet) becomes a twin-arm robot on
-// the same base plate (the factory model leaves its own arm out when this module is installed): a taller yellow
-// torso with a pink 2PM band and a sensor head, and two articulated arms, one each side, elbows up. While the
+// the same base plate (the factory model leaves its own arm out when this module is installed), in the brand's white
+// and pink so it stands out from the old yellow arm at 1×: a taller torso with a pink 2PM band and a sensor head,
+// and two articulated arms with pink joints, one each side, elbows up. While the
 // Factory works the left arm takes a crate off the belt and lifts it to the torso, the right one takes it over and
 // sets it on the pallet, both moving every frame; off, both arms hang parked. On the torso's back a short exhaust
 // (the variant's extra 'smoke' point, after the chimney's); the 'spark' point stays where it was, on the torso.
@@ -220,8 +221,9 @@ export function factoryArm(v: Vox, frame: number, working: boolean): void {
   const f = frame % 4;
   // pedestal and torso
   v.cylZ(tx, ty, 2.2, 5, 8, M.dark);
-  v.box(tx - 2, ty - 2, 8, tx + 2, ty + 2, 17, M.yellow);
+  v.box(tx - 2, ty - 2, 8, tx + 2, ty + 2, 17, M.white);
   v.box(tx - 2, ty - 2, 10, tx + 2, ty + 2, 12, M.pink);
+  v.box(tx - 2, ty - 2, 8, tx + 2, ty + 2, 9, M.steelL);
   // sensor head: a dark visor with a lime eye that is lit while working
   v.box(tx - 1, ty - 1, 17, tx + 1, ty + 2, 20, M.steelD);
   v.box(tx - 1, ty + 1, 18, tx + 1, ty + 2, 19, working ? M.limeLit : M.limeD);
@@ -240,10 +242,10 @@ export function factoryArm(v: Vox, frame: number, working: boolean): void {
     const sh: P3 = [arm.sx, ty, sz];
     const el: P3 = [ex, ty, ez];
     const gr: P3 = [gx, ty, gz];
-    beam(v, sh, el, 1, M.yellow);
-    beam(v, el, gr, 1, M.yellow);
-    v.box(Math.round(arm.sx) - 1, ty - 1, Math.round(sz) - 1, Math.round(arm.sx) + 1, ty + 1, Math.round(sz) + 1, M.ink);
-    v.box(Math.round(ex) - 1, ty - 1, Math.round(ez) - 1, Math.round(ex) + 1, ty + 1, Math.round(ez) + 1, M.ink);
+    beam(v, sh, el, 1, M.white);
+    beam(v, el, gr, 1, M.white);
+    v.box(Math.round(arm.sx) - 1, ty - 1, Math.round(sz) - 1, Math.round(arm.sx) + 1, ty + 1, Math.round(sz) + 1, M.pink);
+    v.box(Math.round(ex) - 1, ty - 1, Math.round(ez) - 1, Math.round(ex) + 1, ty + 1, Math.round(ez) + 1, M.pink);
     const gxi = Math.round(gx);
     const gzi = Math.round(gz);
     v.box(gxi - 2, ty - 2, gzi - 1, gxi + 2, ty + 2, gzi, M.steelD); // gripper and fingers
@@ -495,14 +497,15 @@ export function recyclerSorterIcon(): Vox {
   return crop(v, 21, 15, 2, 32, 30, 24);
 }
 
-// The twin-arm robot on its base plate.
+// The twin-arm robot on its base plate, arms out to the belt's end and the pallet.
 export function factoryArmIcon(): Vox {
   const v = new Vox(48, 32, 24);
   v.box(28, 24, 2, 48, 32, 3, M.sand);
   v.box(35, 26, 3, 41, 31, 5, M.steelD);
-  factoryArm(v, 2, true);
+  v.box(41, 23, 3, 47, 31, 4, M.rustD);
+  factoryArm(v, 0, true);
   delete v.points.smoke;
-  return crop(v, 27, 23, 2, 48, 32, 23);
+  return crop(v, 28, 23, 2, 48, 32, 23);
 }
 
 export function podsCapsuleIcon(): Vox {
@@ -513,20 +516,28 @@ export function podsCapsuleIcon(): Vox {
   return crop(v, 7, 17, 14, 24, 31, 33);
 }
 
+// The two back trackers on a strip of the gravel bed.
 export function solarTrackerIcon(): Vox {
   const v = new Vox(32, 32, 20);
   v.box(2, 2, 3, 30, 14, 4, M.dark);
-  for (const [cx, cy] of TRACKERS.slice(0, 2)) {
-    v.box(cx - 2, cy - 2, 4, cx + 2, cy + 2, 5, M.concrete);
-  }
-  const keep = TRACKERS.slice();
-  void keep;
   solarTracker(v, 0, true);
   return crop(v, 1, 1, 3, 31, 15, 20);
 }
 
+// The boom and its spray head on the collar of a stub of the tall tank, with a puff of mist under the head.
 export function purifierNozzleIcon(): Vox {
   const v = new Vox(32, 32, 50);
+  tank(v, 20, 12, 6.5, 30, 41, M.white);
+  tank(v, 20, 12, 6.6, 41, 43, M.blueD);
+  tank(v, 20, 12, 6.5, 43, 45, M.blue);
   purifierNozzle(v, 0, true);
-  return crop(v, 0, 3, 24, 21, 22, 48);
+  for (const [x, y, z] of [
+    [2, 30, 36],
+    [1, 29, 34],
+    [3, 31, 33],
+    [2, 28, 31],
+    [0, 30, 31],
+  ])
+    v.set(x, y, z, M.white);
+  return crop(v, 0, 4, 30, 27, 32, 47);
 }

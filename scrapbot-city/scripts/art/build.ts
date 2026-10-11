@@ -29,7 +29,29 @@ import { BLIMP_FRAMES, blimpModel } from './models/blimp';
 import { fenceIcon, fenceModel, floorIcon, floorTiles, gateIcon, gateModel, lampHead, lampIcon, pieceLampModel, withLightPool } from './models/pieces';
 import type { FenceShape } from './models/pieces';
 import { dockStorageIcon, smelterFilterIcon, variantName } from './models/modules';
-import { withMist } from './models/catalog-modules';
+import { factoryArmIcon, podsCapsuleIcon, purifierNozzleIcon, recyclerMagnetIcon, recyclerSorterIcon, solarTrackerIcon, withMist } from './models/catalog-modules';
+import {
+  FOUNTAIN_FRAMES,
+  SIGN_MOTIFS,
+  TREE_KINDS,
+  baseIcon,
+  baseTiles,
+  benchPiece,
+  catHousePiece,
+  fitIcon,
+  fountainPiece,
+  pergolaPiece,
+  pillarIcon,
+  pillarPiece,
+  planterPiece,
+  sculpturePiece,
+  signPiece,
+  statuePiece,
+  treePiece,
+  wallIcon,
+  wallPiece,
+} from './models/catalog-pieces';
+import type { WallShape } from './models/catalog-pieces';
 
 // npm runs scripts from the package root; fall back to walking up from this file
 function projectRoot(): string {
@@ -256,6 +278,52 @@ const icons: [string, Vox][] = [
 ];
 for (const [name, v] of icons) {
   const r = render(v);
+  add(name, r.img, r.ax, r.ay);
+}
+
+// ---------- catalogue, increment 2: decorations, constructions and their icons (catalog-pieces.ts) ----------
+// Same conventions as increment 1's pieces: solid pieces anchored on the tile's back corner with a /shadow frame,
+// /g where something is lit (sign tubes, pillar lamps, the eyes of the sculpture and of the statue); the concrete
+// base is a ground tile like the floor. Rendered after every older frame, so their materials come last.
+const bases = baseTiles();
+for (const [name, img] of Object.entries(bases)) add(name, img, 16, 0);
+for (let dir = 0; dir < 4; dir++) addPiece(`pc/bench/${dir}`, benchPiece(dir));
+for (let k = 0; k < 2; k++) addPiece(`pc/planter/${k}`, planterPiece(k));
+for (let m = 0; m < SIGN_MOTIFS; m++) for (let dir = 0; dir < 4; dir++) addPiece(`pc/sign/${m}/${dir}`, signPiece(m, dir));
+for (const axis of ['x', 'y'] as const) addPiece(`pc/pergola/${axis}`, pergolaPiece(axis));
+for (let dir = 0; dir < 4; dir++) addPiece(`pc/cathouse/${dir}`, catHousePiece(dir));
+for (let dir = 0; dir < 4; dir++) addPiece(`pc/sculpture/${dir}`, sculpturePiece(dir));
+for (let k = 0; k < TREE_KINDS; k++) addPiece(`pc/tree/${k}`, treePiece(k));
+for (let f = 0; f < FOUNTAIN_FRAMES; f++) addPiece(`pc/fountain/${f}`, fountainPiece(f));
+for (let dir = 0; dir < 4; dir++) addPiece(`pc/statue/${dir}`, statuePiece(dir));
+const wallShapes: WallShape[] = ['x', 'y'];
+for (let mask = 1; mask < 16; mask++) wallShapes.push(mask);
+for (const shape of wallShapes) addPiece(`pc/wall/${shape}`, wallPiece(shape));
+for (let mask = 0; mask < 16; mask++) addPiece(`pc/pillar/${mask}`, pillarPiece(mask));
+const baseIco = baseIcon(bases);
+add('pc/base/icon', baseIco.img, baseIco.ax, baseIco.ay);
+const icons2: [string, Vox][] = [
+  ['pc/bench/icon', fitIcon(benchPiece(1))],
+  ['pc/planter/icon', fitIcon(planterPiece(1))],
+  ['pc/sign/icon', fitIcon(signPiece(2, 0))],
+  ['pc/pergola/icon', fitIcon(pergolaPiece('x'))],
+  ['pc/cathouse/icon', fitIcon(catHousePiece(1))],
+  ['pc/sculpture/icon', fitIcon(sculpturePiece(1))],
+  ['pc/tree/icon', fitIcon(treePiece(0))],
+  ['pc/fountain/icon', fitIcon(fountainPiece(2))],
+  ['pc/statue/icon', fitIcon(statuePiece(1))],
+  ['pc/wall/icon', wallIcon()],
+  ['pc/pillar/icon', fitIcon(pillarIcon())],
+  ['mod/recyclerMagnet/icon', fitIcon(recyclerMagnetIcon())],
+  ['mod/recyclerSorter/icon', fitIcon(recyclerSorterIcon())],
+  ['mod/factoryArm/icon', fitIcon(factoryArmIcon())],
+  ['mod/podsCapsule/icon', fitIcon(podsCapsuleIcon())],
+  ['mod/solarTracker/icon', fitIcon(solarTrackerIcon())],
+  ['mod/purifierNozzle/icon', fitIcon(purifierNozzleIcon())],
+];
+for (const [name, v] of icons2) {
+  const r = render(v);
+  if (r.img.w > 64 || r.img.h > 44) throw new Error(`${name}: icon ${r.img.w}×${r.img.h} does not fit the catalogue's 64×44 box`);
   add(name, r.img, r.ax, r.ay);
 }
 
