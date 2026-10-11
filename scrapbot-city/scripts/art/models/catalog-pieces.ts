@@ -234,7 +234,7 @@ const MOTIFS: { rows: string[]; tube: 'c' | 'g' | 'p' }[] = [
   },
   {
     // recycle arrows (the plant's mark)
-    rows: ['....#....', '...#o#...', '..##o##..', '.#ooooo#.', '##ooooo##', '.........', '###.#.###', '.##...##.', '.........'],
+    rows: ['....#....', '...#.#...', '..##.##..', '.#.....#.', '##.....##', '.........', '###.#.###', '.##...##.', '.........'],
     tube: 'g',
   },
   {
@@ -244,7 +244,7 @@ const MOTIFS: { rows: string[]; tube: 'c' | 'g' | 'p' }[] = [
   },
 ];
 export const SIGN_MOTIFS = MOTIFS.length;
-const SIGN_H = 22;
+const SIGN_H = 26;
 
 export function signPiece(motif: number, dir: number): Vox {
   const P = catalogPieceMats();
@@ -261,29 +261,31 @@ export function signPiece(motif: number, dir: number): Vox {
   v.box(px - 1, py - 1, 0, px + 3, py + 3, 1, M.concrete);
   v.box(px, py, 1, px + 2, py + 2, SIGN_H, M.steelD);
   v.box(px, py, SIGN_H - 1, px + 2, py + 2, SIGN_H, M.steel);
-  // arm and the board's frame: along the arm 12 voxels, 2 thick, 11 tall under the arm
+  // arm and the board's frame: along the arm 12 voxels, 2 thick, 16 tall under the arm. The motif is drawn upright on
+  // screen, so its columns step up (on a +y face) or down (on a +x face) by half a voxel each: 9 rows plus 4 of
+  // step need 13 of the board's 14 inner rows.
   const a0 = sgn > 0 ? 4 : 0;
   const a1 = sgn > 0 ? 16 : 12;
   const zb = 6;
-  const zt = 18;
+  const zt = 22;
   if (along === 'x') {
     v.box(a0, 7, SIGN_H - 3, a1, 9, SIGN_H - 2, M.steel);
-    v.box(a0, 7, zb, a1, 9, zt, M.steel);
-    v.box(a0 + 1, 7, zb + 1, a1 - 1, 9, zt - 1, M.dark);
+    v.box(a0, 7, zb, a1, 9, zt, M.steelD);
+    v.box(a0 + 1, 7, zb + 1, a1 - 1, 9, zt - 1, M.navy);
     for (const hx of [a0 + 2, a1 - 3]) v.box(hx, 7, zt, hx + 1, 9, SIGN_H - 3, M.steelD); // hangers
     // motif on the +y face (y 8) and the −y face (y 7)
     const x0 = a0 + 2 - 1 + Math.floor((a1 - a0 - 2 - 9) / 2) + 1;
     for (const fy of [8, 7])
-      screenBitmap(v, '+y', x0, fy, zt - 2, 9, 9, (r, c) => (rows[r][c] === '#' ? lit : rows[r][c] === 'o' ? fill : 0));
+      screenBitmap(v, '+y', x0, fy, zb + 1 + 8 + (Math.floor((x0 + fy) / 2) - Math.floor((x0 + 8) / 2)), 9, 9, (r, c) => (rows[r][c] === '#' ? lit : rows[r][c] === 'o' ? fill : 0));
   } else {
     v.box(7, a0, SIGN_H - 3, 9, a1, SIGN_H - 2, M.steel);
-    v.box(7, a0, zb, 9, a1, zt, M.steel);
-    v.box(7, a0 + 1, zb + 1, 9, a1 - 1, zt - 1, M.dark);
+    v.box(7, a0, zb, 9, a1, zt, M.steelD);
+    v.box(7, a0 + 1, zb + 1, 9, a1 - 1, zt - 1, M.navy);
     for (const hy of [a0 + 2, a1 - 3]) v.box(7, hy, zt, 9, hy + 1, SIGN_H - 3, M.steelD);
     // motif on the +x face (x 8) reading towards −y, and the −x face (x 7)
     const y0 = a1 - 2 - Math.floor((a1 - a0 - 2 - 9) / 2) - 1;
     for (const fx of [8, 7])
-      screenBitmap(v, '+x', fx, y0, zt - 2, 9, 9, (r, c) => (rows[r][c] === '#' ? lit : rows[r][c] === 'o' ? fill : 0));
+      screenBitmap(v, '+x', fx, y0, zt - 2 + (Math.floor((fx + y0) / 2) - Math.floor((8 + y0) / 2)), 9, 9, (r, c) => (rows[r][c] === '#' ? lit : rows[r][c] === 'o' ? fill : 0));
   }
   return v;
 }
@@ -891,6 +893,12 @@ export function fitIcon(v: Vox, maxW = 64, maxH = 44): Vox {
           x1 = Math.max(x1, x + 1);
           y1 = Math.max(y1, y + 1);
         }
+  // keep x0 + y0 even: the projection works in half voxels, and an odd shift would break the half-voxel steps that
+  // keep a sign's motif (or any upright shape) square on screen
+  if ((x0 + y0) % 2) {
+    if (x0 > 0) x0--;
+    else y0--;
+  }
   const top = v.top();
   const size = (zr: number) => [x1 - x0 + (y1 - y0) + 2, zr + Math.ceil((x1 - x0 + (y1 - y0)) / 2) + 2];
   let z0 = 0;

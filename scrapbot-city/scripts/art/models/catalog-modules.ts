@@ -462,8 +462,10 @@ export function withMist<T extends { img: { w: number; h: number; data: Uint8Cla
 }
 
 // ---------- catalogue icons: the module on its own ----------
-// A box of a model, moved to the origin (points dropped).
+// A box of a model, moved to the origin (points dropped). x0 + y0 is kept even (the projection works in half voxels:
+// an odd shift would change how upright shapes like the magnet's U fall on the pixel grid).
 function crop(src: Vox, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): Vox {
+  if ((x0 + y0) % 2) x0--;
   const out = new Vox(x1 - x0, y1 - y0, z1 - z0);
   for (let z = z0; z < z1; z++)
     for (let y = y0; y < y1; y++)

@@ -10,6 +10,7 @@ import { blit, createImage, encodePNG } from './png';
 import type { Image } from './png';
 import { render, renderShadow } from './voxel';
 import { ART } from './models/index';
+import { withMist } from './models/catalog-modules';
 import { DIRS, botModel, facing } from './models/bot';
 import { CAT_FRAMES, CITIZEN_FRAMES, CITIZEN_VARIANTS, catModel, citizenModel } from './models/characters';
 import { DECOR } from './models/decor';
@@ -159,7 +160,7 @@ if (baseType in BUILDINGS) {
   const type = baseType as BuildingType;
   const art = ART[type];
   const frames: Image[] = [];
-  for (let f = 0; f < art.frames; f++) frames.push(render(art.model(f, true, mods)).img);
+  for (let f = 0; f < art.frames; f++) frames.push((mods.includes('purifierNozzle') ? withMist(render(art.model(f, true, mods)), f) : render(art.model(f, true, mods))).img);
   frames.push(render(art.model(0, false, mods)).img);
   const icon = render(art.model(0, true, mods), { scale: 2 }).img;
   sheet = stack([upscale(row([...frames, icon]), SCALE), upscale(row([scene(type, 0, false, mods), scene(type, 0, true, mods)]), 2)]);
