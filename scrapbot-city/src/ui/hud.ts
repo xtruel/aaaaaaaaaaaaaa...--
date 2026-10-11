@@ -109,8 +109,8 @@ function costChips(cost: Cost): string {
   return chips.join('') || `<span class="cost">${t('common.free')}</span>`;
 }
 
-// A module's Remove confirmation takes no click in its first moments (ms), so a double click on Remove does not
-// confirm it.
+// A confirmation (Demolish, a module's Remove) takes no click in its first moments (ms): it comes up where the
+// button was, so the second click of a double click on that button does not confirm it.
 const CONFIRM_DELAY = 350;
 
 // Catalog pictures: the item's icon frame from the atlas at its own size (30×35 up to 64×32), centred in one
@@ -166,6 +166,7 @@ export class Hud {
   private toolButtons = new Map<BuildingType, HTMLButtonElement>();
   private inspectorKey = '';
   private confirmDemolish = false;
+  private confirmDemolishAt = 0; // when it was asked for (performance.now())
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
   private catalogKey = '';
@@ -796,6 +797,7 @@ export class Hud {
     panel.querySelector('[data-demolish]')?.addEventListener('click', () => {
       audio.play('click');
       this.confirmDemolish = true;
+      this.confirmDemolishAt = performance.now();
       this.confirmRemove = null;
       this.inspectorKey = `${b.id}:`;
     });
@@ -804,6 +806,8 @@ export class Hud {
       this.inspectorKey = `${b.id}:`;
     });
     panel.querySelector('[data-confirm]')?.addEventListener('click', () => {
+      // the building and its modules go only on a click of its own, not on the second click of a double click
+      if (performance.now() - this.confirmDemolishAt < CONFIRM_DELAY) return;
       this.confirmDemolish = false;
       this.handlers.onDemolish(b.id);
     });

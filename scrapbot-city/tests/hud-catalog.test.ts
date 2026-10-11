@@ -252,12 +252,24 @@ describe('building panel modules', () => {
     // effective numbers with the filter: energy -3, smog 0.8 a day
     expect(insp.querySelector('dl')!.textContent).toContain('-3');
     expect(insp.querySelector('dl')!.textContent).toContain('+0.8');
-    q(insp, '[data-demolish]')!.click();
-    update({ selectedId: smelter.id });
-    // Smelter 30 credits (half back: 15) and the filter (22 credits + 10 parts back)
-    expect(q(insp, '[data-confirm]')!.textContent).toBe('Demolish (+37 credits + 10 parts)');
-    q(insp, '[data-confirm]')!.click();
-    expect(calls.at(-1)).toEqual(['onDemolish', smelter.id]);
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(20_000);
+    try {
+      q(insp, '[data-demolish]')!.click();
+      update({ selectedId: smelter.id });
+      // Smelter 30 credits (half back: 15) and the filter (22 credits + 10 parts back)
+      expect(q(insp, '[data-confirm]')!.textContent).toBe('Demolish (+37 credits + 10 parts)');
+      // the confirmation comes up where Demolish was: the second click of a double click does not demolish
+      clock.mockReturnValue(20_150);
+      q(insp, '[data-confirm]')!.click();
+      expect(calls.some((c) => c[0] === 'onDemolish')).toBe(false);
+      expect(q(insp, '[data-confirm]')).not.toBeNull();
+      // a click of its own does
+      clock.mockReturnValue(21_000);
+      q(insp, '[data-confirm]')!.click();
+      expect(calls.at(-1)).toEqual(['onDemolish', smelter.id]);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('follows the money a module still needs without rebuilding the panel', () => {
