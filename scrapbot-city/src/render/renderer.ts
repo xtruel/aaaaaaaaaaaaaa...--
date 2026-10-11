@@ -581,10 +581,18 @@ export class Renderer {
       if (d.f && !opaqueAt(d.f, ix - d.sx, iy - d.sy)) continue;
       if (d.kind === K_BUILDING) return d.ref;
       if (d.kind === K_CAT) return -2;
-      // bots, citizens, scenery and pieces never take a click here: what is behind them stays clickable (a fence
-      // in front of a building does not hide it; pieces are found by pickPiece)
+      // a lamp or a decoration stands above the fence line: drawn in front of a building, its own pixels are what is
+      // seen there, so the building behind does not take the click (pickPiece finds the piece)
+      if (d.kind === K_PIECE && this.isTallPiece(d.ref)) return -1;
+      // bots, citizens, scenery, fences and gates never take a click here: what is behind them stays clickable (a
+      // fence in front of a building does not hide it; pieces are found by pickPiece)
     }
     return -1;
+  }
+
+  private isTallPiece(i: number): boolean {
+    const kind = this.terrainState ? solidKind(this.terrainState.solid[i]) : null;
+    return !!kind && !!PIECES[kind].decoration;
   }
 
   // The fence, gate or lamp drawn under a screen point (its visible pixels, nearest first), else the tile under the
