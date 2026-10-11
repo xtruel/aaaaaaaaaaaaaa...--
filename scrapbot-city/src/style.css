@@ -1897,9 +1897,13 @@ select {
   grid-template-columns: minmax(min-content, 1fr) auto;
 }
 
-/* the cycle's inputs and outputs, the fuel: a line each above the columns, close to them */
-.inspector .insp-lines {
-  margin-block: 12px -6px;
+/* the cycle's inputs and outputs, the fuel: a line each across the whole width */
+.inspector .insp-line {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
 }
 
 .inspector dd.span {
