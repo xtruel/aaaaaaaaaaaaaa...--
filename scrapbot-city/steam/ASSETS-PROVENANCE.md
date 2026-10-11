@@ -23,6 +23,11 @@ coerente) non basta a dire niente con certezza, e qui non si afferma nulla in un
 
 ## 2. File per file
 
+**Chi ha fatto le lavorazioni**: tutte quelle descritte in questa sezione (ritagli, ridimensionamenti, cancellatura
+degli slogan, ripulitura della trasparenza, icone piccole ridisegnate, copia dell'atlante senza scritte, render e
+schermate) le ha fatte **Claude (IA, Anthropic) in questo progetto**, scrivendo ed eseguendo gli script qui sotto, su
+indicazione del titolare; nessun generatore di immagini è stato usato. Va detto anche nel Content Survey
+([CONTENT-SURVEY-DRAFT.md](CONTENT-SURVEY-DRAFT.md), sezione 3).
 Strumenti usati per tutto ciò che è derivato: Python 3 con Pillow e NumPy (ritagli, ridimensionamento Lanczos,
 pulizia della trasparenza, cancellatura degli slogan per interpolazione), Chromium + Playwright per i render e le
 schermate del gioco. Nessun file è stato ingrandito; ogni ritaglio ha già le proporzioni finali (nessuna deformazione).
@@ -74,9 +79,20 @@ vanno **rifatti sulla build finale**: `scripts/trailer/run.sh` produce anche `re
 perdita della build filmata, con città giocate dal pilota automatico del gioco e azioni fatte solo dall'interfaccia
 (nessuna risorsa aggiunta). Vedi `scripts/trailer/README.md`.
 
+### 2.4 Trailer e schermate della pipeline (fuori dal repository)
+
+| File | Dove | Come è stato fatto |
+|---|---|---|
+| `trailer.mp4` (+ `.contact.jpg`, `.thumbnail.jpg`) | prodotto da `scripts/trailer/run.sh` in una cartella fuori da git; la prova dell'11/10/2026 è nello scratchpad della sessione | **ripresa del gioco vero**: la build di rilascio gira in Chromium guidato da Playwright; le 5 città sono state giocate prima dal pilota automatico del gioco (`scripts/autopilot.ts`) con la simulazione del gioco; poi solo clic, trascinamenti e tasti sull'interfaccia. Il profilo di partenza ha già tutti gli achievement (perché le notifiche non coprano le scene) e le stelle guadagnate da due partite per città (piano verde e piano industriale). Montaggio con ffmpeg: tagli, dissolvenze agli estremi, nessun testo né immagine aggiunti, audio muto. Script scritti ed eseguiti da Claude (IA) |
+| `rec/stills/*.png` | stessa cartella | schermate senza perdita degli stessi momenti (candidate per gli screenshot del negozio) |
+
+La prova dell'11/10/2026 mostra la **0.7.0-alpha.1** (ramo principale `04d782e`), non la build finale: non va caricata.
+
 ## 3. Il gioco: chi ha fatto che cosa
 
-Dal repository del gioco (ramo principale, sola lettura): 93 commit firmati "Claude", 2 del titolare.
+Dal repository del gioco (ramo principale, sola lettura): i 93 commit che toccano il gioco (`scrapbot-city/`) sono
+tutti firmati "Claude"; i 2 commit del titolare sono quelli iniziali del repository (un altro progetto, fuori dalla
+cartella del gioco).
 
 | Parte | Origine | Note |
 |---|---|---|
@@ -97,7 +113,7 @@ Dal repository del gioco (ramo principale, sola lettura): 93 commit firmati "Cla
 | DotGothic16 (solo katakana) | @fontsource 5.3.0 | SIL OFL 1.1 | 2020 The DotGothic16 Project Authors | idem |
 | Lilita One | @fontsource 5.3.0 | SIL OFL 1.1 (Reserved Font Name "Lilita One") | 2011 Juan Montoreano | idem |
 | Nunito | @fontsource 5.3.0 | SIL OFL 1.1 | 2014 The Nunito Project Authors | idem |
-| Permanent Marker | @fontsource 5.3.0 | **Apache 2.0** | Google Inc. (pacchetto) | idem |
+| Permanent Marker | @fontsource 5.3.0 | **Apache 2.0** | 2010 Font Diner, Inc. (dal README del pacchetto; il file LICENSE non ha la riga di copyright; `package.json` indica come autore Google Inc.) | idem |
 | Silkscreen | @fontsource 5.3.0 | SIL OFL 1.1 | 2001 The Silkscreen Project Authors | idem |
 | steamworks.js | 0.4.0 | MIT | 2022 Gabriel Francisco Dos Santos | `resources/app.asar.unpacked/node_modules/steamworks.js/` |
 | Steamworks API (`steam_api64.dll`, `libsteam_api.so`) | SDK incluso in steamworks.js 0.4.0 | Steamworks SDK Access Agreement (Valve) | Valve Corporation | idem |
@@ -106,7 +122,9 @@ Dal repository del gioco (ramo principale, sola lettura): 93 commit firmati "Cla
 Cosa è stato fatto l'11/10/2026: le build Steam (`npm run dist:steam`) ora contengono la cartella **`licenses/`**
 (scritta da `scripts/after-pack.cjs`): `THIRD-PARTY-NOTICES.txt` con l'elenco qui sopra, il testo di licenza di ognuno
 dei sei font (`licenses/fonts/<font>-LICENSE.txt`, copiato dal pacchetto @fontsource) e quello di steamworks.js. OFL 1.1
-e Apache 2.0 chiedono che avviso di copyright e testo della licenza accompagnino i font distribuiti.
+e Apache 2.0 chiedono che avviso di copyright e testo della licenza accompagnino i font distribuiti. Per Permanent
+Marker l'avviso di copyright (Font Diner, Inc.) non è nel file LICENSE del pacchetto: `after-pack.cjs` lo prende dal
+README e lo mette in testa al file e nell'elenco (corretto e ricostruito l'11/10/2026 in revisione).
 
 **Da correggere nel ramo principale** (non toccato da qui): la schermata Crediti del gioco dice «Bungee, Lilita One,
 Nunito, Silkscreen, Permanent Marker, DotGothic16 (SIL Open Font License)», ma **Permanent Marker è Apache 2.0**

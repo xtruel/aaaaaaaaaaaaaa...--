@@ -71,7 +71,8 @@ Regole seguite:
 > - Four chiptune tracks.
 >
 > **Play your way**
-> - Mouse and keyboard, touch, or a controller (menus with the D-pad, a virtual cursor in the city).
+> - **[verify on real hardware]** Mouse and keyboard, touch, or a controller (menus with the D-pad, a virtual cursor in
+>   the city).
 > - 8 languages: English, Italiano, Deutsch, Français, Español, Português, Polski, Nederlands.
 > - Automatic saves every in-game day; three manual slots in free play.
 > - 18 achievements.
@@ -79,8 +80,11 @@ Regole seguite:
 Notes for whoever pastes it:
 - "**[pending final build]**": delete the line if the item is not in the build that goes on sale, or delete the marker
   once it is checked (table in section 3).
+- "**[verify on real hardware]**": touch and controller are in the game but were only ever driven by simulated input
+  (Chrome DevTools touch, a simulated Gamepad API), never by a real touch screen or pad. Delete the marker after
+  trying them for real (a pad on PC, and the Deck); if one does not work, take it out of the line.
 - "18 achievements": true in the game; on Steam they appear only after they are created in Steamworks
-  (docs/STEAM.md, section 8) and checked with the Steam client.
+  (docs/STEAM.md, section 7) and checked with the Steam client.
 - Do **not** add "Steam Deck Verified", "Steam Cloud" or "Full controller support" in the text: Steam shows those
   itself once configured and verified (Deck review by Valve; Cloud and Steam Input set in Steamworks).
 
@@ -142,7 +146,7 @@ Notes for whoever pastes it:
 > - Quattro brani chiptune.
 >
 > **Gioca come preferisci**
-> - Mouse e tastiera, touch o controller (menu col D-pad, cursore virtuale in città).
+> - **[verify on real hardware]** Mouse e tastiera, touch o controller (menu col D-pad, cursore virtuale in città).
 > - 8 lingue: English, Italiano, Deutsch, Français, Español, Português, Polski, Nederlands.
 > - Salvataggi automatici a ogni giorno di gioco; tre slot manuali nel gioco libero.
 > - 18 achievement.
@@ -160,7 +164,8 @@ ricontrollali sulla build finale prima di pubblicare.
 | Sblocchi a traguardi (progetti) | catalogo: stati «Da scoprire», notifica «Nuovo progetto» | specificati in `docs/MODULAR-INC2.md` §4, non ancora nel codice del ramo principale |
 | Spostare le decorazioni | pannello di una decorazione: «Sposta» | specificato (§3c), non ancora nel ramo principale |
 | Temi delle città | le quattro città della campagna dopo la prima | nel ramo `inc2-cities` / `inc2-int2`, non nel principale |
-| 12 edifici, 5 città, 3 finali + smog, 10 eventi, 18 achievement, 8 lingue, 4 brani, controller | già nel ramo principale | presenti (`README.md`, `CHANGELOG.md`) |
+| 12 edifici, 5 città, 3 finali + smog, 10 eventi, 18 achievement, 8 lingue, 4 brani | già nel ramo principale | presenti, ricontrollati l'11/10 nel codice del ramo principale (`src/game/defs.ts`, `story.ts`, `music.ts`, `achievements.ts`, `i18n/index.ts`, `campaign.ts`) |
+| Touch e controller (**[verify on real hardware]**) | un controller vero su PC e sullo Steam Deck; uno schermo touch | nel codice; provati **solo con input simulati** (touch CDP, Gamepad API simulata: `docs/INC1-REPORT.md`), mai con hardware vero |
 | Smog leggibile (nuvole, foschia, pannello) | già nel ramo principale | presente (`CHANGELOG.md`, G0) |
 
 Se una riga «pending» non entra nella build in vendita, **togli la frase**, non lasciarla con una promessa.
@@ -169,7 +174,7 @@ Se una riga «pending» non entra nella build in vendita, **togli la frase**, no
 
 ## 4. Requisiti di sistema (da confermare)
 
-Valori **non misurati su hardware vero**: vanno confermati provando la build sul ramo beta (docs/STEAM.md, sezione 7).
+Valori **non misurati su hardware vero**: vanno confermati provando la build sul ramo beta (docs/STEAM.md, sezione 6).
 
 | Campo Steamworks | Minimo (proposta) | Da dove viene |
 |---|---|---|
@@ -218,6 +223,6 @@ cerca giochi rilassanti), **Relaxing** (stesso motivo), **Short** (solo dopo un 
 - **Data di uscita**: "Coming soon" finché non è decisa (niente date nei testi).
 - **Lingue** (solo *Interface*; niente *Full Audio* e *Subtitles*: il gioco non ha voci): English, Italian, German,
   French, Spanish - Spain, Portuguese - Portugal, Polish, Dutch.
-- **Supporto controller**: da dichiarare in *Basic Info* solo dopo la prova con il client Steam (docs/STEAM.md §10).
+- **Supporto controller**: da dichiarare in *Basic Info* solo dopo la prova con il client Steam (docs/STEAM.md §9).
 - **Dichiarazione sull'IA**: è nel questionario, non nei testi: bozza in [CONTENT-SURVEY-DRAFT.md](CONTENT-SURVEY-DRAFT.md).
 - **Prezzo**: lo decide il titolare (candidato in discussione: 7,99 EUR). Questo file non lo imposta.

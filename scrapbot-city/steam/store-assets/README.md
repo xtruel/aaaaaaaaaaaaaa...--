@@ -63,7 +63,10 @@ Icone dell'applicazione (fuori da questa cartella, usate da `electron-builder` e
 - **Restano le insegne dentro la città** ("2PM" sugli edifici, "SCRAP" nel poster): fanno parte del disegno e
   riportano il nome del gioco. Se la revisione di Valve le contesta, sono gli unici punti da ritoccare.
 - **Il logo contiene "2PM" e il sottotitolo in katakana** "スクラップボット・シティ 2PM" (il titolo in giapponese):
-  Steam li ammette come logo/sottotitolo. Resta da fare la verifica legale del nome "2PM" (docs/STEAM.md, sezione 15).
+  Steam li ammette **solo se** fanno parte del logotipo o del sottotitolo ufficiale del gioco (capsule: "artwork, the
+  game name, and any official subtitle"; Library Logo: "no other words" oltre al logotipo). È una decisione del
+  titolare, non ancora presa: vedi [../ASSETS-PROVENANCE.md](../ASSETS-PROVENANCE.md), sezione 5, punti 1–2. Resta
+  anche la verifica legale del nome "2PM" (docs/STEAM.md, sezioni 13 e 14).
 - **Small capsule**: il ritaglio di `5.webp` basta, non è servito ricomporla; il logo si legge a 462, 231, 184 e
   120 px di larghezza (provato).
 - **Hero e sfondo pagina senza parole**: sono render del gioco fatti con una copia dell'atlante solo per il

@@ -59,12 +59,12 @@ quello si vede solo sul ramo beta.
 | Steam Deck | **Da verificare** | nessun Deck qui; `SteamDeck=1` (schermo intero) provato in passato solo impostando la variabile a mano |
 | Controller | **Verificato solo con Gamepad API simulata** in Chromium (sessioni precedenti) | da provare con un controller vero e con Steam Input |
 | Build nel runtime Linux "sniper" | **Verificato** in passato **senza** client Steam (contenitore preparato a mano) | la prova vera è dal client Steam |
-| Script SteamPipe (`steam/sdk/*.vdf`, `upload.sh`, `upload.bat`) | **Fatto** | `node steam/prepare-upload.cjs --check` oggi rifiuta di partire per i segnaposto (verificato l'11/10); provati in passato con uno steamcmd finto; `upload.bat` mai provato su Windows |
+| Script SteamPipe (`steam/sdk/*.vdf`, `upload.sh`, `upload.bat`) | **Fatto** | `node steam/prepare-upload.cjs --check` oggi rifiuta di partire per i segnaposto (verificato l'11/10); provati in passato con uno steamcmd finto; l'11/10 alle 00:20 è stato avviato anche lo steamcmd vero in *preview* con `+login anonymous` e un App ID inventato, fuori dal repository: connessione fallita, niente inviato (dettagli in [steam/README.md](../steam/README.md), passo 5); `upload.bat` mai provato su Windows |
 | Grafica del negozio | **Generato** | dimensioni tutte conformi alle regole attuali; screenshot del menu tolto dal set; screenshot da rifare sulla build finale; tre dubbi sul logo da decidere (ASSETS-PROVENANCE §5) |
 | Testi del negozio, requisiti, tag | **Bozza** | STORE-COPY.md (righe **[pending final build]** da controllare) |
 | Questionario sui contenuti | **Bozza** | CONTENT-SURVEY-DRAFT.md |
 | Trailer | **Fatto** (pipeline) · **Generato** (video di prova) | provato da capo a fondo l'11/10 sulla build del ramo principale (`04d782e`, 0.7.0-alpha.1): video di prova di 54 s, 1920×1080, 30 fps, H.264 9,8 Mbit/s, audio muto, più 11 schermate; fuori da git. Va rifatto sulla build finale |
-| Licenze di terzi nelle build | **Fatto** | cartella `licenses/` nelle due build (font OFL/Apache, steamworks.js MIT) |
+| Licenze di terzi nelle build | **Fatto** | cartella `licenses/` nelle due build (font OFL/Apache, steamworks.js MIT); in revisione (11/10) aggiunto l'avviso di copyright di Permanent Marker (Font Diner, Inc.), che il file LICENSE del pacchetto non ha, e ricostruite le build (`app.asar` identico) |
 
 **Cosa devi fare tu** (nessuno può farlo al posto tuo): account e pagamenti (1), creare app, depot e ramo beta (2),
 pagina, grafica, trailer e questionario (3, 10), impostazioni di Steamworks (4, 7, 8, 9), caricare e provare (6),
@@ -199,7 +199,13 @@ L'eseguibile si scrive così, senza `./` né cartelle: i file sono nella radice 
 
 **Runtime Linux** (*Installation → Linux Runtime*): **Steam Linux Runtime 3.0 (sniper)**. Provato in passato con i
 file di sniper senza client Steam (il gioco parte); **non** scegliere il 4.0: mancano le librerie GTK 3 e di
-accessibilità che Electron 33 richiede. La prova definitiva è quella sul ramo beta.
+accessibilità che Electron 33 richiede (`libgtk-3.so.0`, `libatk-bridge-2.0.so.0`, `libatspi.so.0` sono tra le
+librerie dell'eseguibile e non sono nell'elenco dei pacchetti del 4.0 scaricato da Valve: controllo sui file, non
+un avvio). La prova definitiva è quella sul ramo beta.
+**glibc dentro sniper**: sniper porta glibc 2.31, ma il modulo Linux di steamworks.js chiede la 2.34; Steam usa la
+glibc del sistema quando è più nuova (provato in passato con 2.39: il modulo si carica). Quindi su sistemi con glibc
+< 2.34 il gioco parte ma **senza** funzioni di Steam; sullo Steam Deck (SteamOS recente) non dovrebbe succedere, ma
+va visto nella prova sul ramo beta.
 
 **Componenti da installare** (*Installation → Redistributables*): spunta **Visual C++ Redistributable 2015-2022
 (x64)** (il nome in lista può variare di poco). Il modulo Windows di steamworks.js importa `VCRUNTIME140.dll`, che
@@ -397,7 +403,8 @@ Deck**), nessun launcher (fatto), schermo intero sul Deck (fatto, provato solo c
 Fa parte del questionario sui contenuti: bozza completa, con le domande a cui devi rispondere, in
 **[steam/CONTENT-SURVEY-DRAFT.md](../steam/CONTENT-SURVEY-DRAFT.md)**. In breve: contenuti **pre-generati** con l'aiuto
 dell'IA sì (codice, grafica generata da codice, testi, traduzioni, musica ed effetti sintetizzati); **generati dal
-vivo** no. L'origine delle immagini del negozio la dichiari tu.
+vivo** no. Fatti da Claude anche: le lavorazioni delle tue immagini (ritagli, slogan tolti, icone piccole), i testi
+del negozio, trailer e screenshot (riprese del gioco montate da script). L'origine delle 5 immagini la dichiari tu.
 
 ## 11. Prezzo
 
@@ -410,8 +417,9 @@ dalla revisione di Valve.
 ## 12. Pagina "Coming Soon" e Steam Next Fest
 
 **Apri la pagina "Coming Soon" il prima possibile**: le wishlist raccolte prima dell'uscita sono ciò che pesa di più
-sulle vendite. Serve solo la pagina approvata (sezione 3), non la build; deve restare "Coming Soon" per un periodo
-minimo prima dell'uscita (controllalo in Steamworks).
+sulle vendite. Serve solo la pagina approvata (sezione 3), non la build; deve restare "Coming Soon", visibile a
+tutti, per **almeno due settimane** prima dell'uscita (letto l'11/10/2026 su
+[Steam Direct](https://partner.steamgames.com/steamdirect); ricontrollalo in Steamworks).
 
 **Steam Next Fest** (una settimana di demo gratuite, tre volte l'anno): si partecipa una volta sola per gioco, con una
 demo giocabile da tutti; la demo è un'app separata collegata al gioco (gratuita); oggi non c'è una build demo (idea:

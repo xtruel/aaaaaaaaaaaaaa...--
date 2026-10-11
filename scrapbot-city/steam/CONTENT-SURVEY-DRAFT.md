@@ -33,7 +33,7 @@ del gioco** (verificati nel codice e nei testi del ramo principale, commit `04d7
 | Acquisti nel gioco | Nessuno: niente microtransazioni, niente DLC. I "suggerimenti a pagamento" si pagano con crediti del gioco, non con denaro | No |
 | Temi | Inquinamento e smog, satira di una multinazionale (2PM Corp), barili "che brillano un po'" da stoccare (evento): toni da cartone animato | Temi ambientali lievi, nessun contenuto sensibile |
 | Interazione online / contenuti degli utenti | Nessuna: gioco per giocatore singolo, nessuna chat, nessun contenuto creato da altri, nessuna connessione a internet (il gioco non va mai online; la versione desktop blocca anche il download del dizionario di Electron) | No |
-| Dati personali | Il gioco non raccoglie né invia dati; i salvataggi sono file locali (sincronizzati da Steam Cloud se lo attivi) | No |
+| Dati personali | Il gioco non raccoglie né invia dati; i salvataggi sono file locali (sincronizzati da Steam Cloud se lo attivi); gli achievement sbloccati vanno al client Steam tramite steamworks.js, come in ogni gioco con achievement di Steam | No |
 | Pubblicità nel gioco | Nessuna | No |
 | Contenuti generati dagli utenti | Nessuno (niente editor, niente Workshop) | No |
 
@@ -41,8 +41,9 @@ del gioco** (verificati nel codice e nei testi del ramo principale, commit `04d7
 
 Nel gioco **non c'è** contenuto per adulti di nessun tipo: niente violenza frequente o sangue, niente nudità o
 contenuto sessuale, niente contenuto sessuale solo per adulti, niente altro contenuto maturo. Gli sprite sono generati
-da modelli voxel scritti nel codice (`scripts/art/models/`), i testi sono in `src/i18n/`: non ci sono file nascosti o
-inutilizzati con altri contenuti.
+da modelli voxel scritti nel codice (`scripts/art/models/`), i testi sono in `src/i18n/`. Le sole immagini presenti ma
+non ancora usate sono gli sprite dei 18 elementi del catalogo in lavorazione e dei temi delle città (panchine,
+fontane, alberi…: `docs/MODULAR-INC2.md`), senza contenuti maturi.
 
 **Risposta proposta**: nessun contenuto maturo in tutte le categorie.
 **Da confermare dal titolare**: che le immagini del negozio (capsule, logo, icone: sezione 1 di
@@ -62,8 +63,17 @@ inutilizzati con altri contenuti.
 | Musica (4 brani chiptune) | **Sì** | note scritte con l'assistenza dell'IA in `src/music.ts`, suonate da un sintetizzatore nel gioco |
 | Effetti sonori | **Sì** | parametri di sintesi scritti con l'assistenza dell'IA, sintetizzati dal gioco |
 | Font | No | font open source di terzi (licenze OFL 1.1 / Apache 2.0) |
-| Capsule, logo, icone del negozio e dell'app | **Da dichiarare** | derivano dalle 5 immagini fornite dal titolare: come sono state fatte lo sa solo lui |
-| Trailer | No (registrazione) | ripresa del gioco dalla build di rilascio (`scripts/trailer/`), nessuna immagine generata |
+| Icona dell'app (finestra, barra delle applicazioni, `.exe`, favicon): **è nella build** | **Da dichiarare** + **Sì** per le lavorazioni | deriva da `1.webp` del titolare (come sia stata fatta lo sa solo lui); ritagli, riduzioni e il primo piano ridisegnato per 16–32 px li ha fatti Claude (IA) con script in questo progetto |
+| Capsule, logo, sfondo e immagini della libreria (pagina del negozio, non nella build) | **Da dichiarare** + **Sì** per le lavorazioni | derivano dalle 5 immagini del titolare; ritagli, riduzioni, slogan cancellati per interpolazione, trasparenza ripulita: fatti da Claude (IA) con script (nessun generatore di immagini). Hero e sfondo pagina: render del gioco fatti da script di Claude con una copia dell'atlante senza scritte ([ASSETS-PROVENANCE.md](ASSETS-PROVENANCE.md), sezione 2) |
+| Testi della pagina del negozio (descrizioni EN/IT, tag proposti) | **Sì** | bozze scritte da Claude (IA) in [STORE-COPY.md](STORE-COPY.md), da rivedere e approvare dal titolare |
+| Nomi e descrizioni degli achievement su Steam | **Sì** | gli stessi testi del gioco (`steam/achievements*.csv`, dalle traduzioni del gioco) |
+| Trailer e screenshot | **Sì** per ripresa e montaggio (il contenuto mostrato è quello del gioco, già dichiarato sopra) | ripresa della build di rilascio e montaggio fatti da script scritti ed eseguiti da Claude (IA) (`scripts/trailer/`); le città filmate sono giocate dal pilota automatico del gioco; nessuna immagine generata, nessun testo aggiunto. Gli screenshot della 0.6.0 oggi in `store-assets/` sono di città allestite da uno script ([ASSETS-PROVENANCE.md](ASSETS-PROVENANCE.md), 2.3) |
+
+**Che cosa entra nella sezione IA.** La pagina di Steamworks (letta l'11/10/2026) la limita al contenuto che **esce
+col gioco** ed è fruito dai giocatori, e non dice se testi del negozio, trailer e capsule ne facciano parte; dice però
+che Valve controlla la coerenza del gioco con il materiale promozionale. Le righe su pagina del negozio, trailer,
+screenshot e capsule sono qui **per trasparenza**: il titolare può decidere di non citarle nel modulo, ma non deve
+dire il contrario (per esempio "nessuna IA nella grafica del negozio").
 
 **Generato dal vivo**: **niente**. Il gioco non usa nessun modello di IA mentre gira, non va online, non genera
 testi, immagini o suoni con l'IA. (La musica è "generata" nel senso che è sintetizzata da note fisse: non è IA.)
@@ -80,9 +90,11 @@ toglie il titolare:
 > created with AI assistance during development: the game's code; the pixel-art sprites, which are rendered from
 > voxel models written as code with AI assistance; the interface art; all in-game text and its translations; the
 > chiptune music, written as notes with AI assistance and synthesized by the game; and the sound effects.
-> [The store artwork, logo and icons were made by/with … .] [All of this was directed, reviewed and selected by the
-> developer.] No AI is used while you play: the game generates nothing with AI at runtime and never connects to the
-> internet.
+> [The store artwork, logo and app icon were made by/with … ;] they were cropped, resized and cleaned of slogans by
+> scripts written with AI assistance. The store page text was drafted with AI assistance; the trailer and screenshots
+> are recordings of the game, captured and edited by scripts written with AI assistance. [All of this was directed,
+> reviewed and selected by the developer.] No AI is used while you play: the game generates nothing with AI at
+> runtime and never connects to the internet.
 
 Versione italiana (se compili la pagina anche in italiano):
 
@@ -90,9 +102,11 @@ Versione italiana (se compili la pagina anche in italiano):
 > creati con l'assistenza dell'IA durante lo sviluppo: il codice; gli sprite in pixel art, ricavati da modelli voxel
 > scritti come codice con l'aiuto dell'IA; la grafica dell'interfaccia; tutti i testi e le loro traduzioni; la musica
 > chiptune, scritta come note con l'aiuto dell'IA e sintetizzata dal gioco; gli effetti sonori. [La grafica del
-> negozio, il logo e le icone sono stati realizzati da/con … .] [Tutto è stato diretto, rivisto e scelto dallo
-> sviluppatore.] Durante il gioco non si usa nessuna IA: il gioco non genera nulla con l'IA e non si collega mai a
-> internet.
+> negozio, il logo e l'icona dell'app sono stati realizzati da/con … ;] ritagli, riduzioni e cancellatura degli slogan
+> sono stati fatti da script scritti con l'aiuto dell'IA. I testi della pagina del negozio sono stati scritti con
+> l'aiuto dell'IA; trailer e screenshot sono riprese del gioco, registrate e montate da script scritti con l'aiuto
+> dell'IA. [Tutto è stato diretto, rivisto e scelto dallo sviluppatore.] Durante il gioco non si usa nessuna IA: il
+> gioco non genera nulla con l'IA e non si collega mai a internet.
 
 Perché dichiarare anche il codice, anche se la sezione dice che l'efficienza non è il suo oggetto: qui il codice
 **produce** contenuto che il giocatore vede e sente (sprite, interfaccia, musica, effetti), quindi è più corretto
@@ -112,8 +126,9 @@ senza rendere la dichiarazione incompleta.
 4. **Linguaggio nelle traduzioni**: dopo la revisione madrelingua conferma "nessun linguaggio volgare" in tutte le lingue.
 5. **Classificazioni ufficiali esistenti** (PEGI, ESRB, USK…): il gioco ne ha già? Se no, il questionario genera quelle
    dei Paesi che lo prevedono (IARC).
-6. Hai usato altri strumenti di IA (per esempio per il mockup del menu in `docs/`, per testi del negozio o per il
-   trailer) che vanno aggiunti?
+6. Hai usato **tu**, fuori da questo progetto, altri strumenti di IA che vanno aggiunti (per esempio per
+   `docs/mockup-main-menu.png` o per idee, nomi e personaggi)? Testi del negozio, trailer, screenshot e lavorazioni
+   delle immagini sono già dichiarati sopra: li ha fatti Claude in questo progetto.
 7. Chi compila il modulo deve poter rispondere anche alle domande di Valve in revisione: tieni questa bozza e
    ASSETS-PROVENANCE.md a portata di mano.
 

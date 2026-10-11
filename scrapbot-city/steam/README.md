@@ -117,11 +117,16 @@ Su Windows: `steam\upload.bat <account_build> --beta beta` (stesse opzioni).
 > Meglio caricare con `upload.sh` da Linux, macOS o WSL (Windows Subsystem for Linux). `upload.bat` non è stato
 > provato su Windows (solo scritto e controllato); `upload.sh` e i controlli sono stati provati su Linux con uno
 > steamcmd finto, e i file `.vdf` con un lettore VDF, ma non con un vero caricamento (serve l'App ID).
+> **Per esattezza** (verificato l'11/10/2026 nei log della sessione): l'11/10 alle 00:20, in una cartella di lavoro fuori
+> dal repository, è stato avviato anche lo **steamcmd vero** in modalità *preview* (`+login anonymous +run_app_build`
+> su una copia dei `.vdf` con un App ID inventato per la prova, mai usato nei file del progetto). La connessione a
+> Steam è fallita (`Connecting anonymously to Steam Public... FAILED (No Connection)`): nessun accesso, nessun dato
+> inviato, niente caricato. Non va ripetuto: steamcmd si avvia solo con l'App ID vero e con l'account del titolare.
 
 ## Passo 6 — Provare e pubblicare
 
 1. Nel client Steam: tasto destro sul gioco → **Proprietà → Beta** → inserisci la password → scegli `beta`.
-2. Prova su Windows, su Linux e sullo Steam Deck (elenco delle prove in docs/STEAM.md, sezione 7).
+2. Prova su Windows, su Linux e sullo Steam Deck (elenco delle prove in docs/STEAM.md, sezione 6).
 3. Se va tutto bene: Steamworks → **SteamPipe → Builds** → nella riga della build scegli il ramo **default**
    e conferma (Steamworks mostra prima un riepilogo). È l'unico passo che Valve vuole fatto a mano: nessuno
    script può mettere live il ramo `default`.
