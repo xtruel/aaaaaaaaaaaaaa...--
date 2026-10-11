@@ -26,7 +26,6 @@ export interface ModalOptions {
 }
 
 let current: { el: HTMLElement; opts: ModalOptions } | null = null;
-let closedAt = -Infinity; // when the last dialog closed (performance.now())
 // what had the focus before the first dialog opened: it gets it back when the last one closes
 let opener: HTMLElement | null = null;
 
@@ -48,12 +47,6 @@ export function isModalOpen(): boolean {
   return current !== null;
 }
 
-// When the last dialog closed (performance.now()): the second press of the double press that closed it lands on what
-// is behind, and the map takes no purchase from it (session.ts).
-export function modalClosedAt(): number {
-  return closedAt;
-}
-
 // While a dialog is open everything behind it is inert: Tab, the keyboard and screen readers stay in the
 // dialog (the HUD behind an ending or a story event cannot be reached).
 function setBackgroundInert(on: boolean): void {
@@ -64,7 +57,6 @@ export function closeModal(): void {
   if (!current) return;
   const { el, opts } = current;
   current = null;
-  closedAt = performance.now();
   el.remove();
   setBackgroundInert(false);
   opts.onClose?.();
