@@ -27,12 +27,15 @@
 - **Lo slot nel pannello**: per ogni modulo lo stato (installato · slot occupato · installabile · non ora, col motivo),
   costo e rimborso, prima → dopo a piena energia e, se installato, il valore di ora. «Installa» avvisa se lascerebbe la
   città senza energia sufficiente; «Rimuovi» e «Demolisci» dicono cosa si perde: rottami oltre il deposito che resta,
-  cittadini oltre gli alloggi che restano, energia che non basta più.
+  cittadini oltre gli alloggi che restano, energia che non basta più. Una rimozione confermata con un doppio clic (o
+  doppio tocco, o A premuto due volte) non ricompra più il modulo: il secondo clic finiva su «Installa», comparso al
+  posto della conferma, e costava il prezzo pieno contro metà rimborso (anche nell'incremento 1, col deposito del Dock).
 - **«+N in attesa»** accanto al contatore dei rottami quando i bot ne hanno portati più di quanti ne stanno nel
   deposito; il suggerimento al passaggio del mouse spiega che entrano da soli appena c'è posto.
 - **Consigli di USA-9** sul collo di bottiglia reale: con il deposito pieno e pochi crediti propone un convertitore
   (Lab Riparatutto o Fonderia, secondo il percorso) e non più un Bot Dock; un nuovo Riciclatore solo se c'è energia e
-  ci sono rottami da lavorare, altrimenti «prima l'energia» o «niente rottami da riciclare».
+  ci sono rottami da lavorare, altrimenti «prima l'energia» o «niente rottami da riciclare» (l'energia conta gli
+  edifici in costruzione: i consumi, i Campi Solari e i Bruciatori quando c'è rottame da bruciare).
 - **Fumo, vapore e animazioni seguono lo stato reale**: il fumo segue lo smog che l'edificio emette davvero (meno con
   poca energia, ×1,5 con gli straordinari, niente da fermo); il camino della Fabbrica tiene il suo fumo e lo scarico del
   braccio doppio aggiunge il fumo in più del modulo; l'ugello spruzza una nebbiolina mentre il Purificatore lavora; le
