@@ -671,6 +671,7 @@ export const fr: Dict = {
   'hint.storageCredits.fixlab': "Le stockage de ferraille est à {n}/{cap}, mais ce qui te manque, ce sont les crédits : plus de stockage n'y changerait rien. Un Labo Répare-tout transforme les pièces de tes Recycleurs en crédits, sans fumée. {afford}",
   'hint.recyclerPower.title': "D'abord l'énergie",
   'hint.recyclerPower.text': "Un Recycleur de plus consomme {need} d'énergie, mais il ne t'en reste que {spare} : il ralentirait toutes les machines. {what} {afford}",
+  'hint.recyclerPower.going': "Un Recycleur de plus consomme {need} d'énergie. Il t'en reste {spare} pour l'instant, mais les bâtiments en construction en consommeront {going} de plus : il ralentirait toutes les machines. {what} {afford}",
   'hint.noScrap.title': "Pas de ferraille à recycler",
   'hint.noScrap.text': "Un Recycleur a besoin de ferraille, et il n'y en a ni dans le stockage ni sur la carte pour l'instant. Les tempêtes et les déchets des habitants en apportent : construis des Capsules en attendant.",
 

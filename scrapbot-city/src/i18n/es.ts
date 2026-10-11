@@ -674,6 +674,7 @@ export const es: Dict = {
   'hint.storageCredits.fixlab': "El almacén de chatarra está a {n}/{cap}, pero lo que te falta son créditos: más almacén no serviría de nada. Un Taller Manitas convierte en créditos las piezas de tus Recicladores, sin humo. {afford}",
   'hint.recyclerPower.title': "Primero, energía",
   'hint.recyclerPower.text': "Otro Reciclador necesita {need} de energía, pero solo te sobran {spare}: frenaría todas las máquinas. {what} {afford}",
+  'hint.recyclerPower.going': "Otro Reciclador necesita {need} de energía. Ahora te sobran {spare}, pero los edificios en construcción gastarán {going} más: frenaría todas las máquinas. {what} {afford}",
   'hint.noScrap.title': "No hay chatarra que reciclar",
   'hint.noScrap.text': "Un Reciclador necesita chatarra, y ahora no hay ni en el almacén ni en el mapa. Las tormentas y la basura de los ciudadanos traen más: mientras tanto, construye Cápsulas bot.",
 

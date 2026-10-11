@@ -672,6 +672,7 @@ export const it: Dict = {
   'hint.storageCredits.fixlab': "Il magazzino dei rottami è a {n}/{cap}, ma quello che ti manca sono i crediti: più spazio non servirebbe. Un Lab Riparatutto trasforma in crediti i pezzi dei tuoi Riciclatori, senza fumo. {afford}",
   'hint.recyclerPower.title': "Prima l'energia",
   'hint.recyclerPower.text': "Un altro Riciclatore consuma {need} di energia, ma te ne avanza solo {spare}: rallenterebbe tutte le macchine. {what} {afford}",
+  'hint.recyclerPower.going': "Un altro Riciclatore consuma {need} di energia. Ora te ne avanza {spare}, ma gli edifici in costruzione ne useranno altri {going}: rallenterebbe tutte le macchine. {what} {afford}",
   'hint.noScrap.title': "Niente rottami da riciclare",
   'hint.noScrap.text': "Un Riciclatore ha bisogno di rottami, e ora non ce ne sono né in magazzino né sulla mappa. Le tempeste e i rifiuti dei cittadini ne portano altri: intanto costruisci delle Capsule Bot.",
 

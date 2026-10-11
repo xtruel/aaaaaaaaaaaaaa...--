@@ -149,20 +149,30 @@ export function citizensLost(s: GameState, drop: number): number {
 
 // ---------- what the advice needs to know ----------
 
-// Power to spare for a new consumer: power made minus power used now, minus what the consumers still under
-// construction will use, plus what the power plants under construction will make: a Solar Array always, a Burner when
-// there is scrap to burn (as the sim counts a finished one: only while it has fuel).
-export function energyHeadroom(s: GameState): number {
-  let spare = s.derived.energyProd - s.derived.energyUse;
+// Power to spare right now, as the HUD shows it (power made / power used): made minus used.
+export function energySpare(s: GameState): number {
+  return s.derived.energyProd - s.derived.energyUse;
+}
+
+// What the buildings under construction will do to the power to spare once finished: minus what the consumers will
+// use, plus what the power plants will make: a Solar Array always, a Burner when there is scrap to burn (as the sim
+// counts a finished one: only while it has fuel).
+export function energyGoingUp(s: GameState): number {
+  let going = 0;
   let fuel: boolean | null = null; // scrap for the Burners being built (looked up once, only if there is one)
   for (const b of s.buildings) {
     if (b.built >= 1 || b.paused) continue;
     const e = buildingStats(b).energy;
     const burns = BUILDINGS[b.type].fuel;
-    if (e < 0 || !burns) spare += e;
-    else if ((fuel ??= scrapToCome(s, burns.scrap))) spare += e;
+    if (e < 0 || !burns) going += e;
+    else if ((fuel ??= scrapToCome(s, burns.scrap))) going += e;
   }
-  return spare;
+  return going;
+}
+
+// Power to spare for a new consumer: the power to spare now (the HUD's) and what the buildings going up will do to it.
+export function energyHeadroom(s: GameState): number {
+  return energySpare(s) + energyGoingUp(s);
 }
 
 // `need` scrap in storage (or waiting for room), or junk on the map that the bots can fetch (they fly anywhere, from

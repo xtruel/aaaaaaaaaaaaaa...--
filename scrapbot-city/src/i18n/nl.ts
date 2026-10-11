@@ -671,6 +671,7 @@ export const nl: Dict = {
   'hint.storageCredits.fixlab': "De schrootopslag zit op {n}/{cap}, maar wat je tekortkomt zijn credits: meer opslag helpt niet. Een Repareerlab maakt van de onderdelen van je Recyclers credits, zonder rook. {afford}",
   'hint.recyclerPower.title': "Eerst stroom",
   'hint.recyclerPower.text': "Nog een Recycler heeft {need} energie nodig, maar je hebt er maar {spare} over: hij zou alle machines afremmen. {what} {afford}",
+  'hint.recyclerPower.going': "Nog een Recycler heeft {need} energie nodig. Nu heb je {spare} over, maar de gebouwen in aanbouw gebruiken er nog {going} bij: hij zou alle machines afremmen. {what} {afford}",
   'hint.noScrap.title': "Geen schroot om te recyclen",
   'hint.noScrap.text': "Een Recycler heeft schroot nodig, en dat is er nu niet, in de opslag noch op de kaart. Stormen en het afval van je inwoners brengen nieuw schroot: bouw intussen Botpods.",
 

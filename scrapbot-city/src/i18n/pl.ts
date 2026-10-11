@@ -674,6 +674,7 @@ export const pl: Dict = {
   'hint.storageCredits.fixlab': "Magazyn złomu {n}/{cap}, ale brakuje ci kredytów: większy magazyn nic tu nie da. Naprawialnia zamienia części z twoich recyklerów na kredyty, bez dymu. {afford}",
   'hint.recyclerPower.title': "Najpierw energia",
   'hint.recyclerPower.text': "Kolejny recykler potrzebuje {need} energii, a zapas to tylko {spare}: spowolniłby wszystkie maszyny. {what} {afford}",
+  'hint.recyclerPower.going': "Kolejny recykler potrzebuje {need} energii. Teraz zapas to {spare}, ale budowane budynki zużyją jeszcze {going}: spowolniłby wszystkie maszyny. {what} {afford}",
   'hint.noScrap.title': "Brak złomu do przerobu",
   'hint.noScrap.text': "Recykler potrzebuje złomu, a teraz nie ma go ani w magazynie, ani na mapie. Burze i śmieci mieszkańców przyniosą więcej: w międzyczasie buduj Kapsuły botów.",
 

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { placeBuilding, placeCheck } from '../src/game/actions';
 import { T } from '../src/game/defs';
 import type { BuildingType } from '../src/game/defs';
-import { energyHeadroom, scrapAvailable } from '../src/game/economy';
+import { energyGoingUp, energyHeadroom, energySpare, scrapAvailable } from '../src/game/economy';
 import { creditsShort, recyclerCheck, suggest } from '../src/game/hints';
 import { computeDerived } from '../src/game/sim';
 import { createGame } from '../src/game/state';
@@ -125,6 +125,29 @@ describe('no new Recycler without power to run it and scrap to feed it', () => {
     expect(s.derived.efficiency).toBe(1);
     expect(recyclerCheck(s).power).toBe(true);
     expect(suggest(s)).toMatchObject({ title: t('hint.storage.title'), build: 'recycler' });
+  });
+
+  it('"Power first" names the power to spare the HUD shows, and what the buildings going up will take of it', () => {
+    // the advice's text up to "{what}", with these numbers
+    const lead = (key: 'hint.recyclerPower.text' | 'hint.recyclerPower.going', p: Record<string, number>) => t(key, { ...p, what: '|', afford: '' }).split('|')[0];
+    // HQ 6 against 5 Pods: the HUD shows 6 made, 5 used; 1 to spare, nothing going up
+    const tight = city({ buildings: ['pods', 'pods', 'pods', 'pods', 'pods'], credits: 200, parts: 40, junk: true });
+    expect([tight.derived.energyProd, tight.derived.energyUse]).toEqual([6, 5]);
+    expect(energySpare(tight)).toBe(1);
+    expect(energyGoingUp(tight)).toBe(0);
+    const h1 = suggest(tight);
+    expect(h1.title).toBe(t('hint.recyclerPower.title'));
+    expect(h1.text.startsWith(lead('hint.recyclerPower.text', { need: 2, spare: 1 }))).toBe(true);
+    // HQ 6 against 3 Pods: the HUD shows 6 made, 3 used, 3 to spare, enough for a Recycler's 2; but 2 more Pods are
+    // going up and will use 2 of it: the advice says 3 to spare now (as the HUD) and 2 more to come, not "only 1"
+    const going = city({ buildings: ['pods', 'pods', 'pods'], unfinished: ['pods', 'pods'], credits: 200, parts: 40, junk: true });
+    expect([going.derived.energyProd, going.derived.energyUse]).toEqual([6, 3]);
+    expect([energySpare(going), energyGoingUp(going), energyHeadroom(going)]).toEqual([3, -2, 1]);
+    expect(recyclerCheck(going)).toMatchObject({ power: false, now: 3, going: -2, spare: 1 });
+    const h2 = suggest(going);
+    expect(h2).toMatchObject({ title: t('hint.recyclerPower.title'), build: 'solar' });
+    expect(h2.text.startsWith(lead('hint.recyclerPower.going', { need: 2, spare: 3, going: 2 }))).toBe(true);
+    expect(h2.text).not.toContain(lead('hint.recyclerPower.text', { need: 2, spare: 1 }));
   });
 
   it('scrap available: one cycle in storage or waiting, or junk on the map for the bots', () => {

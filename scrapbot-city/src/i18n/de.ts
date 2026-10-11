@@ -671,6 +671,7 @@ export const de: Dict = {
   'hint.storageCredits.fixlab': "Das Schrottlager ist bei {n}/{cap}, aber dir fehlen Credits: Mehr Lagerplatz würde nichts bringen. Ein Flicklabor macht aus den Teilen deiner Recycler Credits, ganz ohne Rauch. {afford}",
   'hint.recyclerPower.title': "Erst Strom",
   'hint.recyclerPower.text': "Ein weiterer Recycler braucht {need} Energie, du hast aber nur {spare} übrig: Er würde alle Maschinen bremsen. {what} {afford}",
+  'hint.recyclerPower.going': "Ein weiterer Recycler braucht {need} Energie. Gerade hast du {spare} übrig, aber die Gebäude im Bau brauchen noch {going} dazu: Er würde alle Maschinen bremsen. {what} {afford}",
   'hint.noScrap.title': "Kein Schrott zum Recyceln",
   'hint.noScrap.text': "Ein Recycler braucht Schrott, und gerade gibt es keinen, weder im Lager noch auf der Karte. Stürme und der Müll deiner Einwohner bringen neuen: Bau solange Bot-Kapseln.",
 

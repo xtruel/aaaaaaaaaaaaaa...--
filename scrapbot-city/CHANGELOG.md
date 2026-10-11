@@ -14,6 +14,10 @@
   l'ugello «nel raggio di 8 caselle», la Capsule Bot con la capsula 9 alloggi, il Campo Solare coi pannelli +7, il
   Riciclatore col selezionatore 3 pezzi, il Bot Dock col deposito aggiuntivo +180; senza modulo, e nella barra degli
   strumenti, le parole di sempre.
+- **USA-9, «Prima l'energia»**: l'energia che avanza è quella che mostra la barra in alto (prodotta meno consumata);
+  se gli edifici in costruzione ne useranno una parte, il consiglio lo dice a parte («ora te ne avanza 3, ma gli
+  edifici in costruzione ne useranno altri 2») invece di dare un numero che contraddice la barra. La decisione resta la
+  stessa di G1 (conta anche ciò che si sta costruendo).
 
 ## In lavorazione — incremento 2: le città della campagna nei loro temi
 
