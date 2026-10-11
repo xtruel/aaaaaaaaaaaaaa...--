@@ -693,4 +693,21 @@ export const de: Dict = {
   'msg.rowPartial': '{n} von {total} gesetzt: Die übrigen Felder waren belegt, oder das Geld reichte nicht.',
   'extras.controls.5': '<kbd>O</kbd>: Objekte & Module · <kbd>R</kbd>: drehen (<kbd>Shift</kbd>+<kbd>R</kbd>: andersherum) · mit der linken Taste ziehen: eine Reihe Boden oder Zaun',
   'extras.controls.pad3': '<kbd>Y</kbd> dreht beim Setzen auch Zaun, Tor oder Laterne.',
+
+  // ---------- added in 0.7, increment 2: readable smog ----------
+  'hud.smog.more': 'Klicken oder tippen: woher er kommt und wohin er geht.',
+  'smog.title': 'Woher er kommt und wohin er geht',
+  'smog.sources': 'Quellen',
+  'smog.cleaning': 'Reinigung',
+  'smog.perDay': 'pro Tag',
+  'smog.none': 'Gerade keine',
+  'smog.sludge': 'Giftschlamm ({n} Felder)',
+  'smog.sludge.one': 'Giftschlamm ({n} Feld)',
+  'smog.renewal': 'Natürlicher Luftaustausch',
+  'smog.renewal.note': 'Je schmutziger die Luft, desto schneller klärt sie sich von selbst.',
+  'smog.net': 'Summe pro Tag',
+  'smog.overtime': 'Überstunden: Industrie-Smog ×1,5 noch {n} s lang.',
+  'smog.power': 'Energie bei {n}%: Industrie und Filteranlagen arbeiten langsamer.',
+  'smog.limit': 'Liegt der Smog {seconds} Sekunden lang über {limit}%, ist die Stadt verloren.',
+  'smog.countdown': 'Über {limit}%: In {n} s ist die Stadt verloren!',
 };

@@ -696,4 +696,21 @@ export const es: Dict = {
   'msg.rowPartial': 'Colocadas {n} de {total}: las demás casillas estaban ocupadas o no llegaba el dinero.',
   'extras.controls.5': '<kbd>O</kbd>: objetos y módulos · <kbd>R</kbd>: girar (<kbd>Mayús</kbd>+<kbd>R</kbd>: al revés) · arrastrar con el botón izquierdo: una fila de suelo o valla',
   'extras.controls.pad3': '<kbd>Y</kbd> también gira una valla, un portón o una farola mientras la colocas.',
+
+  // ---------- added in 0.7, increment 2: readable smog ----------
+  'hud.smog.more': 'Haz clic o toca para ver de dónde viene y adónde va.',
+  'smog.title': 'De dónde viene y adónde va',
+  'smog.sources': 'Fuentes',
+  'smog.cleaning': 'Limpieza',
+  'smog.perDay': 'al día',
+  'smog.none': 'Ninguna ahora mismo',
+  'smog.sludge': 'Lodo tóxico ({n} casillas)',
+  'smog.sludge.one': 'Lodo tóxico ({n} casilla)',
+  'smog.renewal': 'Renovación natural del aire',
+  'smog.renewal.note': 'Cuanto más sucio está el aire, más rápido se limpia solo.',
+  'smog.net': 'Total al día',
+  'smog.overtime': 'Horas extra: smog de la industria ×1,5 durante {n}\u00a0s más.',
+  'smog.power': 'Energía al {n}\u00a0%: la industria y los Purificadores van más lentos.',
+  'smog.limit': 'Si pasa del {limit}\u00a0% durante {seconds} segundos, la ciudad está perdida.',
+  'smog.countdown': '¡Por encima del {limit}\u00a0%: la ciudad se pierde en {n}\u00a0s!',
 };

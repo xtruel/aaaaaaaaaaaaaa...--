@@ -952,7 +952,8 @@ select {
 .meters,
 .clock,
 .toolbar,
-.inspector {
+.inspector,
+.smog-panel {
   background: var(--panel);
   border: 3px solid var(--ink);
   border-radius: var(--r);
@@ -1131,6 +1132,35 @@ select {
   width: 40px;
 }
 
+/* the smog meter is a button: it opens the smog panel (where the smog comes from and where it goes) */
+.meter-smog {
+  margin: -3px -6px;
+  padding: 3px 6px;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+}
+
+.meter-smog:hover,
+.meter-smog.active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.meter-smog:hover .meter-ico,
+.meter-smog.active .meter-ico {
+  background: var(--cream);
+}
+
+.meter-smog:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 1px;
+}
+
 .meter b {
   font-family: var(--f-display);
   font-weight: 400;
@@ -1141,6 +1171,7 @@ select {
 
 .bar {
   position: relative;
+  display: block;
   width: 150px;
   height: 14px;
   overflow: hidden;
@@ -1429,6 +1460,220 @@ select {
 @keyframes alarm {
   50% {
     transform: translateX(-50%) scale(1.04);
+  }
+}
+
+/* The smog panel: under the meters (and under the smog alarm while it shows), between the goal card and the
+   building panel */
+.smog-panel {
+  --path: #d8c49a;
+  position: absolute;
+  top: var(--below-alarm, 80px);
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  width: min(330px, calc(100% - 20px));
+  max-height: calc(100% - var(--below-alarm, 80px) - var(--dock, 186px) - 14px);
+  overflow: hidden;
+  transform: translateX(-50%);
+}
+
+.smog-panel .insp-head {
+  flex: none;
+  padding-block: 8px;
+}
+
+.smog-panel .tool-plate {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.smog-panel .tool-plate img {
+  width: 24px;
+  height: 24px;
+}
+
+.smog-panel .insp-head h3 {
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.air {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 12px 12px;
+}
+
+.air-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.air-foot {
+  flex: none;
+}
+
+.air-section {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.air-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.air-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.air-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.air-bar {
+  height: 8px;
+  overflow: hidden;
+  background: var(--night);
+  border-radius: 999px;
+}
+
+.air-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.air-up .air-bar span {
+  background: var(--orange);
+}
+
+.air-down .air-bar span {
+  background: var(--teal);
+}
+
+.air-row b,
+.air-net b {
+  font-family: var(--f-display);
+  font-weight: 400;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.air-up b {
+  color: var(--orange);
+}
+
+.air-down b {
+  color: var(--teal);
+}
+
+.air-none,
+.air-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.air-warn {
+  color: var(--yellow);
+}
+
+.air-net {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 2px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--f-display);
+  font-size: 16px;
+}
+
+.air-net b {
+  font-size: 18px;
+}
+
+.air-limit {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 1.3;
+  background: rgba(18, 11, 41, 0.55);
+  border-radius: var(--r-s);
+}
+
+.air-limit.danger {
+  color: #fff;
+  background: var(--red);
+  text-shadow: 1px 1px 0 var(--ink);
+}
+
+/* short windows: a tighter smog panel, so the lists fit between the top bar and the build bar */
+@media (max-height: 720px) {
+  .smog-panel .insp-head {
+    padding-block: 5px;
+  }
+
+  .smog-panel .tool-plate {
+    width: 32px;
+    height: 32px;
+  }
+
+  .smog-panel .insp-head h3 {
+    font-size: 15px;
+  }
+
+  /* the level is on the meter right above */
+  .smog-panel .insp-head .tag {
+    display: none;
+  }
+
+  .air-section {
+    margin-top: 6px;
+  }
+
+  .air-list {
+    gap: 0;
+  }
+
+  .air-row {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  .air-scroll .air-note {
+    display: none;
+  }
+
+  .air-net {
+    margin-top: 6px;
+    padding-top: 5px;
+  }
+
+  .air-limit {
+    margin-top: 5px;
+    padding: 4px 8px;
+    font-size: 12px;
   }
 }
 

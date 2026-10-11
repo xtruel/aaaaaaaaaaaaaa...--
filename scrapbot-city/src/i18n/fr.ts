@@ -693,4 +693,21 @@ export const fr: Dict = {
   'msg.rowPartial': "{n} sur {total} posés : les autres cases étaient prises ou l'argent manquait.",
   'extras.controls.5': "<kbd>O</kbd> : objets et modules · <kbd>R</kbd> : tourner (<kbd>Maj</kbd>+<kbd>R</kbd> : dans l'autre sens) · glisser avec le bouton gauche : une rangée de sol ou de clôture",
   'extras.controls.pad3': "<kbd>Y</kbd> tourne aussi une clôture, un portail ou un lampadaire pendant la pose.",
+
+  // ---------- added in 0.7, increment 2: readable smog ----------
+  'hud.smog.more': "Clique ou touche pour voir d'où il vient et où il va.",
+  'smog.title': "D'où il vient et où il va",
+  'smog.sources': "Sources",
+  'smog.cleaning': "Nettoyage",
+  'smog.perDay': "par jour",
+  'smog.none': "Aucune pour l'instant",
+  'smog.sludge': "Boue toxique ({n} cases)",
+  'smog.sludge.one': "Boue toxique ({n} case)",
+  'smog.renewal': "Renouvellement naturel de l'air",
+  'smog.renewal.note': "Plus l'air est sale, plus il se nettoie vite tout seul.",
+  'smog.net': "Total par jour",
+  'smog.overtime': "Heures sup : smog de l'industrie ×1,5 encore {n} s.",
+  'smog.power': "Énergie à {n} % : l'industrie et les Purificateurs tournent moins vite.",
+  'smog.limit': "Au-dessus de {limit} % pendant {seconds} secondes, la ville est perdue.",
+  'smog.countdown': "Au-dessus de {limit} % : la ville est perdue dans {n} s !",
 };

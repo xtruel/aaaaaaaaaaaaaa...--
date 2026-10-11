@@ -2,15 +2,15 @@
 // which tile or building is under a screen point. Art comes from the generated atlas (npm run art).
 //
 // Layers: background → terrain cache (tiles, industrial floors, junk heaps, rubble) → shadows → ground marks →
-// depth-sorted objects (buildings, fences/gates/lamps, bots, cat) → particles → placement preview → night glow →
-// smog → floating text → blimp.
+// depth-sorted objects (buildings, fences/gates/lamps, bots, cat) → blimp → particles → placement preview →
+// night glow → smog clouds and haze → floating text.
 import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { costText, placeCheck } from '../game/actions';
 import type { PlaceCheck } from '../game/actions';
 import { MODULES, PIECES, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
 import type { CatalogKind, ModuleKind, PieceKind, SolidKind } from '../game/pieces';
-import { dayPhase } from '../game/sim';
+import { airEffect, dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
 import type { Bot, Building, FxEvent, GameState } from '../game/state';
 import { hash2 } from '../game/world';
@@ -228,6 +228,121 @@ interface ModulePreview {
   ghost: string | null;
 }
 
+// Smog puffs: small pixel-art clouds with a dark rim, a lighter top over a darker belly, flattened like the ground,
+// in a few sizes (radius in art px). Drawn once into one sheet, then blitted with the alpha each puff needs. Two kinds,
+// the smoke of industry and the fumes over sludge, each in a day and a night tone (at night lit from below by the city).
+const PUFF_R = [4, 6, 8, 11, 15, 20, 28];
+type PuffKind = 'smog' | 'sludge';
+type Light = 'day' | 'night';
+interface PuffFrame {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+interface Puffs {
+  sheet: HTMLCanvasElement;
+  frames: Record<Light, Record<PuffKind, PuffFrame[]>>; // by size, as PUFF_R
+}
+// rim, top, middle, belly
+const PUFF_TONES: Record<Light, Record<PuffKind, [string, string, string, string]>> = {
+  day: { smog: ['#5a4e42', '#d2c4a4', '#ab9b7e', '#877862'], sludge: ['#4a5236', '#b4c27e', '#8f9d60', '#6f7a48'] },
+  night: { smog: ['#2a2030', '#5a4a50', '#7a6258', '#ab7a56'], sludge: ['#1e2619', '#44523a', '#5a6c40', '#7f9844'] },
+};
+let puffs: Puffs | null = null;
+
+// Draws the sheet once. Called when the browser is idle after a city opens (until then no puffs are drawn), so it
+// never lengthens the first frames of a city.
+function makePuffs(): void {
+  if (puffs) return;
+  // three round lobes side by side (centre and size in radii), squashed to two thirds of their height
+  const lobes = [
+    [0, -0.12, 0.62],
+    [-0.42, 0.12, 0.5],
+    [0.44, 0.1, 0.52],
+  ];
+  // each size's shape once: per pixel 0 (empty) or 1 + the tone (rim, top, middle, belly)
+  const shapes = PUFF_R.map((r) => {
+    const w = r * 2 + 2;
+    const h = Math.ceil(r * 1.3) + 2;
+    const inside = (x: number, y: number) => {
+      let up = 2; // where in the lobe the pixel sits, top (-1) to bottom (+1); 2: in none
+      for (const [lx, ly, lr] of lobes) {
+        const dx = (x + 0.5 - w / 2 - lx * r) / (lr * r);
+        const dy = (y + 0.5 - h / 2 - ly * r) / (lr * r * 0.66);
+        if (dx * dx + dy * dy <= 1) up = Math.min(up, dy);
+      }
+      return up;
+    };
+    const tone = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const up = inside(x, y);
+        if (up > 1) continue;
+        const rim = inside(x - 1, y) > 1 || inside(x + 1, y) > 1 || inside(x, y - 1) > 1 || inside(x, y + 1) > 1;
+        tone[y * w + x] = 1 + (rim ? 0 : up < -0.3 ? 1 : up < 0.4 ? 2 : 3);
+      }
+    return { w, h, tone };
+  });
+  const rowH = Math.max(...shapes.map((z) => z.h));
+  const sets: [Light, PuffKind][] = [
+    ['day', 'smog'],
+    ['day', 'sludge'],
+    ['night', 'smog'],
+    ['night', 'sludge'],
+  ];
+  const sheet = document.createElement('canvas');
+  sheet.width = shapes.reduce((n, z) => n + z.w, 0);
+  sheet.height = rowH * sets.length;
+  const ctx = sheet.getContext('2d')!;
+  const data = ctx.createImageData(sheet.width, sheet.height);
+  const frames = { day: { smog: [], sludge: [] }, night: { smog: [], sludge: [] } } as Puffs['frames'];
+  sets.forEach(([light, kind], row) => {
+    const rgb = PUFF_TONES[light][kind].map((hex) => [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16)));
+    let x0 = 0;
+    for (const { w, h, tone } of shapes) {
+      const y0 = row * rowH;
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          const k = tone[y * w + x];
+          if (!k) continue;
+          const o = ((y0 + y) * sheet.width + x0 + x) * 4;
+          data.data[o] = rgb[k - 1][0];
+          data.data[o + 1] = rgb[k - 1][1];
+          data.data[o + 2] = rgb[k - 1][2];
+          data.data[o + 3] = 255;
+        }
+      frames[light][kind].push({ x: x0, y: y0, w, h });
+      x0 += w;
+    }
+  });
+  ctx.putImageData(data, 0, 0);
+  puffs = { sheet, frames };
+}
+
+// The value at x of a line through points [x, y] (x ascending), flat outside them.
+function ramp(x: number, points: readonly (readonly [number, number])[]): number {
+  if (x <= points[0][0]) return points[0][1];
+  for (let k = 1; k < points.length; k++) {
+    const [x1, y1] = points[k];
+    if (x <= x1) {
+      const [x0, y0] = points[k - 1];
+      return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+    }
+  }
+  return points[points.length - 1][1];
+}
+
+// Haze over the whole city by smog level (0..1): clear air under 10%, a light dusty veil from about 20%, thicker and
+// sooty past 50% (the colours fade and the light dims under it), and an overcast sky past 80%. One plain fill over
+// the view, as before: a blend mode that greys the colours costs ten times as much where the canvas has no GPU.
+const HAZE_VEIL = [[0.1, 0], [0.2, 0.07], [0.5, 0.22], [0.8, 0.46], [1, 0.56]] as const;
+const HAZE_SOOT = [[0.3, 0], [0.65, 1]] as const; // the veil's colour, from dust to soot
+const HAZE_OVERCAST = [[0.8, 0], [1, 1]] as const;
+const SKY_BANDS = 8; // the low sky's shading, in steps (pixel-art banding; a gradient costs more)
+// A Factory's smoke (the most a building puts out, 0.06 a second) makes a full plume; the others in proportion.
+const PLUME_FULL = 0.06;
+
 function isWorking(s: GameState, b: Building): boolean {
   if (b.built < 1 || b.paused) return false;
   if (b.type === 'solar') return dayPhase(s) < 0.58 && s.derived.efficiency > 0;
@@ -283,6 +398,7 @@ export class Renderer {
   private ghostSeen = new Set<number>();
   private modulePreview: ModulePreview | null = null;
   private reduced = false; // reduced motion, this frame
+  private drift = 0; // seconds the wind has blown: the smog clouds move with it (not while paused or with reduced motion)
   private pieceNames: string[] = new Array<string>(MAP_W * MAP_H).fill(''); // frame of each visible piece this frame
 
   // terrain cache
@@ -321,6 +437,11 @@ export class Renderer {
     whenAtlasReady(() => {
       if (this.terrainState) this.paintAllTerrain(this.terrainState);
     });
+    // the smog puffs are drawn once the city is on screen and the browser has a moment
+    if (!puffs) {
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(makePuffs, { timeout: 1000 });
+      else setTimeout(makePuffs, 200);
+    }
   }
 
   // Each art pixel covers a whole number of device pixels, so the art stays crisp at 125% / 150% scaling too.
@@ -838,7 +959,8 @@ export class Renderer {
     this.drawSelection(s, view, camX, camY);
 
     this.drawLighting(s, camX, camY, img);
-    this.drawSmog(s, view.reducedMotion);
+    if (simRunning && !view.reducedMotion) this.drift += dt;
+    this.drawSmog(s, camX, camY);
     this.drawFloaters(dt, camX, camY);
   }
 
@@ -2138,21 +2260,22 @@ export class Renderer {
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  private drawSmog(s: GameState, reducedMotion: boolean): void {
-    const ctx = this.ctx;
-    const p = s.pollution / 100;
-    if (p > 0.2) {
-      const a = Math.pow(p, 1.6) * 0.42;
-      ctx.fillStyle = `rgba(110,84,48,${a})`;
-      ctx.fillRect(0, 0, this.viewW, this.viewH);
-      ctx.fillStyle = `rgba(150,120,80,${a * 0.5})`;
-      for (let k = 0; k < 5; k++) {
-        const off = reducedMotion ? 0 : (this.clock * (6 + k * 2)) % (this.viewW + 200);
-        const y = ((k * 53) % this.viewH) + Math.sin(this.clock * 0.2 + k) * 6;
-        ctx.fillRect(Math.round(off - 200), Math.round(y), 260, 10 + k * 3);
-      }
+  // ---------- smog ----------
+
+  // Smog you can read: clouds over each building putting smog into the air right now, as thick as what it puts out
+  // (airEffect: the sim's own number, which the smog panel shows too), and low fumes over the sludge, both drifting
+  // with the wind; then the haze over the whole city. Drawn over the night lighting in their night tones (lit from
+  // below by the city), so they still read at night; the lights glow through them.
+  private drawSmog(s: GameState, camX: number, camY: number): void {
+    const night = Math.min(1, darkness(dayPhase(s)) / 0.55);
+    if (puffs) {
+      this.drawSmogClouds(s, camX, camY, puffs, night);
+      this.drawSludgeFumes(s, camX, camY, puffs, night);
     }
+    this.drawHaze(s, puffs, night);
     if (s.smog > 0) {
+      // the smog countdown is running: a red pulse around the edge of the view
+      const ctx = this.ctx;
       const a = 0.15 + 0.15 * Math.sin(this.clock * 6);
       ctx.strokeStyle = `rgba(226,54,75,${a + 0.2})`;
       ctx.lineWidth = 3;
@@ -2161,6 +2284,111 @@ export class Renderer {
     }
   }
 
+  // One puff: the day sprite fading into the night one as the light goes.
+  private puff(sprites: Puffs, kind: PuffKind, r: number, x: number, y: number, alpha: number, night: number): void {
+    const ctx = this.ctx;
+    if (night < 0.98) {
+      const f = sprites.frames.day[kind][r];
+      ctx.globalAlpha = alpha * (1 - night);
+      ctx.drawImage(sprites.sheet, f.x, f.y, f.w, f.h, Math.round(x - f.w / 2), Math.round(y - f.h / 2), f.w, f.h);
+    }
+    if (night > 0.02) {
+      const f = sprites.frames.night[kind][r];
+      ctx.globalAlpha = alpha * night;
+      ctx.drawImage(sprites.sheet, f.x, f.y, f.w, f.h, Math.round(x - f.w / 2), Math.round(y - f.h / 2), f.w, f.h);
+    }
+  }
+
+  private drawSmogClouds(s: GameState, camX: number, camY: number, sprites: Puffs, night: number): void {
+    const thick = 0.8 + (0.4 * s.pollution) / 100; // the same plume reads heavier in a smoggy city
+    for (const b of s.buildings) {
+      const e = airEffect(s, b);
+      if (e <= 0) continue;
+      const top = tileTop(b.x, b.y);
+      const X = top.X - camX;
+      const Y = top.Y - camY;
+      if (X < -60 || X > this.viewW + 140 || Y < -20 || Y > this.viewH + 160) continue;
+      const art = artOf(b);
+      const def = BUILDINGS[b.type];
+      // out of its chimneys (a filtered Smelter's steam tower), else off its roof
+      const vents = art?.points.smoke ?? art?.points.steam ?? [[((def.w - def.h) * TILE) / 2, -(art?.height ?? 20) + 6] as [number, number]];
+      const k = Math.min(1.5, e / PLUME_FULL);
+      const n = Math.max(2, Math.min(10, Math.round(2 + k * 5))); // puffs in the plume
+      const len = 24 + 40 * Math.min(1, k); // how far downwind it carries (art px)
+      const rise = 12 + 10 * Math.min(1, k);
+      const big = Math.max(1, Math.min(PUFF_R.length - 2, Math.round(1 + k * 3.2))); // the size it grows to
+      const a = Math.min(0.85, (0.38 + 0.45 * k) * thick);
+      const seed = hash2(b.id, 7);
+      // a cloud sitting on each vent, then the plume it lets go downwind
+      for (let j = 0; j < vents.length; j++) {
+        const v = vents[j];
+        this.puff(sprites, 'smog', Math.max(1, big - 1), X + v[0] + 2, Y + v[1] - 5 + Math.sin(this.drift * 0.8 + seed * 6 + j) * 1.5, a * 0.9, night);
+      }
+      for (let j = 0; j < n; j++) {
+        const v = vents[j % vents.length];
+        // each puff rides the wind from the vent, grows and thins out; with reduced motion they hold their places
+        const u = (this.drift * (0.06 + 0.02 * seed) + j / n + seed) % 1;
+        const r = Math.min(big, Math.floor(u * (big + 1.5)));
+        const x = X + v[0] + u * len + Math.sin((u + seed) * 9) * 2;
+        const y = Y + v[1] - 2 - u * rise;
+        this.puff(sprites, 'smog', r, x, y, a * (u < 0.1 ? u / 0.1 : 1 - ((u - 0.1) / 0.9) ** 2), night);
+      }
+    }
+    this.ctx.globalAlpha = 1;
+  }
+
+  // Sludge gives off a little smog on every tile: low greenish fumes creeping over each pool.
+  private drawSludgeFumes(s: GameState, camX: number, camY: number, sprites: Puffs, night: number): void {
+    if (this.quality === 'low') return;
+    const a = tileAt(camX, camY);
+    const b = tileAt(camX + this.viewW, camY + this.viewH);
+    const c = tileAt(camX + this.viewW, camY);
+    const d = tileAt(camX, camY + this.viewH);
+    const base = 0.3 + (0.2 * s.pollution) / 100;
+    for (let ty = Math.max(0, c.y - 1); ty <= Math.min(MAP_H - 1, d.y + 1); ty++)
+      for (let tx = Math.max(0, a.x - 1); tx <= Math.min(MAP_W - 1, b.x + 1); tx++) {
+        if (s.tiles[idx(tx, ty)] !== T.SLUDGE) continue;
+        const h = hash2(tx, ty, 61);
+        const u = (this.drift * 0.05 + h) % 1;
+        const top = tileTop(tx, ty);
+        this.puff(sprites, 'sludge', 1 + Math.floor(h * 2), top.X - camX + (u - 0.5) * 12, top.Y - camY + 6 - u * 8, base * Math.sin(u * Math.PI), night);
+      }
+    this.ctx.globalAlpha = 1;
+  }
+
+  // The haze over the whole city: a dusty veil that turns to soot as the smog grows (at night, a murky glow of the
+  // city's lights in it), and past 80% a low sky of smog closing in from the top of the view.
+  private drawHaze(s: GameState, sprites: Puffs | null, night: number): void {
+    const p = s.pollution / 100;
+    if (p <= HAZE_VEIL[0][0]) return; // clear air
+    const ctx = this.ctx;
+    const w = this.viewW;
+    const soot = ramp(p, HAZE_SOOT);
+    // dust (176,156,118) to soot (74,68,60) by day, a dim brown glow (66,48,40) at night
+    const tone = (dust: number, sooty: number, dark: number) => Math.round((dust + (sooty - dust) * soot) * (1 - night) + dark * night);
+    ctx.fillStyle = `rgba(${tone(176, 74, 66)},${tone(156, 68, 48)},${tone(118, 60, 40)},${ramp(p, HAZE_VEIL)})`;
+    ctx.fillRect(0, 0, w, this.viewH);
+    const overcast = ramp(p, HAZE_OVERCAST);
+    if (overcast <= 0) return;
+    // the low sky: darkest at the top, starting under the top bar where it can be seen
+    const y0 = Math.round(this.insets.top / this.pxZoom);
+    const band = Math.ceil((y0 + this.viewH * 0.45) / SKY_BANDS);
+    const sky = `${tone(66, 46, 30)},${tone(58, 40, 24)},${tone(52, 36, 26)}`;
+    for (let k = 0; k < SKY_BANDS; k++) {
+      ctx.fillStyle = `rgba(${sky},${0.7 * overcast * (1 - k / SKY_BANDS)})`;
+      ctx.fillRect(0, k * band, w, band);
+    }
+    // dark clouds of every size rolling along it with the wind
+    if (!sprites) return;
+    const step = Math.round(sprites.frames.day.smog[PUFF_R.length - 1].w * 0.55);
+    const blown = this.drift * 4;
+    for (let m = Math.floor(-blown / step) - 1; m * step + blown < w + step; m++) {
+      const x = m * step + blown;
+      this.puff(sprites, 'smog', PUFF_R.length - 1 - Math.floor(hash2(m, 2) * 2), x, y0 + hash2(m, 3) * 10 - 2, 0.8 * overcast, night);
+      this.puff(sprites, 'smog', PUFF_R.length - 3 - Math.floor(hash2(m, 5) * 2), x + step * (0.3 + hash2(m, 6) * 0.4), y0 + 14 + hash2(m, 4) * 12, 0.5 * overcast, night);
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 export function darkness(phase: number): number {

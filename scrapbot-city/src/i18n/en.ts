@@ -694,4 +694,21 @@ export const en = {
   'msg.rowPartial': '{n} of {total} laid: the other tiles were taken or out of budget.',
   'extras.controls.5': '<kbd>O</kbd>: objects & modules · <kbd>R</kbd>: rotate (<kbd>Shift</kbd>+<kbd>R</kbd>: the other way) · drag with the left button: a row of floor or fence',
   'extras.controls.pad3': '<kbd>Y</kbd> also turns a fence, gate or lamp post while you place it.',
+
+  // ---------- added in 0.7, increment 2: readable smog ----------
+  'hud.smog.more': 'Click or tap for where it comes from and where it goes.',
+  'smog.title': 'Where it comes from and where it goes',
+  'smog.sources': 'Sources',
+  'smog.cleaning': 'Cleaning',
+  'smog.perDay': 'per day',
+  'smog.none': 'None right now',
+  'smog.sludge': 'Toxic sludge ({n} tiles)',
+  'smog.sludge.one': 'Toxic sludge ({n} tile)',
+  'smog.renewal': 'Natural air renewal',
+  'smog.renewal.note': 'The dirtier the air, the faster it clears by itself.',
+  'smog.net': 'Total per day',
+  'smog.overtime': 'Overtime: industry smog ×1.5 for {n}s more.',
+  'smog.power': 'Power at {n}%: industry and Purifiers work slower.',
+  'smog.limit': 'Above {limit}% for {seconds} seconds the city is lost.',
+  'smog.countdown': 'Above {limit}%: the city is lost in {n}s!',
 };

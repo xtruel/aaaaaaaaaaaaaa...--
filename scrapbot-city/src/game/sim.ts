@@ -13,6 +13,7 @@ import {
   T,
   TILE,
 } from './defs';
+import type { BuildingType } from './defs';
 import { addWaste, canAfford, costText, gain, partsReserve, pay, setTile, spawnJunk } from './actions';
 import { bName, t, tk } from '../i18n';
 import { cityById, goalText, updateStars } from './cities';
@@ -210,27 +211,47 @@ function runProcess(s: GameState, b: Building, work: number): void {
   }
 }
 
+// What a building puts into the air (+) or takes out of it (-) per second right now: industry while it runs (slower
+// without enough power, faster on overtime), a Burner while it has fuel, a Purifier or a Garden unless paused.
+// updatePollution adds these up; the smog panel and the clouds on the map show the same numbers.
+export function airEffect(s: GameState, b: Building, overtime = s.time < s.overtimeUntil ? 1.5 : 1): number {
+  if (b.built < 1) return 0;
+  const st = buildingStats(b); // a Smelter filter lowers the Smelter's pollution
+  if (st.pollution > 0) {
+    if (BUILDINGS[b.type].fuel) return b.fuel > 0 ? st.pollution * overtime : 0;
+    return b.status === 'ok' ? st.pollution * overtime * s.derived.efficiency : 0;
+  }
+  if (st.pollution < 0 && !b.paused) {
+    const power = st.energy < 0 ? s.derived.efficiency : 1;
+    return st.pollution * power;
+  }
+  return 0;
+}
+
+const BUILDING_TYPES = Object.keys(BUILDINGS) as BuildingType[];
+
 function updatePollution(s: GameState, dt: number, overtime: number): void {
+  // the same sum as always, in the same order; each part is also kept in derived.air for the smog panel
+  const air = s.derived.air;
+  for (const type of BUILDING_TYPES) {
+    air.byType[type] = 0;
+    air.count[type] = 0;
+  }
   let rate = 0;
   for (const b of s.buildings) {
-    if (b.built < 1) continue;
-    const def = BUILDINGS[b.type];
-    const st = buildingStats(b); // a Smelter filter lowers the Smelter's pollution
-    if (st.pollution > 0) {
-      if (def.fuel) {
-        if (b.fuel > 0) rate += st.pollution * overtime;
-      } else if (b.status === 'ok') {
-        rate += st.pollution * overtime * s.derived.efficiency;
-      }
-    } else if (st.pollution < 0 && !b.paused) {
-      const power = st.energy < 0 ? s.derived.efficiency : 1;
-      rate += st.pollution * power;
-    }
+    const effect = airEffect(s, b, overtime);
+    if (effect === 0) continue;
+    rate += effect;
+    air.byType[b.type] += effect;
+    air.count[b.type]++;
   }
   let sludge = 0;
   for (let i = 0; i < s.tiles.length; i++) if (s.tiles[i] === T.SLUDGE) sludge++;
-  rate += sludge * SLUDGE_EMISSION;
-  if (s.pollution > 0) rate -= (DECAY_BASE + s.pollution * DECAY_PER_POINT) * s.mods.decay;
+  air.sludgeTiles = sludge;
+  air.sludge = sludge * SLUDGE_EMISSION;
+  rate += air.sludge;
+  air.renewal = s.pollution > 0 ? -((DECAY_BASE + s.pollution * DECAY_PER_POINT) * s.mods.decay) : 0;
+  rate += air.renewal;
   s.derived.pollutionRate = rate;
   s.pollution = clamp(s.pollution + rate * dt, 0, 100);
 }

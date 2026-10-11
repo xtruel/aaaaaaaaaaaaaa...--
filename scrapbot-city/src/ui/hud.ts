@@ -38,6 +38,8 @@ import {
 } from './catalog';
 import type { PieceInfo } from './catalog';
 import { esc } from './escape';
+import { airReport, perDayText } from './smog';
+import type { AirRow } from './smog';
 
 export interface HudHandlers {
   onBuild(type: BuildingType | null): void;
@@ -94,6 +96,11 @@ export function typeForHotkey(code: string): BuildingType | null {
   const numpad = code.startsWith('Numpad') ? `Digit${code.slice(6)}` : code;
   const i = HOTKEY_CODES.indexOf(numpad);
   return i >= 0 && i < BUILD_ORDER.length ? BUILD_ORDER[i] : null;
+}
+
+// The smog meter's arrow: rising or falling faster than 0.01 a second (0.6 a day).
+function trend(rate: number): string {
+  return rate > 0.01 ? ' ▲' : rate < -0.01 ? ' ▼' : '';
 }
 
 function fmt(n: number): string {
@@ -171,14 +178,19 @@ export class Hud {
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
   private catalogKey = '';
   private starsKey = '';
+  private smogOpen = false; // the smog panel (a click on the smog meter opens and closes it)
+  private smogKey = '';
   private s: GameState;
   private layout = new ResizeObserver(() => this.placePanels());
+  // a press anywhere but on the smog panel or its meter closes the panel (and goes on doing what it does)
+  private pressOutside = (e: PointerEvent) => this.closeSmogUnless(e.target as Element | null);
 
   constructor(root: HTMLElement, handlers: HudHandlers, s: GameState) {
     this.root = root;
     this.handlers = handlers;
     this.s = s;
     this.build();
+    document.addEventListener('pointerdown', this.pressOutside, true);
   }
 
   // After a language change: rebuild every label, keep the game state as it is.
@@ -188,12 +200,14 @@ export class Hud {
     this.inspectorKey = '';
     this.catalogKey = '';
     this.starsKey = '';
+    this.smogKey = '';
     this.last = {};
     this.build();
   }
 
   dispose(): void {
     this.layout.disconnect();
+    document.removeEventListener('pointerdown', this.pressOutside, true);
     document.documentElement.style.removeProperty('--toast-top');
   }
 
@@ -210,9 +224,11 @@ export class Hud {
     style.setProperty('--top-c', `${reach(1)}px`);
     style.setProperty('--top-r', `${reach(2)}px`);
     style.setProperty('--dock', `${window.innerHeight - this.el.toolbar.getBoundingClientRect().top}px`);
-    // achievement toasts (outside the HUD) drop below the top bar and the smog alarm instead of covering them
+    // achievement toasts (outside the HUD) drop below the top bar and the smog alarm instead of covering them; so
+    // does the smog panel, which keeps the alarm in sight
     const alarm = this.el['smog-alert'].getBoundingClientRect();
     document.documentElement.style.setProperty('--toast-top', `${Math.max(reach(1), alarm.bottom) + 10}px`);
+    style.setProperty('--below-alarm', `${Math.max(reach(1), alarm.bottom) + 10}px`);
   }
 
   private build(): void {
@@ -234,12 +250,12 @@ export class Hud {
           ${res('happy', 'happy', t('res.happiness'), 'var(--lime)')}
         </div>
         <div class="meters">
-          <div class="meter meter-smog" title="${t('hud.smog.title', { limit: SMOG_DANGER, seconds: SMOG_LIMIT_SECONDS })}">
+          <button type="button" class="meter meter-smog" data-smog-meter aria-expanded="false" aria-controls="smog-panel" title="${t('hud.smog.title', { limit: SMOG_DANGER, seconds: SMOG_LIMIT_SECONDS })} ${t('hud.smog.more')}">
             <span class="meter-ico"><img src="${iconUrl('smog')}" alt="" /></span>
             <span class="meter-label">${t('hud.smog')}</span>
-            <div class="bar"><span data-smog-bar></span></div>
+            <span class="bar"><span data-smog-bar></span></span>
             <b data-smog></b>
-          </div>
+          </button>
           <div class="meter meter-path" title="${t('hud.path.title')}">
             <span class="path-g"><img src="${iconUrl('leaf')}" alt="" />${t('hud.green')}</span>
             <div class="track"><span class="knob" data-knob></span></div>
@@ -272,6 +288,17 @@ export class Hud {
       </div>
       <div class="feed" data-feed aria-live="polite"></div>
       <div class="smog-alert" data-smog-alert hidden></div>
+      <aside class="smog-panel" id="smog-panel" data-smog-panel aria-label="${esc(t('hud.smog'))}" hidden>
+        <div class="insp-head">
+          <span class="tool-plate"><img src="${iconUrl('smog', 3)}" alt="" /></span>
+          <div>
+            <p class="tag" data-smog-level></p>
+            <h3>${esc(t('smog.title'))}</h3>
+          </div>
+          <button type="button" class="modal-x" data-smog-close aria-label="${t('common.close')}">×</button>
+        </div>
+        <div class="air" data-smog-body></div>
+      </aside>
       <aside class="inspector" data-inspector hidden></aside>
       <aside class="inspector catalog" data-catalog-panel aria-label="${esc(t('hud.catalog'))}" hidden></aside>
       <div class="tooltip" data-tooltip hidden></div>
@@ -281,7 +308,7 @@ export class Hud {
       const key = node.closest<HTMLElement>('[data-res]')!.dataset.res!;
       this.el[`${key}:${node.hasAttribute('data-v') ? 'v' : 'cap'}`] = node;
     }
-    for (const name of ['smog-bar', 'smog', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'tooltip', 'toolbar']) {
+    for (const name of ['smog-bar', 'smog', 'smog-meter', 'smog-panel', 'smog-level', 'smog-body', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'tooltip', 'toolbar']) {
       this.el[name] = this.root.querySelector(`[data-${name}]`)!;
     }
 
@@ -304,6 +331,16 @@ export class Hud {
       audio.play('click');
       this.handlers.onMenu();
     });
+    this.el['smog-meter'].addEventListener('click', () => {
+      audio.play('click');
+      this.smogOpen = !this.smogOpen;
+      this.showSmog();
+    });
+    this.root.querySelector('[data-smog-close]')!.addEventListener('click', () => {
+      audio.play('click');
+      this.closeSmog();
+    });
+    this.showSmog();
 
     const toolbar = this.el.toolbar;
     const groups = new Map<string, HTMLElement>();
@@ -499,7 +536,7 @@ export class Hud {
     this.root.querySelector('[data-import]')!.classList.toggle('nudge', s.res.parts < PARTS_RESERVE && s.res.credits >= IMPORT_PARTS.credits * 2);
 
     const pol = Math.round(s.pollution);
-    set('smog', `${pol}%${d.pollutionRate > 0.01 ? ' ▲' : d.pollutionRate < -0.01 ? ' ▼' : ''}`);
+    set('smog', `${pol}%${trend(d.pollutionRate)}`);
     (this.el['smog-bar'] as HTMLElement).style.width = `${s.pollution}%`;
     this.el['smog-bar'].dataset.level = pol >= 75 ? 'high' : pol >= 45 ? 'mid' : 'low';
     this.el.knob.style.left = `${50 - s.alignment / 2}%`;
@@ -538,6 +575,7 @@ export class Hud {
     const alert = this.el['smog-alert'];
     alert.hidden = s.smog <= 0;
     if (s.smog > 0) set('smog-alert', t('hud.smogAlert', { limit: SMOG_DANGER, n: Math.max(0, Math.ceil(SMOG_LIMIT_SECONDS - s.smog)) }));
+    if (this.smogOpen) this.updateSmog(s);
 
     // the goal card's next step glows on the build bar; the tutorial points at things with its own ring
     const next = s.tutorial ? [] : objectiveTools(s);
@@ -559,6 +597,70 @@ export class Hud {
 
     this.updateCatalog(s, view);
     this.updateInspector(s, view);
+  }
+
+  // ---------- smog panel ----------
+
+  // Esc, B, the panel's ×: true when the panel was open (so that press does nothing else).
+  closeSmog(): boolean {
+    if (!this.smogOpen) return false;
+    this.smogOpen = false;
+    this.showSmog();
+    return true;
+  }
+
+  // A press (or the controller's A) on anything but the panel or the meter closes it.
+  closeSmogUnless(target: Element | null): void {
+    if (this.smogOpen && !(target && (this.el['smog-panel'].contains(target) || this.el['smog-meter'].contains(target)))) this.closeSmog();
+  }
+
+  get smogShown(): boolean {
+    return this.smogOpen;
+  }
+
+  private showSmog(): void {
+    this.el['smog-panel'].hidden = !this.smogOpen;
+    this.el['smog-meter'].setAttribute('aria-expanded', String(this.smogOpen));
+    this.el['smog-meter'].classList.toggle('active', this.smogOpen);
+    this.smogKey = '';
+    if (this.smogOpen) this.updateSmog(this.s);
+  }
+
+  // Where the smog comes from and where it goes, from the sim's own breakdown; rewritten only when a number changes.
+  private updateSmog(s: GameState): void {
+    const r = airReport(s);
+    const level = `${t('hud.smog')} ${Math.round(s.pollution)}%${trend(s.derived.pollutionRate)}`;
+    if (this.el['smog-level'].textContent !== level) this.el['smog-level'].textContent = level;
+    const all = [...r.sources, ...r.cleaning];
+    const most = Math.max(0.1, ...all.map((row) => Math.abs(row.perDay)));
+    const item = (row: AirRow) => `
+      <li class="air-row ${row.perDay > 0 ? 'air-up' : 'air-down'}" data-air="${row.kind}">
+        <span class="air-name">${esc(row.label)}</span>
+        <span class="air-bar"><span style="width:${Math.max(4, Math.round((Math.abs(row.perDay) / most) * 100))}%"></span></span>
+        <b>${perDayText(row.perDay)}</b>
+      </li>`;
+    const list = (rows: AirRow[]) => (rows.length ? `<ul class="air-list">${rows.map(item).join('')}</ul>` : `<p class="air-none">${t('smog.none')}</p>`);
+    const net = r.net > 0.05 ? 'air-up' : r.net < -0.05 ? 'air-down' : '';
+    // the lists scroll on a short window; the total and the 95% rule stay in sight under them
+    const html = `
+      <div class="air-scroll">
+        <h4 class="cat-section air-section"><span>${t('smog.sources')}</span><span>${t('smog.perDay')}</span></h4>
+        ${list(r.sources)}
+        <h4 class="cat-section air-section"><span>${t('smog.cleaning')}</span></h4>
+        ${list(r.cleaning)}
+        ${r.cleaning.some((row) => row.kind === 'renewal') ? `<p class="air-note">${t('smog.renewal.note')}</p>` : ''}
+      </div>
+      <div class="air-foot">
+        <p class="air-net ${net}" data-air-net><span>${t('smog.net')}</span><b>${perDayText(r.net)}${trend(s.derived.pollutionRate)}</b></p>
+        ${r.notes.map((n) => `<p class="air-note air-warn">${esc(n)}</p>`).join('')}
+        <p class="air-limit${r.danger ? ' danger' : ''}" data-air-limit>${esc(r.limit)}</p>
+      </div>`;
+    if (html === this.smogKey) return;
+    this.smogKey = html;
+    const body = this.el['smog-body'];
+    const scrolled = body.querySelector('.air-scroll')?.scrollTop ?? 0;
+    body.innerHTML = html;
+    body.querySelector('.air-scroll')!.scrollTop = scrolled;
   }
 
   // ---------- Objects & modules ----------

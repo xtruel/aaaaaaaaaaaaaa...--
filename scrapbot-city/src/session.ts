@@ -271,7 +271,7 @@ export class GameSession implements PadTarget {
     const r = this.renderer;
     // words on the map (a module's effect, why a piece cannot go there) also keep clear of an open side panel and
     // of the goal card; on a narrow window both sit across the bottom
-    r.labelAvoid = [...this.root.querySelectorAll<HTMLElement>('[data-inspector], [data-catalog-panel], [data-objective]')]
+    r.labelAvoid = [...this.root.querySelectorAll<HTMLElement>('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective]')]
       .filter((el) => el.offsetParent)
       .map((el) => el.getBoundingClientRect());
     if (insets.top === r.insets.top && insets.bottom === r.insets.bottom) return;
@@ -702,7 +702,8 @@ export class GameSession implements PadTarget {
     }
     switch (code) {
       case 'Escape':
-        // one thing at a time: the tool or selection, then the Objects & modules panel, then the menu
+        // one thing at a time: the smog panel, the tool or selection, then the Objects & modules panel, then the menu
+        if (this.hud.closeSmog()) break;
         if (this.hasTool()) this.cancelTool();
         else if (this.catalog) this.closeCatalog();
         else this.openPause();
@@ -1110,10 +1111,12 @@ export class GameSession implements PadTarget {
     const p = f.pressed;
     if (p.has('a')) {
       audio.unlock();
+      // like a press of the mouse or a finger: anywhere but on the smog panel or its meter, it closes the panel
+      this.hud.closeSmogUnless(el);
       if (overMap) this.click(c.x, c.y);
       else (btn ?? el)?.click();
     }
-    if (p.has('b')) {
+    if (p.has('b') && !this.hud.closeSmog()) {
       if (this.hasTool()) this.cancelTool();
       else if (this.catalog) this.closeCatalog();
     }
