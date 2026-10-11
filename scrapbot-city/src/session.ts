@@ -862,8 +862,9 @@ export class GameSession implements PadTarget {
     this.row = null;
     this.selectedId = -1;
     this.selectedPiece = -1;
-    // a press still held ends here too, so its release neither buys nor selects (a map being dragged goes on)
-    if (this.drag && !this.drag.moved) this.drag = null;
+    // a left-button press still held ends here too, so its release neither buys nor selects (the other buttons
+    // and a finger go on moving the map)
+    if (this.drag?.button === 0 && this.drag.pointerType === 'mouse') this.drag = null;
   }
 
   // A building (or nothing: -1) takes the right-hand panel, so the catalog closes.
