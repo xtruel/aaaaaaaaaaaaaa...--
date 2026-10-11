@@ -81,8 +81,7 @@ describe('catalog wording', () => {
     expect(MACHINE_MODULES).toEqual(['dockStorage', 'smelterFilter', 'recyclerMagnet', 'recyclerSorter', 'factoryArm', 'podsCapsule', 'solarTracker', 'purifierNozzle']);
     // every module has its name (the "slot taken by" reason uses it)
     for (const kind of MACHINE_MODULES) expect(catalogName(kind), kind).not.toMatch(/^mod\./);
-    // effect and limit wording of the increment-2 modules comes with their panel rows (UI, increment 2 G1)
-    for (const kind of [...CONSTRUCTION, ...MACHINE_MODULES.slice(0, 2)]) {
+    for (const kind of [...CONSTRUCTION, ...MACHINE_MODULES]) {
       for (const text of [catalogName(kind), catalogEffect(kind), catalogLimit(kind)]) {
         expect(text, kind).not.toMatch(/^(pc|mod|cat)\./);
         expect(text, kind).not.toMatch(/\{\w+\}/);
@@ -104,8 +103,9 @@ describe('catalog wording', () => {
       { stat: 'smog', before: '+2.1', after: '+0.8' },
       { stat: 'energy', before: '-2', after: '-3' },
     ]);
-    // a module that is already there is not counted twice in its own "before"
-    expect(moduleRows('dock', 'dockStorage', ['dockStorage'])).toEqual([{ stat: 'storage', before: '80', after: '180' }]);
+    // one slot: the "before" is always the plain building, whatever is installed (the sorter's numbers do not
+    // change when the magnet holds the slot)
+    expect(moduleRows('recycler', 'recyclerSorter')[0]).toEqual({ stat: 'output', res: 'parts', before: '2', after: '3' });
     expect(catalogEffect('dockStorage')).toBe('Bot Dock storage 80 → 180 scrap');
     expect(catalogEffect('smelterFilter')).toBe('Smelter smog +2.1 → +0.8 per day, energy -2 → -3, same output');
   });

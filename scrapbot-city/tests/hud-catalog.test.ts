@@ -84,6 +84,15 @@ function setup(s = city()) {
 
 const q = (root: HTMLElement, sel: string) => root.querySelector<HTMLElement>(sel);
 
+// A row of the building panel's numbers: [at full power, now] (a value that does not change with power: [value]).
+function row(insp: HTMLElement, label: string): string[] {
+  const dt = [...insp.querySelectorAll('.insp-rows dt')].find((d) => d.textContent === label);
+  if (!dt) throw new Error(`no row ${label}`);
+  const out: string[] = [];
+  for (let el = dt.nextElementSibling; el && el.tagName === 'DD'; el = el.nextElementSibling) out.push(el.textContent!);
+  return out;
+}
+
 describe('toolbar', () => {
   it('keeps every tutorial target and adds Objects & modules (key O) next to the bulldozer', () => {
     const { root, calls, update } = setup();
@@ -219,15 +228,15 @@ describe('building panel modules', () => {
     expect(q(magnet, '[data-install]')!.hasAttribute('disabled')).toBe(true);
     expect(magnet.querySelector('.cat-reason')!.textContent).toBe('Slot taken by Precision sorter: remove it first');
     update({ selectedId: pods.id });
-    expect(rows()).toContain('Citizens: 6');
+    expect(row(insp, 'Homes')).toEqual(['6', '6']);
     installModule(s, 'podsCapsule', pods);
     update({ selectedId: pods.id });
-    expect(rows()).toContain('Citizens: 9');
+    expect(row(insp, 'Homes')).toEqual(['9', '9']);
     update({ selectedId: pur.id });
-    expect(rows()).toContain('Radius: 5 tiles');
+    expect(row(insp, 'Sludge radius (tiles)')).toEqual(['5']);
     installModule(s, 'purifierNozzle', pur);
     update({ selectedId: pur.id });
-    expect(rows()).toContain('Radius: 8 tiles');
+    expect(row(insp, 'Sludge radius (tiles)')).toEqual(['8']);
   });
 
   it('shows the slot, before -> after, 0/1 and Install; then 1/1 and Remove with a second click', () => {
@@ -251,7 +260,7 @@ describe('building panel modules', () => {
     const on = q(insp, '[data-mod="dockStorage"]')!;
     expect(on.querySelector('.mod-count')!.textContent).toBe('1/1');
     // the building rows now show the storage with the module
-    expect(insp.querySelector('dl')!.textContent).toContain('180 scrap');
+    expect(row(insp, 'Storage')).toEqual(['180', '180']);
     const clock = vi.spyOn(performance, 'now').mockReturnValue(10_000);
     try {
       q(on, '[data-remove]')!.click();

@@ -1843,6 +1843,145 @@ select {
   color: var(--yellow);
 }
 
+/* 0.7 (increment 2, G1): why a building is in its state, in words with an icon (never by colour alone) */
+.insp-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  line-height: 1.15;
+}
+
+.insp-status img {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  image-rendering: pixelated;
+}
+
+.cause-ok {
+  color: var(--lime);
+}
+
+.cause-building,
+.cause-reserve {
+  color: var(--sky);
+}
+
+.cause-lowPower,
+.cause-noPower {
+  color: var(--yellow);
+}
+
+.cause-noFuel {
+  color: var(--orange);
+}
+
+.cause-noInput {
+  color: var(--red);
+}
+
+.cause-paused {
+  color: var(--muted);
+}
+
+/* nominal (full power) and now, side by side; a value that does not change with power spans both columns */
+.inspector .insp-rows,
+.inspector .mod-fx.with-now {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+}
+
+.inspector .insp-rows.no-now {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.inspector .insp-rows dt,
+.inspector .mod-fx dt {
+  overflow-wrap: anywhere;
+}
+
+.inspector dd.span {
+  grid-column: 2 / -1;
+}
+
+.inspector .rows-head {
+  font-family: var(--f-display);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.inspector dd.now {
+  min-width: 2.5em;
+  color: var(--teal);
+  font-variant-numeric: tabular-nums;
+}
+
+.insp-note {
+  margin-block: -6px 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--orange);
+}
+
+.mod-slot {
+  margin: -2px 0 6px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.mod-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 2px;
+  font-family: var(--f-display);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.mod-state img {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.mod-state.state-installed,
+.mod-state.state-available {
+  color: var(--lime);
+}
+
+.mod-state.state-slotTaken {
+  color: var(--yellow);
+}
+
+.mod-state.state-cantBuy {
+  color: var(--red);
+}
+
+.mod-price {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+/* scrap the bots brought back that waits for room in storage: next to the storage limit, on its line */
+.res-sub {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.res small.res-wait {
+  color: var(--orange);
+  white-space: nowrap;
+}
+
 .piece-note {
   font-family: var(--f-body);
   font-size: 14px;
