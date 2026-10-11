@@ -1,4 +1,4 @@
-# Scrapbot City — build 0.6.1
+# Scrapbot City — build 0.7.0-alpha.1
 
 City builder in pixel art: piccoli robot raccolgono spazzatura, tu decidi cosa diventa.
 **Recycle × Build × Expand × Survive.** Un pianeta pulito o un profitto più grande?
@@ -43,6 +43,9 @@ Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
 
 ## Cosa c'è nel gioco
 
+- **Oggetti e moduli** (tasto `O`): pavimento industriale, recinzioni, cancelli e lampioni per dare forma ai quartieri
+  (solo decorazione), il deposito aggiuntivo per il Bot Dock e il filtro antismog per la Fonderia. Si paga alla conferma;
+  anteprima e annullamento sono gratis. Dettagli in [docs/MODULAR-INC1.md](docs/MODULAR-INC1.md).
 - **Suggerimenti** (lampadina o tasto `Q`): USA-9 legge la città e consiglia cosa costruire, spiegando il perché.
   I primi 3 per città sono gratis e uno nuovo torna ogni 5 giorni. Poi si pagano in crediti, e il prezzo sale a ogni acquisto.
 - **18 achievement**, salvati localmente e inviati a Steam nella versione desktop.
@@ -79,7 +82,10 @@ i testi di aiuto mostrano i nomi dei tasti della tastiera del giocatore (per ese
 | Muovere la camera | WASD, frecce, trascinare col tasto destro o centrale del mouse, un dito sul touch |
 | Zoom | rotella, pinch su trackpad e touch, `+` / `-` |
 | Scegliere un edificio | `1`–`0`, `M` per la Scrap Spire |
-| Ruspa (macerie) | `X` |
+| Ruspa (macerie, oggetti) | `X` |
+| Oggetti e moduli (pavimento, recinzione, cancello, lampione, moduli) | `O` |
+| Ruotare l'oggetto in mano o quello selezionato | `R` / `Shift+R`, `Shift` + rotella |
+| Posare una fila di pavimento o recinzione | trascinare col tasto sinistro |
 | Suggerimento | `Q` |
 | Annullare | clic destro, `Esc` |
 | Pausa / velocità | `Space` / `Tab` |
@@ -87,7 +93,8 @@ i testi di aiuto mostrano i nomi dei tasti della tastiera del giocatore (per ese
 | Schermo intero (desktop) | `F11` |
 
 Con il **controller**: stick sinistro = cursore, stick destro = mappa, `A` costruisce o seleziona, `B` annulla,
-`LB`/`RB` scelgono l'edificio, `LT`/`RT` zoom, `X` ruspa, `Y` suggerimento, `Start` menu,
+`LB`/`RB` scelgono l'edificio, `LT`/`RT` zoom, `X` ruspa, `Y` suggerimento (con una recinzione, un cancello o un
+lampione in mano `Y` lo ruota), `Start` menu,
 D-pad = una casella alla volta, `View` pausa, `L3` velocità, `R3` torna all'HQ. Nei menu: D-pad o stick, `A` conferma, `B` indietro.
 
 ## Struttura

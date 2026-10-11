@@ -167,7 +167,7 @@ export function openCredits(): void {
     body: `
       <dl class="credits">
         <dt>${t('credits.design')}</dt><dd>Qwerty3D Games</dd>
-        <dt>${t('credits.build')}</dt><dd>0.6.1 · Pixel Planet Initiative</dd>
+        <dt>${t('credits.build')}</dt><dd>0.7.0-alpha.1 · Pixel Planet Initiative</dd>
         <dt>${t('credits.music')}</dt><dd>${t('credits.musicValue')}</dd>
         <dt>${t('credits.fonts')}</dt><dd>Bungee, Lilita One, Nunito, Silkscreen, Permanent Marker, DotGothic16 (SIL Open Font License)</dd>
         <dt>${t('credits.morale')}</dt><dd>${t('credits.moraleValue')}</dd>

@@ -70,10 +70,10 @@ export class MainMenu {
     this.ui.innerHTML = `
       <header class="corner corner-tl">
         <div class="studio">${GLOBE}<span>Qwerty3D<br />Games</span></div>
-        <p>Build_0.6.1<br />Oct 10 2026</p>
+        <p>Build_0.7.0-alpha.1<br />Oct 11 2026</p>
       </header>
       <div class="corner-right">
-        <p class="corner corner-tr">Version 0.6.1<br />Pixel Planet Initiative<br />© 2026 Qwerty3D<br />All rights reserved</p>
+        <p class="corner corner-tr">Version 0.7.0-alpha.1<br />Pixel Planet Initiative<br />© 2026 Qwerty3D<br />All rights reserved</p>
         <button type="button" class="lang-pill" data-lang-open aria-label="${t('menu.language')}">${GLOBE}<span>${langName}</span></button>
       </div>
       <div class="menu-left">

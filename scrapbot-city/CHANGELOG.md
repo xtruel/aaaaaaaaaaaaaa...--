@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.7.0-alpha.1 — costruzione modulare, incremento 1
+
+- **Sei elementi nuovi nel pannello «Oggetti e moduli»** (pulsante nella barra degli strumenti accanto alla ruspa, tasto
+  `O`), divisi in Costruzioni e Moduli macchina; ogni voce mostra icona, nome, costo, effetto, limite e, se non si può
+  avere, il motivo:
+  - **Pavimento industriale**: 3 crediti a casella. Ci si costruiscono sopra edifici e oggetti; riappare quando
+    l'edificio sopra viene demolito. Rimborso 1 credito.
+  - **Recinzione**: 4 crediti a casella, si raccorda da sola con recinzioni e cancelli. Rimborso 2 crediti.
+  - **Cancello**: 12 crediti, si allinea alle recinzioni. Rimborso 6 crediti.
+  - **Lampione**: 10 crediti + 2 pezzi, braccio in 4 direzioni, di notte illumina la strada. Rimborso 5 crediti + 1 pezzo.
+  - **Deposito aggiuntivo** per l'Hangar Bot (Bot Dock): 30 crediti + 15 pezzi, deposito del Dock 80 → 180 rottami.
+    Rimborso 15 crediti + 7 pezzi.
+  - **Filtro antismog** per la Fonderia: 45 crediti + 20 pezzi, smog della Fonderia 0,035 → 0,014 al secondo
+    (+2,1 → +0,8 al giorno), energia −2 → −3, stessa produzione. Rimborso 22 crediti + 10 pezzi.
+
+  Pavimenti, recinzioni, cancelli e lampioni sono decorazioni: nessun effetto su economia, felicità, stelle,
+  achievement o indicatore Green ◀ ▶ Industry. Nessuno dei sei elementi serve per finire una città.
+- **Si paga una sola volta, alla conferma** (clic, tocco o `A`): l'anteprima (fantasma verde o rosso, con il motivo
+  scritto sulla mappa) e l'annullamento (`Esc`, clic destro, `B`, «Fatto») non costano nulla.
+- **File col mouse**: con pavimento o recinzione in mano, trascinare col tasto sinistro posa una fila, anche ad L.
+  Ogni casella si paga quando viene posata; quelle occupate o fuori budget vengono saltate senza costo. Il tasto
+  sinistro continua a non spostare la mappa; sul touch un dito sposta la mappa come prima.
+- **Rotazione**: `R` (`Shift+R` al contrario) o `Shift` + rotellina; sul controller `Y` quando lo strumento in mano si
+  può ruotare (altrimenti `Y` resta il suggerimento); sul touch il pulsante «⟳ Ruota» nel pannello. Un oggetto già
+  posato si seleziona con un clic e si ruota o si rimuove dal suo pannello.
+- **Rimozione e rimborsi**: la ruspa, o «Rimuovi» nel pannello, su una recinzione, un cancello o un lampione rende
+  metà del prezzo; su un pavimento libero 1 credito; su un edificio lo seleziona come prima.
+- **Moduli nel pannello dell'edificio** (Hangar Bot, Fonderia): sezione «Moduli» con lo slot, l'effetto prima → dopo
+  (deposito, smog, energia), il limite 0/1 o 1/1, «Installa» (disattivato con il motivo) e «Rimuovi (+rimborso)» con
+  conferma, che avvisa se dei rottami andranno persi. I numeri del pannello (energia, smog, deposito) contano i moduli.
+- **Demolizione**: la conferma mostra il rimborso totale, moduli compresi, e i moduli spariscono con l'edificio. Come
+  la conferma della rimozione di un modulo, non accetta clic nei primi 350 ms: un doppio clic su «Demolisci» non
+  demolisce più l'edificio senza che la conferma sia stata vista (succedeva già nella 0.6.1).
+- **Grafica**: pavimenti disegnati nel terreno, recinzioni che si raccordano, cancelli e lampioni con la luce notturna,
+  il Dock con i silos del deposito sul tetto, la Fonderia con la torre del filtro (niente fumo scuro, vapore chiaro).
+  I cittadini girano attorno a recinzioni, cancelli e lampioni; i bot ci volano sopra.
+- Le scritte sulla mappa (effetto di un modulo, motivo di un rifiuto) restano fuori dal pannello laterale aperto e dalla
+  carta dell'obiettivo. I prezzi con quantità 1 sono al singolare in tutte le 8 lingue («1 credito», «1 pezzo», in
+  polacco «1 część»).
+- **Salvataggi**: stesso formato (versione 2, con campi nuovi facoltativi); i salvataggi della 0.6 si caricano senza
+  cambiamenti.
+- **Non in questo incremento**: gli altri 18 oggetti del catalogo, i nuovi eventi e la modalità infinita.
+
 ## 0.6.1 — comandi della camera
 
 - **Il tasto sinistro del mouse non sposta più la mappa**: serve solo a selezionare e costruire. La mappa si sposta
