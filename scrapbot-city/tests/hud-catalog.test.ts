@@ -167,6 +167,25 @@ describe('catalog panel', () => {
     expect(lamp.querySelector('.cat-reason')!.textContent).toBe('Missing 5 credits + 2 parts');
     expect(q(root, '[data-item="fence"]')!.classList.contains('cant')).toBe(false);
   });
+
+  it('follows the money coming in without rebuilding the list (a rebuild would lose a click)', () => {
+    const { s, root, update } = setup();
+    s.res.credits = 5;
+    s.res.parts = 0;
+    update({ catalog: true });
+    const lamp = q(root, '[data-item="lamp"]')!;
+    s.res.credits = 7.5;
+    update({ catalog: true });
+    expect(q(root, '[data-item="lamp"]')).toBe(lamp);
+    expect(lamp.querySelector('.cat-reason')!.textContent).toBe('Missing 3 credits + 2 parts');
+    // once the city can pay, the same row is no longer greyed out
+    s.res.credits = 10;
+    s.res.parts = 2;
+    update({ catalog: true });
+    expect(q(root, '[data-item="lamp"]')).toBe(lamp);
+    expect(lamp.classList.contains('cant')).toBe(false);
+    expect(lamp.querySelector<HTMLElement>('.cat-reason')!.hidden).toBe(true);
+  });
 });
 
 describe('building panel modules', () => {
@@ -226,6 +245,28 @@ describe('building panel modules', () => {
     expect(q(insp, '[data-confirm]')!.textContent).toBe('Demolish (+37 credits + 10 parts)');
     q(insp, '[data-confirm]')!.click();
     expect(calls.at(-1)).toEqual(['onDemolish', smelter.id]);
+  });
+
+  it('follows the money a module still needs without rebuilding the panel', () => {
+    const { s, root, update } = setup();
+    const dock = build(s, 'dock');
+    s.res.credits = 20;
+    update({ selectedId: dock.id });
+    const insp = q(root, '[data-inspector]')!;
+    const demolish = q(insp, '[data-demolish]');
+    expect(q(insp, '[data-mod="dockStorage"] .cat-reason')!.textContent).toBe('Missing 10 credits');
+    s.res.credits = 26;
+    update({ selectedId: dock.id });
+    // the same buttons (a click on Demolish or Pause is not lost), with the new amount
+    expect(q(insp, '[data-demolish]')).toBe(demolish);
+    expect(q(insp, '[data-mod="dockStorage"] .cat-reason')!.textContent).toBe('Missing 4 credits');
+    const install = q(insp, '[data-install="dockStorage"]') as HTMLButtonElement;
+    expect(install.disabled).toBe(true);
+    s.res.credits = 30;
+    update({ selectedId: dock.id });
+    expect(q(insp, '[data-install="dockStorage"]')).toBe(install);
+    expect(install.disabled).toBe(false);
+    expect(q(insp, '[data-mod="dockStorage"] .cat-reason')!.hidden).toBe(true);
   });
 });
 

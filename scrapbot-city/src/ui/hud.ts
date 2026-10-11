@@ -36,7 +36,7 @@ import {
   rowLabel,
   scrapLost,
 } from './catalog';
-import type { CatalogState, PieceInfo } from './catalog';
+import type { PieceInfo } from './catalog';
 import { esc } from './escape';
 
 export interface HudHandlers {
@@ -557,8 +557,9 @@ export class Hud {
 
   // ---------- Objects & modules ----------
 
-  // The catalog panel. Rebuilt only when what it shows changes (what can be bought, the tool in hand, the
-  // controller coming or going), so a click on it is never lost to a rebuild.
+  // The catalog panel. Rebuilt only when the tool in hand changes or a controller comes or goes, so a click on
+  // it is never lost to a rebuild: what can be had right now (money comes in with every tax tick, a Dock gets
+  // finished) is written in place.
   private updateCatalog(s: GameState, view: HudView): void {
     const panel = this.el['catalog-panel'];
     const opening = panel.hidden && view.catalog;
@@ -567,29 +568,43 @@ export class Hud {
       this.catalogKey = '';
       return;
     }
-    const states = new Map(CATALOG_ORDER.map((k) => [k, catalogState(s, k)] as const));
     const active = view.piece?.kind ?? null;
-    const key = [active, padMode(), ...[...states.values()].map((st) => st.reason ?? '')].join('|');
-    if (key === this.catalogKey) return;
+    const key = `${active}|${padMode()}`;
+    if (key === this.catalogKey) {
+      this.markCatalog(s);
+      return;
+    }
     this.catalogKey = key;
-    this.renderCatalog(states, active, opening);
+    this.renderCatalog(s, active, opening);
   }
 
-  private renderCatalog(states: Map<CatalogKind, CatalogState>, active: CatalogKind | null, opening: boolean): void {
+  // What can be had right now, written into the list in place: the greyed-out items and why.
+  private markCatalog(s: GameState): void {
     const panel = this.el['catalog-panel'];
-    // name and price, what it does, the limit (and why it cannot be had now)
-    const item = (kind: CatalogKind) => {
-      const st = states.get(kind)!;
-      return `
-        <button type="button" class="cat-item${kind === active ? ' active' : ''}${st.ok ? '' : ' cant'}" data-item="${kind}" aria-pressed="${kind === active}">
+    for (const kind of CATALOG_ORDER) {
+      const btn = panel.querySelector<HTMLElement>(`[data-item="${kind}"]`);
+      const reason = btn?.querySelector<HTMLElement>('.cat-reason');
+      if (!btn || !reason) continue;
+      const st = catalogState(s, kind);
+      btn.classList.toggle('cant', !st.ok);
+      const text = st.ok ? '' : (st.reason ?? '');
+      if (reason.textContent !== text) reason.textContent = text;
+      reason.hidden = st.ok;
+    }
+  }
+
+  private renderCatalog(s: GameState, active: CatalogKind | null, opening: boolean): void {
+    const panel = this.el['catalog-panel'];
+    // name and price, what it does, the limit (and why it cannot be had now: markCatalog)
+    const item = (kind: CatalogKind) => `
+        <button type="button" class="cat-item${kind === active ? ' active' : ''}" data-item="${kind}" aria-pressed="${kind === active}">
           <span class="cat-pic"><img src="${catalogPicture(kind)}" alt="" /></span>
           <span class="cat-text">
             <span class="cat-top"><span class="cat-name">${esc(catalogName(kind))}</span><span class="tool-cost">${costChips(catalogCost(kind))}</span></span>
             <span class="cat-effect">${esc(catalogEffect(kind))}</span>
-            <span class="cat-meta"><span class="cat-limit">${esc(catalogLimit(kind))}</span>${st.ok ? '' : `<span class="cat-reason">${esc(st.reason ?? '')}</span>`}</span>
+            <span class="cat-meta"><span class="cat-limit">${esc(catalogLimit(kind))}</span><span class="cat-reason" hidden></span></span>
           </span>
         </button>`;
-    };
     // the list scrolls on small windows: it opens at the top, and a rebuild while open keeps its place
     const scrolled = opening ? 0 : (panel.querySelector<HTMLElement>('.cat-scroll')?.scrollTop ?? 0);
     panel.innerHTML = `
@@ -609,6 +624,7 @@ export class Hud {
         <h4 class="cat-section">${t('cat.modules')}</h4>
         <div class="cat-list">${MACHINE_MODULES.map(item).join('')}</div>
       </div>`;
+    this.markCatalog(s);
     const list = panel.querySelector<HTMLElement>('.cat-scroll')!;
     list.scrollTop = scrolled;
     // the item in hand stays in sight when the tool box above the list takes its room
@@ -686,12 +702,20 @@ export class Hud {
       this.confirmRemove = null;
     }
     // Rebuild only when the buttons change; status text updates in place so clicks are never lost.
-    const slots = MACHINE_MODULES.filter((k) => MODULES[k].building === b.type);
-    const mods = slots.map((k) => `${installedModules(b).includes(k) ? 1 : 0}${installState(s, k, b).reason ?? ''}`).join();
-    const key = `${b.id}:${b.built >= 1}:${b.paused}:${this.confirmDemolish}:${this.confirmRemove}:${mods}`;
+    const key = `${b.id}:${b.built >= 1}:${b.paused}:${this.confirmDemolish}:${this.confirmRemove}:${installedModules(b).join()}`;
     if (key !== this.inspectorKey) {
       this.inspectorKey = key;
       this.renderInspector(s, b);
+    }
+    // so does whether a module can go on now (money comes in with every tax tick)
+    for (const btn of panel.querySelectorAll<HTMLButtonElement>('[data-install]')) {
+      const st = installState(s, btn.dataset.install as ModuleKind, b);
+      btn.disabled = !st.ok;
+      const reason = btn.closest('.insp-mod')?.querySelector<HTMLElement>('.cat-reason');
+      if (!reason) continue;
+      const text = st.ok ? '' : (st.reason ?? '');
+      if (reason.textContent !== text) reason.textContent = text;
+      reason.hidden = st.ok;
     }
     const def = BUILDINGS[b.type];
     const status = panel.querySelector<HTMLElement>('[data-status]');
@@ -813,7 +837,7 @@ export class Hud {
     if (!installed) {
       actions = `
         <div class="insp-actions"><button type="button" class="btn" data-install="${kind}"${check.ok ? '' : ' disabled'}>${t('insp.install')}<span class="tool-cost">${costChips(def.cost)}</span></button></div>
-        ${check.ok ? '' : `<p class="cat-reason">${esc(check.reason ?? '')}</p>`}`;
+        <p class="cat-reason"${check.ok ? ' hidden' : ''}>${esc(check.reason ?? '')}</p>`;
     } else if (this.confirmRemove === kind) {
       actions = `
         <p class="insp-warn" data-loss hidden></p>
