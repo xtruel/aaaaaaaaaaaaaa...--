@@ -110,8 +110,21 @@ describe('no new Recycler without power to run it and scrap to feed it', () => {
     expect(energyHeadroom(s)).toBe(6 - 2 - 2);
     const t2 = city({ buildings: ['pods', 'pods'], unfinished: ['recycler', 'pods', 'solar'], credits: 500, parts: 100 });
     expect(energyHeadroom(t2)).toBe(6 - 2 - 2 - 1 + 5);
+    // a Burner being built counts when there is scrap to burn (as the sim counts a finished one: only with fuel)
     const t3 = city({ buildings: ['pods', 'pods'], unfinished: ['burner'], credits: 500, parts: 100 });
-    expect(energyHeadroom(t3)).toBe(6 - 2); // a Burner only counts once it burns
+    expect(energyHeadroom(t3)).toBe(6 - 2);
+    const t4 = city({ buildings: ['pods', 'pods'], unfinished: ['burner'], credits: 500, parts: 100, scrap: 10 });
+    expect(energyHeadroom(t4)).toBe(6 - 2 + 9);
+    const t5 = city({ buildings: ['pods', 'pods'], unfinished: ['burner'], credits: 500, parts: 100, junk: true });
+    expect(energyHeadroom(t5)).toBe(6 - 2 + 9);
+  });
+
+  it('a Burner already going up with scrap to burn: no "power first" for another Recycler', () => {
+    // HQ 6 against Recycler 2 + 3 Pods: 1 to spare now, 10 once the Burner burns (scrap in storage)
+    const s = city({ buildings: ['recycler', 'pods', 'pods', 'pods'], unfinished: ['burner'], credits: 300, parts: 60, scrap: 150, pop: 3 });
+    expect(s.derived.efficiency).toBe(1);
+    expect(recyclerCheck(s).power).toBe(true);
+    expect(suggest(s)).toMatchObject({ title: t('hint.storage.title'), build: 'recycler' });
   });
 
   it('scrap available: one cycle in storage or waiting, or junk on the map for the bots', () => {

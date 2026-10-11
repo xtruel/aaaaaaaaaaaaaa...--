@@ -150,23 +150,31 @@ export function citizensLost(s: GameState, drop: number): number {
 // ---------- what the advice needs to know ----------
 
 // Power to spare for a new consumer: power made minus power used now, minus what the consumers still under
-// construction will use, plus what the Solar Arrays under construction will make (a Burner only counts once it burns).
+// construction will use, plus what the power plants under construction will make: a Solar Array always, a Burner when
+// there is scrap to burn (as the sim counts a finished one: only while it has fuel).
 export function energyHeadroom(s: GameState): number {
   let spare = s.derived.energyProd - s.derived.energyUse;
+  let fuel: boolean | null = null; // scrap for the Burners being built (looked up once, only if there is one)
   for (const b of s.buildings) {
     if (b.built >= 1 || b.paused) continue;
     const e = buildingStats(b).energy;
-    if (e < 0 || !BUILDINGS[b.type].fuel) spare += e;
+    const burns = BUILDINGS[b.type].fuel;
+    if (e < 0 || !burns) spare += e;
+    else if ((fuel ??= scrapToCome(s, burns.scrap))) spare += e;
   }
   return spare;
 }
 
-// Scrap a new Recycler could work on: one cycle's worth in storage (or waiting for room), or junk on the map that the
-// bots can fetch (they fly anywhere, from the HQ or a Dock).
-export function scrapAvailable(s: GameState): boolean {
-  const need = buildingStats({ type: 'recycler' }).input.scrap ?? 0;
+// `need` scrap in storage (or waiting for room), or junk on the map that the bots can fetch (they fly anywhere, from
+// the HQ or a Dock).
+function scrapToCome(s: GameState, need: number): boolean {
   if (s.res.scrap + Math.max(0, s.scrapPending || 0) >= need) return true;
   if (s.bots.length === 0 && s.derived.botTarget <= 0) return false;
   for (let i = 0; i < s.tiles.length; i++) if (s.tiles[i] === T.JUNK && s.amount[i] > 0) return true;
   return false;
+}
+
+// Scrap a new Recycler could work on: one cycle's worth in storage (or waiting for room), or junk on the map.
+export function scrapAvailable(s: GameState): boolean {
+  return scrapToCome(s, buildingStats({ type: 'recycler' }).input.scrap ?? 0);
 }
