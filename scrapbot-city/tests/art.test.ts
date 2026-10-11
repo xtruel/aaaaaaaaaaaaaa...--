@@ -1,5 +1,6 @@
 // The generated atlas: every building has all its frames, animations really move, and "off" looks different
 // from "working". Reads src/assets/iso/atlas.png + atlas.json exactly as the game does.
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BUILDINGS } from '../src/game/defs';
@@ -10,7 +11,8 @@ const meta = JSON.parse(readFileSync(new URL('../src/assets/iso/atlas.json', imp
   w: number;
   h: number;
   frames: Record<string, [number, number, number, number, number, number]>;
-  buildings: Record<BuildingType, { frames: number; fps: number; height: number }>;
+  buildings: Record<BuildingType, { frames: number; fps: number; height: number; points: Record<string, [number, number][]> }>;
+  variants: Record<string, { frames: number; fps: number; height: number; glow: boolean[]; points: Record<string, [number, number][]> }>;
 };
 const atlas = decodePNG(new Uint8Array(readFileSync(new URL('../src/assets/iso/atlas.png', import.meta.url))));
 const TYPES = Object.keys(BUILDINGS) as BuildingType[];
@@ -112,5 +114,166 @@ describe('characters and terrain', () => {
 
   it('street lamps light up at night (their lens is visible, so they have a glow frame)', () => {
     for (const axis of ['x', 'y']) expect(meta.frames[`p/lamp/${axis}/g`], axis).toBeTruthy();
+  });
+});
+
+// ---------- modular building, increment 1 (0.7): floor, fence, gate, lamp, Dock storage, Smelter filter ----------
+
+const VARIANTS: [BuildingType, string][] = [
+  ['dock', 'dock+dockStorage'],
+  ['smelter', 'smelter+smelterFilter'],
+];
+const FENCE_SHAPES = ['x', 'y', ...Array.from({ length: 15 }, (_, k) => String(k + 1))];
+
+function opaqueCount(name: string): number {
+  const p = pixels(name);
+  let k = 0;
+  for (let i = 3; i < p.px.length; i += 4) if (p.px[i] > 0) k++;
+  return k;
+}
+
+// changed pixels between two same-sized frames inside a box around (cx, cy), in frame pixels
+function changedNear(a: string, b: string, cx: number, cy: number, rx: number, ry0: number, ry1: number): number {
+  const A = pixels(a);
+  const B = pixels(b);
+  let n = 0;
+  for (let y = Math.max(0, cy - ry0); y <= Math.min(A.h - 1, cy + ry1); y++)
+    for (let x = Math.max(0, cx - rx); x <= Math.min(A.w - 1, cx + rx); x++) {
+      const i = (y * A.w + x) * 4;
+      if (Math.abs(A.px[i] - B.px[i]) + Math.abs(A.px[i + 1] - B.px[i + 1]) + Math.abs(A.px[i + 2] - B.px[i + 2]) + Math.abs(A.px[i + 3] - B.px[i + 3]) > 24) n++;
+    }
+  return n;
+}
+
+// Every frame of a building type (b/<type>/...: work, off, construction, icon, shadow and their glow frames),
+// hashed with names, sizes and anchors.
+function buildingHash(type: string): string {
+  const h = createHash('sha256');
+  for (const name of Object.keys(meta.frames)
+    .filter((n) => n.startsWith(`b/${type}/`))
+    .sort()) {
+    const [, , w, hh, ax, ay] = meta.frames[name];
+    h.update(`${name}:${w}x${hh}@${ax},${ay};`);
+    h.update(pixels(name).px);
+  }
+  return h.digest('hex').slice(0, 16);
+}
+
+describe('modular building art (0.7, increment 1)', () => {
+  it('every new frame exists', () => {
+    const need: string[] = [];
+    for (let k = 0; k < 4; k++) need.push(`t/floor/${k}`);
+    for (const shape of FENCE_SHAPES) need.push(`pc/fence/${shape}`);
+    for (const axis of ['x', 'y']) need.push(`pc/gate/${axis}`, `pc/gate/${axis}/g`);
+    for (let dir = 0; dir < 4; dir++) need.push(`pc/lamp/${dir}`, `pc/lamp/${dir}/g`);
+    for (const kind of ['floor', 'fence', 'gate', 'lamp']) need.push(`pc/${kind}/icon`);
+    for (const kind of ['dockStorage', 'smelterFilter']) need.push(`mod/${kind}/icon`);
+    for (const [type, variant] of VARIANTS) {
+      const v = meta.variants[variant];
+      expect(v, variant).toBeTruthy();
+      expect(v.frames, variant).toBe(meta.buildings[type].frames);
+      expect(v.fps, variant).toBe(meta.buildings[type].fps);
+      for (let f = 0; f < v.frames; f++) {
+        need.push(`b/${variant}/w${f}`);
+        if (v.glow[f]) need.push(`b/${variant}/w${f}/g`);
+      }
+      need.push(`b/${variant}/off`);
+    }
+    for (const n of need) expect(meta.frames[n], n).toBeTruthy();
+  });
+
+  it('the fence has a frame for every neighbour mask, each one different, all lined up on the same tile', () => {
+    const [, , w0, h0, ax0, ay0] = meta.frames['pc/fence/x'];
+    const seen = new Map<string, string>();
+    for (const shape of FENCE_SHAPES) {
+      const name = `pc/fence/${shape}`;
+      const [, , w, h, ax, ay] = meta.frames[name];
+      expect([w, h, ax, ay], name).toEqual([w0, h0, ax0, ay0]);
+      const digest = createHash('sha256').update(pixels(name).px).digest('hex');
+      expect(seen.get(digest), `${name} looks like ${seen.get(digest)}`).toBeUndefined();
+      seen.set(digest, name);
+    }
+  });
+
+  it('building variants: work frames differ from each other and from off, and keep the plain building\'s frame', () => {
+    for (const [type, variant] of VARIANTS) {
+      const v = meta.variants[variant];
+      for (let f = 0; f < v.frames; f++) {
+        const next = (f + 1) % v.frames;
+        expect(difference(`b/${variant}/w${f}`, `b/${variant}/w${next}`), `${variant} w${f} vs w${next}`).toBeGreaterThan(0.004);
+        expect(difference(`b/${variant}/w${f}`, `b/${variant}/off`), `${variant} w${f} vs off`).toBeGreaterThan(0.002);
+      }
+      // same size and anchor as the plain building, so the renderer can swap one for the other
+      for (const fr of ['w0', 'off']) expect(meta.frames[`b/${variant}/${fr}`].slice(2), `${variant} ${fr}`).toEqual(meta.frames[`b/${type}/${fr}`].slice(2));
+      // and the module shows
+      expect(difference(`b/${variant}/w0`, `b/${type}/w0`), variant).toBeGreaterThan(0.02);
+      expect(difference(`b/${variant}/off`, `b/${type}/off`), variant).toBeGreaterThan(0.02);
+    }
+  });
+
+  it("the Smelter's filter: steam point on the tower, no dark-smoke point, a fan that turns while working", () => {
+    const v = meta.variants['smelter+smelterFilter'];
+    expect(v.points.steam?.length).toBe(1);
+    expect(v.points.smoke).toBeUndefined();
+    expect(v.points.spark).toEqual(meta.buildings.smelter.points.spark);
+    const [, , , , ax, ay] = meta.frames['b/smelter+smelterFilter/w0'];
+    const [sx, sy] = v.points.steam[0];
+    // the steam rises from the top of the tower, above the kiln and right of the chimney's smoke point
+    expect(sy).toBeLessThan(-20);
+    expect(sx).toBeGreaterThan(meta.buildings.smelter.points.smoke[0][0]);
+    // the fan (just under the steam point) changes from each work frame to the next
+    for (let f = 0; f < v.frames; f++) {
+      const n = changedNear(`b/smelter+smelterFilter/w${f}`, `b/smelter+smelterFilter/w${(f + 1) % v.frames}`, ax + sx, ay + sy, 6, 1, 5);
+      expect(n, `fan w${f}`).toBeGreaterThan(3);
+    }
+  });
+
+  it('the plain buildings are pixel-identical to 0.6.1 (modules only draw when installed)', () => {
+    // sha256 (first 16 hex) of every b/<type>/ frame: name, size, anchor and pixels, from the 0.6.1 atlas
+    const expected: Record<BuildingType, string> = {
+      hq: '1cd21b29af320cb6',
+      dock: 'cb5b6c0d9dbe1d9f',
+      recycler: 'a47bbb772c4a0f69',
+      smelter: 'ef8faaa219c75487',
+      solar: '541626872f33f429',
+      burner: 'c4ed792caecef334',
+      pods: 'c538d0d384fa6fa0',
+      garden: 'c2cb1be7d5b64077',
+      factory: '833b59b23b6273ab',
+      fixlab: 'fd1a5a7309501479',
+      purifier: 'f6a87b2c241d6a38',
+      spire: 'a23746d945590539',
+    };
+    for (const type of TYPES) expect(buildingHash(type), type).toBe(expected[type]);
+  });
+
+  it('floor plates are flat ground tiles: same diamond and anchor as the ground, so they tile seamlessly', () => {
+    const ground = pixels('t/ground/1/0');
+    const [, , gw, gh, gax, gay] = meta.frames['t/ground/1/0'];
+    for (let k = 0; k < 4; k++) {
+      const name = `t/floor/${k}`;
+      expect(meta.frames[name].slice(2), name).toEqual([gw, gh, gax, gay]);
+      const p = pixels(name);
+      for (let i = 3; i < p.px.length; i += 4) expect(p.px[i] > 0, `${name} alpha at ${(i - 3) / 4}`).toBe(ground.px[i] > 0);
+      if (k > 0) expect(difference(name, 't/floor/0'), name).toBeGreaterThan(0.02);
+    }
+  });
+
+  it('gates and lamps glow at night, and a lamp lights a pool of ground around it', () => {
+    for (const name of ['pc/gate/x', 'pc/gate/y', 'pc/lamp/0', 'pc/lamp/1', 'pc/lamp/2', 'pc/lamp/3']) {
+      // the glow frame is registered on the colour frame (same size, same anchor)
+      expect(meta.frames[`${name}/g`].slice(2), name).toEqual(meta.frames[name].slice(2));
+    }
+    for (let dir = 0; dir < 4; dir++) {
+      // the lens hangs ~19 voxels up (about 6 rows above the anchor even at the tile's front); glow lower down, on
+      // the tile's ground rows, is the pool of light
+      const name = `pc/lamp/${dir}/g`;
+      const [, , , , , ay] = meta.frames[name];
+      const p = pixels(name);
+      let pool = 0;
+      for (let y = ay + 2; y < p.h; y++) for (let x = 0; x < p.w; x++) if (p.px[(y * p.w + x) * 4 + 3] > 0) pool++;
+      expect(pool, name).toBeGreaterThan(80);
+      expect(opaqueCount(name), name).toBeGreaterThan(opaqueCount('p/lamp/x/g'));
+    }
   });
 });

@@ -1,13 +1,14 @@
 // Bot Dock (2×2): blue hangar with a garage door, a control tower with the bot face, and a landing pad on
-// the roof where bots touch down (lights chase around the ring).
+// the roof where bots touch down (lights chase around the ring). Module: extra storage silos (modules.ts).
 import { M } from '../palette';
 import { botFaceY, footprint, hazardBand, plate, windowsX } from './common';
 import type { BuildingArt } from './common';
+import { dockStorage, hasModule } from './modules';
 
 export const dock: BuildingArt = {
   frames: 4,
   fps: 4,
-  model(frame, working) {
+  model(frame, working, modules) {
     const v = footprint(2, 2, 34);
     plate(v);
     // hangar
@@ -42,6 +43,7 @@ export const dock: BuildingArt = {
     v.box(6, 6, 32, 9, 9, 34, working ? M.redLit : M.red);
     v.point('light', 7.5, 7.5, 34);
     v.point('pad', 21, 20, 18);
+    if (hasModule(modules, 'dockStorage')) dockStorage(v, frame, working);
     return v;
   },
 };

@@ -27,6 +27,7 @@ const raw = data as unknown as {
   frames: Record<string, RawFrame>;
   buildings: Record<BuildingType, BuildingArtMeta>;
   decor?: Record<string, { w: number; d: number; frames: number; fps: number; tall: boolean }>;
+  variants?: Record<string, BuildingArtMeta>;
 };
 
 const frames = new Map<string, Frame>();
@@ -34,6 +35,16 @@ for (const [name, [x, y, w, h, ax, ay]] of Object.entries(raw.frames)) frames.se
 
 export const buildingArt = raw.buildings;
 export const decorArt = raw.decor ?? {};
+
+// Buildings with modules installed (0.7): the same metadata as buildingArt, by variant name, e.g.
+// 'dock+dockStorage', whose frames are b/<variant>/w<f>, b/<variant>/off (+ /g glow) and b/<variant>/shadow.
+export const variantArt: Record<string, BuildingArtMeta> = raw.variants ?? {};
+
+// The variant name for a building type and its installed modules: the type alone without modules, otherwise
+// the type and the modules sorted, joined by '+' (the art pipeline's naming, scripts/art/models/modules.ts).
+export function variantKey(type: BuildingType, modules?: readonly string[]): string {
+  return modules && modules.length ? [type, ...[...modules].sort()].join('+') : type;
+}
 
 // how many citizen looks the atlas has (cit/<variant>/sw/0)
 export function citizenVariants(): number {

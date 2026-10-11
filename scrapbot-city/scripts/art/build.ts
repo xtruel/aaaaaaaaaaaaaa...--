@@ -2,7 +2,8 @@
 //
 // Outputs:
 //   src/assets/iso/atlas.png   one texture with every frame (imported by the game, inlined in the build)
-//   src/assets/iso/atlas.json  frame rectangles + anchors, building metadata (frames, fps, height, points)
+//   src/assets/iso/atlas.json  frame rectangles + anchors, building metadata (frames, fps, height, points), the same
+//                              metadata for each building-with-modules variant ("variants"), scenery ("decor")
 //   art/sprites/*.png          every frame as its own transparent PNG (for review and hand edits)
 //   art/contact-sheet.png      all frames on one labelled sheet
 // Hand edits: put a PNG with the same name and size in art/overrides/ and it replaces the generated frame.
@@ -25,6 +26,9 @@ import { CAT_FRAMES, CITIZEN_FRAMES, CITIZEN_VARIANTS, catModel, citizenModel } 
 import type { CatPose } from './models/characters';
 import { DECOR } from './models/decor';
 import { BLIMP_FRAMES, blimpModel } from './models/blimp';
+import { fenceIcon, fenceModel, floorIcon, floorTiles, gateIcon, gateModel, lampHead, lampIcon, pieceLampModel, withLightPool } from './models/pieces';
+import type { FenceShape } from './models/pieces';
+import { dockStorageIcon, smelterFilterIcon, variantName } from './models/modules';
 
 // npm runs scripts from the package root; fall back to walking up from this file
 function projectRoot(): string {
@@ -122,6 +126,41 @@ for (const type of Object.keys(BUILDINGS) as BuildingType[]) {
   buildings[type] = { frames: art.frames, fps: art.fps, height, glow, points };
 }
 
+// ---------- buildings with modules (0.7) ----------
+// The model draws the module itself when it is in the list; the variant's name is the type and its modules,
+// sorted, joined by '+': b/<variant>/w<f>, b/<variant>/off (+ /g glow frames like the plain building) and
+// b/<variant>/shadow. Same footprint and frame size as the plain building, so the renderer can swap the frames.
+// Modules are only installed on finished buildings: no construction stages, no toolbar icon.
+const VARIANTS: { type: BuildingType; modules: string[] }[] = [
+  { type: 'dock', modules: ['dockStorage'] },
+  { type: 'smelter', modules: ['smelterFilter'] },
+];
+const variants: Record<string, BuildingMeta> = {};
+for (const { type, modules } of VARIANTS) {
+  const art = ART[type];
+  const def = BUILDINGS[type];
+  const name = variantName(type, modules);
+  const glow: boolean[] = [];
+  let height = 0;
+  for (let f = 0; f < art.frames; f++) {
+    const v = art.model(f, true, modules);
+    if (v.w !== def.w * 16 || v.d !== def.h * 16) throw new Error(`${name}: model footprint ${v.w}×${v.d} does not match ${def.w * 16}×${def.h * 16}`);
+    const r = render(v);
+    addRendered(`b/${name}/w${f}`, r);
+    glow.push(r.hasGlow);
+    height = Math.max(height, r.height);
+  }
+  const offModel = art.model(0, false, modules);
+  const off = render(offModel);
+  addRendered(`b/${name}/off`, off);
+  glow.push(off.hasGlow);
+  const sh = renderShadow(offModel);
+  add(`b/${name}/shadow`, sh.img, sh.ax, sh.ay);
+  const points: Record<string, [number, number][]> = {};
+  for (const [k, list] of Object.entries(off.points)) points[k] = list.map(([px, py]) => [px - off.ax, py - off.ay]);
+  variants[name] = { frames: art.frames, fps: art.fps, height, glow, points };
+}
+
 // ---------- bots ----------
 const POSES: BotPose[] = ['fly', 'carry', 'work'];
 for (const dir of DIRS)
@@ -178,6 +217,39 @@ for (let size = 0; size < 3; size++)
 for (let k = 0; k < 4; k++) addRendered(`p/rubble/${k}`, render(rubbleModel(k)));
 for (const axis of ['x', 'y'] as const) addRendered(`p/lamp/${axis}`, render(lampModel(axis)));
 
+// ---------- player-built pieces (0.7): floor, fence, gate, lamp, and the catalogue icons ----------
+// Solid pieces are anchored like buildings (model origin = the tile's back corner) and come with a ground shadow
+// (<name>/shadow). The lamp's glow frame carries the lens and the pool of light it throws on the ground.
+const floors = floorTiles();
+for (const [name, img] of Object.entries(floors)) add(name, img, 16, 0);
+function addPiece(name: string, v: Vox, r: Rendered = render(v)): void {
+  addRendered(name, r);
+  const sh = renderShadow(v);
+  add(`${name}/shadow`, sh.img, sh.ax, sh.ay);
+}
+const fenceShapes: FenceShape[] = ['x', 'y'];
+for (let mask = 1; mask < 16; mask++) fenceShapes.push(mask);
+for (const shape of fenceShapes) addPiece(`pc/fence/${shape}`, fenceModel(shape));
+for (const axis of ['x', 'y'] as const) addPiece(`pc/gate/${axis}`, gateModel(axis));
+for (let dir = 0; dir < 4; dir++) {
+  const v = pieceLampModel(dir);
+  const [gx, gy] = lampHead(dir);
+  addPiece(`pc/lamp/${dir}`, v, withLightPool(render(v), gx, gy, 7));
+}
+const floorIco = floorIcon(floors);
+add('pc/floor/icon', floorIco.img, floorIco.ax, floorIco.ay);
+const icons: [string, Vox][] = [
+  ['pc/fence/icon', fenceIcon()],
+  ['pc/gate/icon', gateIcon()],
+  ['pc/lamp/icon', lampIcon()],
+  ['mod/dockStorage/icon', dockStorageIcon()],
+  ['mod/smelterFilter/icon', smelterFilterIcon()],
+];
+for (const [name, v] of icons) {
+  const r = render(v);
+  add(name, r.img, r.ax, r.ay);
+}
+
 // ---------- hand-made overrides ----------
 const safe = (name: string) => name.replace(/\//g, '_');
 const overrideDir = join(PROJECT, 'art/overrides');
@@ -225,7 +297,7 @@ for (const f of frames) {
 const outDir = join(PROJECT, 'src/assets/iso');
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'atlas.png'), encodePNG(atlas));
-writeFileSync(join(outDir, 'atlas.json'), JSON.stringify({ w: ATLAS_W, h: atlasH, frames: frameMeta, buildings, decor }) + '\n');
+writeFileSync(join(outDir, 'atlas.json'), JSON.stringify({ w: ATLAS_W, h: atlasH, frames: frameMeta, buildings, decor, variants }) + '\n');
 
 // ---------- individual sprites + contact sheet ----------
 const spriteDir = join(PROJECT, 'art/sprites');
