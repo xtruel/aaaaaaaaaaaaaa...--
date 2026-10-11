@@ -1710,7 +1710,8 @@ export class Renderer {
       for (let dx = 0; dx < def.w; dx++) {
         const tx = ox + dx;
         const ty = oy + dy;
-        const okTile = inBounds(tx, ty) && s.occ[idx(tx, ty)] === -1 && (s.tiles[idx(tx, ty)] === T.GROUND || s.tiles[idx(tx, ty)] === T.GRASS);
+        // a fence, gate or lamp blocks its tile as a building does (placeCheck): that tile shows red too
+        const okTile = inBounds(tx, ty) && s.occ[idx(tx, ty)] === -1 && s.solid[idx(tx, ty)] === 0 && (s.tiles[idx(tx, ty)] === T.GROUND || s.tiles[idx(tx, ty)] === T.GRASS);
         this.fillFootprint(tx, ty, 1, 1, okTile ? (check.ok ? 'rgba(198,244,50,0.35)' : 'rgba(255,212,64,0.35)') : 'rgba(226,54,75,0.5)', camX, camY);
       }
     const f = frame(`b/${type}/off`);
