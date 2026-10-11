@@ -232,14 +232,17 @@ export function gateModel(axis: 'x' | 'y'): Vox {
   v.box(12, 8, 1, 13, 9, GATE_H - 1, M.yellow);
   for (let k = 0; k < 7; k++) v.set(4 + Math.floor(k * 1.3), 8, 4 + k, M.yellow); // diagonal brace
   v.box(5, 9, 5, 7, 10, 7, M.steelD); // handle
-  // pillars: dark steel, hazard stripes round the foot, a yellow band under the cap
+  // pillars: dark steel, hazard stripes round the foot (on all four sides, so the faces the camera sees are striped
+  // in both orientations once the model is turned for y), a yellow band under the cap
   for (const px of [0, 13]) {
     v.box(px, 6, 0, px + 3, 11, GATE_H - 1, M.steelD);
     v.box(px, 6, GATE_H - 3, px + 3, 11, GATE_H - 2, M.yellow);
     v.box(px, 6, GATE_H - 1, px + 3, 11, GATE_H, M.steelL);
     for (let z = 0; z < 4; z++) {
-      for (let x = px; x < px + 3; x++) v.set(x, 10, z, Math.floor((x + z) / 2) % 2 ? M.hazardK : M.hazardY);
-      for (let y = 6; y < 11; y++) v.set(px + 2, y, z, Math.floor((y + z) / 2) % 2 ? M.hazardK : M.hazardY);
+      for (let x = px; x < px + 3; x++)
+        for (const y of [6, 10]) v.set(x, y, z, Math.floor((x + z) / 2) % 2 ? M.hazardK : M.hazardY);
+      for (let y = 6; y < 11; y++)
+        for (const x of [px, px + 2]) v.set(x, y, z, Math.floor((y + z) / 2) % 2 ? M.hazardK : M.hazardY);
     }
   }
   // amber light on the right pillar (glows at night)

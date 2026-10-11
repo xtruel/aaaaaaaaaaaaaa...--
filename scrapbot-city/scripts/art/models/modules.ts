@@ -36,12 +36,14 @@ export function moduleMats() {
 // ---------- Bot Dock: extra storage ----------
 // The hangar roof is at z 16; the landing pad covers x ≥ 13 and the control tower x 4..12, y 4..12, whose bot face
 // looks out of its y = 12 side. The two silos stand side by side (as seen from the camera) on a steel saddle on the
-// free front-left part of the roof, every voxel with x − y ≤ −9 so that they stay left of the bot face. They are
-// rounded-square tanks (flat faces read clean in the iso light) in a warm orange that stands out on the blue
-// hangar, with hazard stripes round the foot. Their load goes down a chute into a roof hatch beside the pad and a
-// downpipe along the front-left wall by the garage door.
+// free front-left part of the roof, every voxel above the roof with x − y ≤ −9 so that they stay left of the bot
+// face (tests/art.test.ts checks that the face and the pad stay fully visible). They are round tanks, 6 voxels
+// across with the corners cut, in a warm orange that stands out on the blue hangar, with hazard stripes round the
+// foot. Their centres sit on voxel corners (whole numbers): a centre in the middle of a voxel leaves a lone voxel at
+// exactly r on each side, a one-voxel ridge up the whole silo that reads as dark streaks. Their load goes down a
+// chute into a roof hatch beside the pad and a downpipe along the front-left wall by the garage door.
 const SILOS = [
-  { x: 7.5, y: 21.5, top: 29 }, // the tall one, with the hopper the bots fill
+  { x: 7, y: 21, top: 29 }, // the tall one, with the hopper the bots fill
   { x: 5, y: 27, top: 26 },
 ];
 const SILO_R = 3;
@@ -52,7 +54,7 @@ export function dockStorage(v: Vox, frame: number, working: boolean): void {
   v.box(3, 17, 16, 12, 30, 17, M.steelD);
   hazardBand(v, 3, 29, 16, 12, 30, 17);
   for (const { x: cx, y: cy, top } of SILOS) {
-    tank(v, cx, cy, SILO_R, 17, top, P.silo);
+    tank(v, cx, cy, SILO_R, 17, top, P.silo, -1, 2);
     // hazard stripes round the foot
     for (let z = 17; z < 19; z++)
       for (let y = Math.floor(cy - 4); y <= Math.ceil(cy + 4); y++)
@@ -78,17 +80,18 @@ export function dockStorage(v: Vox, frame: number, working: boolean): void {
   v.box(4, gy, 20, 5, gy + 1, 20 + level, working ? M.limeLit : M.limeD);
   // pipe between the silos
   v.box(7, 24, 22, 8, 26, 23, M.steelL);
-  // chute from the tall silo into a roof hatch beside the pad
+  // chute from the tall silo into a roof hatch beside the pad (a voxel of bare roof between the hatch and the pad's
+  // deck, which starts at x = 13)
   v.cylX(a.y + 0.5, 21.5, 1.0, 10, 12, M.steelL);
-  v.box(10, 20, 16, 13, 24, 18, M.steelD);
-  v.box(11, 21, 18, 13, 23, 19, M.steel);
+  v.box(10, 20, 16, 12, 24, 18, M.steelD);
+  v.box(10, 21, 18, 12, 23, 19, M.steel);
   // downpipe along the front-left wall, left of the garage door, into the hangar
   v.cylZ(3.5, 29.5, 0.9, 4, 17, M.steelL);
   v.box(3, 29, 7, 4, 31, 8, M.steelD);
   v.box(3, 29, 12, 4, 31, 13, M.steelD);
   v.box(2, 29, 3, 5, 31, 5, M.steelD); // its foot on the plate
   // beacon on the hopper rim
-  v.box(Math.floor(a.x) - 2, Math.floor(a.y) - 1, a.top + 4, Math.floor(a.x) - 1, Math.floor(a.y), a.top + 6, working && frame % 2 === 0 ? M.limeLit : M.limeD);
+  v.box(Math.floor(a.x) - 3, Math.floor(a.y) - 1, a.top + 4, Math.floor(a.x) - 2, Math.floor(a.y), a.top + 6, working && frame % 2 === 0 ? M.limeLit : M.limeD);
 }
 
 // ---------- Smelter: smoke filter ----------

@@ -6,6 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { BUILDINGS } from '../src/game/defs';
 import type { BuildingType } from '../src/game/defs';
 import { decodePNG } from '../scripts/art/png';
+import { mat, render } from '../scripts/art/voxel';
+import type { Vox } from '../scripts/art/voxel';
+import { dock } from '../scripts/art/models/dock';
 
 const meta = JSON.parse(readFileSync(new URL('../src/assets/iso/atlas.json', import.meta.url), 'utf8')) as {
   w: number;
@@ -257,6 +260,40 @@ describe('modular building art (0.7, increment 1)', () => {
       for (let i = 3; i < p.px.length; i += 4) expect(p.px[i] > 0, `${name} alpha at ${(i - 3) / 4}`).toBe(ground.px[i] > 0);
       if (k > 0) expect(difference(name, 't/floor/0'), name).toBeGreaterThan(0.02);
     }
+  });
+
+  it("the Dock's storage silos never hide the bot face or the landing pad", () => {
+    // Paint the face (the y = 12 slab of the control tower) and the pad (the roof deck x ≥ 13 and its markings) of
+    // the plain model in a marker colour: the pixels that change are exactly where they show. Those pixels must be
+    // the same in the model with the module as in the plain one.
+    const MARK = mat('test-marker', { rgb: [255, 0, 255], jitter: 0 });
+    const paint = (v: Vox, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): Vox => {
+      for (let z = z0; z < z1; z++) for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (v.get(x, y, z)) v.set(x, y, z, MARK);
+      return v;
+    };
+    const regions: [string, number, number, number, number, number, number][] = [
+      ['bot face', 5, 12, 18, 11, 13, 25],
+      ['landing pad', 13, 11, 16, 29, 29, 18],
+    ];
+    for (const working of [true, false])
+      for (let f = 0; f < 4; f++) {
+        const plain = render(dock.model(f, working, [])).img.data;
+        const withModule = render(dock.model(f, working, ['dockStorage'])).img.data;
+        for (const [what, ...box] of regions) {
+          const marked = render(paint(dock.model(f, working, []), ...box)).img.data;
+          let shown = 0;
+          let hidden = 0;
+          for (let i = 0; i < plain.length; i += 4) {
+            if (plain[i] === marked[i] && plain[i + 1] === marked[i + 1] && plain[i + 2] === marked[i + 2]) continue;
+            shown++;
+            // (the outline pass may shade an edge pixel by a step or two next to the module: not hidden)
+            const delta = Math.abs(withModule[i] - plain[i]) + Math.abs(withModule[i + 1] - plain[i + 1]) + Math.abs(withModule[i + 2] - plain[i + 2]);
+            if (delta > 24 || withModule[i + 3] !== plain[i + 3]) hidden++;
+          }
+          expect(shown, `${what} visible (working ${working}, frame ${f})`).toBeGreaterThan(20);
+          expect(hidden, `${what} pixels changed by the module (working ${working}, frame ${f})`).toBe(0);
+        }
+      }
   });
 
   it('gates and lamps glow at night, and a lamp lights a pool of ground around it', () => {
