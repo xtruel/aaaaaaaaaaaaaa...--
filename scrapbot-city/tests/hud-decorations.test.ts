@@ -11,6 +11,7 @@ import { computeDerived } from '../src/game/sim';
 import { createGame } from '../src/game/state';
 import type { GameState } from '../src/game/state';
 import { Hud } from '../src/ui/hud';
+import { forgetPresses, notePress } from '../src/ui/presses';
 import type { HudHandlers, HudView } from '../src/ui/hud';
 
 vi.mock('../src/render/icons', () => ({ iconUrl: () => '', toolThumb: () => '', portraitUrl: () => '', pathColor: () => 'var(--muted)' }));
@@ -99,39 +100,58 @@ describe('catalog: the Decorations section', () => {
     expect(item('bench').classList.contains('cant')).toBe(false);
   });
 
-  it('the second press of a double press on an item or Done (the list moves under the pointer) picks nothing; a press after that does', () => {
+  it('the second press of a double press on an item or Done (the list moves under it) picks nothing; a press elsewhere or after a moment does', () => {
     const { root, calls, update } = setup();
     let now = 1000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
+    forgetPresses();
+    // a press at screen point (x, y) that lands on `el` (what the session notes for every press, then the click)
+    const press = (el: HTMLElement, x: number, y: number) => {
+      notePress({ t: now, x, y, cam: '', tile: '' });
+      el.click();
+    };
     update({ catalog: true });
     const panel = q(root, '[data-catalog-panel]')!;
-    q(panel, '[data-item="bench"]')!.click();
-    // (the session takes the bench; the panel is redrawn with the tool box above the list)
-    now += 60;
-    q(panel, '[data-item="planter"]')!.click();
-    expect(calls).toEqual([['onPick', 'bench']]);
+    const item = (k: string) => q(panel, `[data-item="${k}"]`)!;
+    press(item('bench'), 900, 300);
+    // the panel is redrawn for the bench, the list moves: the second press of a double click lands on the planter
     update({ catalog: true, piece: { kind: 'bench', rot: 0 } });
-    now += 100;
-    q(panel, '[data-item="pergola"]')!.click();
-    q(panel, '[data-done]')!.click();
-    q(panel, '[data-rotate]')!.click();
+    now += 60;
+    press(item('planter'), 900, 300);
     expect(calls).toEqual([['onPick', 'bench']]);
-    now += 400;
-    q(panel, '[data-rotate]')!.click();
-    q(panel, '[data-item="sign"]')!.click();
-    expect(calls).toEqual([['onPick', 'bench'], ['onRotate'], ['onPick', 'sign']]);
-    update({ catalog: true, piece: { kind: 'sign', rot: 0 } });
-    now += 400;
-    q(panel, '[data-done]')!.click();
-    now += 50;
-    q(panel, '[data-done]')!.click();
-    expect(calls.at(-1)).toEqual(['onPick', null]);
-    expect(calls.filter((c) => c[0] === 'onPick' && c[1] === null).length).toBe(1);
-    // the panel redrawn for another reason (Esc put the tool away, a key took another one): the next press counts
-    now += 400;
-    update({ catalog: true, piece: { kind: 'gate', rot: 0 } });
+    // a press somewhere else, even soon after, is meant
+    now += 100;
+    press(item('pergola'), 900, 420);
+    expect(calls.at(-1)).toEqual(['onPick', 'pergola']);
+    update({ catalog: true, piece: { kind: 'pergola', rot: 0 } });
+    // Done pressed twice: the tool is put away once, the item that comes under the finger is not taken
+    now += 1000;
+    press(q(panel, '[data-done]')!, 950, 200);
     update({ catalog: true, piece: null });
-    q(panel, '[data-item="cathouse"]')!.click();
+    now += 50;
+    press(item('sign'), 950, 200);
+    expect(calls.at(-1)).toEqual(['onPick', null]);
+    // item, a right click on the map, the same item again within 350 ms: three presses, all meant (scripted play)
+    now += 1000;
+    press(item('fence'), 900, 250);
+    now += 120;
+    notePress({ t: now, x: 400, y: 300, cam: '', tile: '20,20' });
+    now += 150;
+    press(item('fence'), 900, 250);
+    expect(calls.slice(-2)).toEqual([
+      ['onPick', 'fence'],
+      ['onPick', 'fence'],
+    ]);
+    // Rotate tapped twice turns twice (the panel does not move under it)
+    update({ catalog: true, piece: { kind: 'bench', rot: 0 } });
+    now += 1000;
+    press(q(panel, '[data-rotate]')!, 700, 220);
+    now += 80;
+    press(q(panel, '[data-rotate]')!, 700, 220);
+    expect(calls.slice(-2)).toEqual([['onRotate'], ['onRotate']]);
+    // a key long after a double click is not a double press
+    now += 5000;
+    item('cathouse').click();
     expect(calls.at(-1)).toEqual(['onPick', 'cathouse']);
   });
 });

@@ -39,6 +39,7 @@ import {
 } from './catalog';
 import type { PieceInfo } from './catalog';
 import { esc } from './escape';
+import { secondPress } from './presses';
 import { airReport, perDayText } from './smog';
 import type { AirRow } from './smog';
 
@@ -178,7 +179,6 @@ export class Hud {
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
   private catalogKey = '';
-  private catalogPressAt = -Infinity; // when an item or Done was last pressed in the catalog (performance.now())
   // when the smog panel last closed (performance.now()): the map takes no purchase in the moments after (session)
   smogClosedAt = -Infinity;
   private starsKey = '';
@@ -694,10 +694,10 @@ export class Hud {
   }
 
   // An item or Done pressed redraws the panel for the new tool (the tool box above the list comes or goes, the list
-  // moves): a press on the catalog in the moments after is the second press of a double press (double click, double
-  // tap, A A), which would land on another item or on Done. It does nothing.
+  // moves): the second press of a double press there (double click, double tap, A A: within 350 ms and 10 px of the
+  // press before, src/ui/presses.ts) would land on another item or on Done. It does nothing.
   private catalogSettled(): boolean {
-    return performance.now() - this.catalogPressAt >= CONFIRM_DELAY;
+    return !secondPress();
   }
 
   // What can be had right now, written into the list in place: the greyed-out items and why.
@@ -767,17 +767,14 @@ export class Hud {
     for (const btn of panel.querySelectorAll<HTMLElement>('[data-item]')) {
       btn.addEventListener('click', () => {
         if (!this.catalogSettled()) return;
-        this.catalogPressAt = performance.now();
         audio.play('click');
         this.handlers.onPick(btn.dataset.item as CatalogKind);
       });
     }
-    panel.querySelector('[data-rotate]')?.addEventListener('click', () => {
-      if (this.catalogSettled()) this.handlers.onRotate();
-    });
+    // (Rotate tapped twice turns twice: the panel does not move under it)
+    panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotate());
     panel.querySelector('[data-done]')?.addEventListener('click', () => {
       if (!this.catalogSettled()) return;
-      this.catalogPressAt = performance.now();
       audio.play('click');
       this.handlers.onPick(null);
     });

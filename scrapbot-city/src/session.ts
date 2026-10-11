@@ -28,6 +28,7 @@ import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEv
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
+import { DOUBLE_DIST, DOUBLE_PRESS, forgetPresses, lastPresses, notePress } from './ui/presses';
 import type { ModalAction } from './ui/modal';
 import { Tutorial } from './ui/tutorial';
 import type { Box } from './ui/tutorial';
@@ -63,12 +64,6 @@ interface Row {
 }
 
 const PAN_SPEED = 260; // screen px per second
-// The owner's comfort rules for building: a press within this many ms of the press before and this close to it
-// (screen px, the map not moved) is the second press of a double click, double tap or A A. On the map it buys nothing
-// the first press did not mean: across a tile edge, or behind a dialog or a panel that the first press closed (on the
-// same tile it is only refused, as before; see meantPress).
-const DOUBLE_PRESS = 350;
-const DOUBLE_DIST = 10;
 const CURSOR_SPEED = 900; // controller cursor, screen px per second at full tilt
 const PANEL_SCROLL = 700; // right stick over a side panel that scrolls, px per second
 // WASD by physical position: ZQSD on AZERTY keyboards.
@@ -100,12 +95,6 @@ export class GameSession implements PadTarget {
   private pieceRot: Partial<Record<CatalogKind, number>> = {};
   private catalog = false;
   private selectedPiece = -1; // tile index of the selected piece (fence, gate, lamp, decoration) or floor
-  // the last two presses anywhere (mouse, finger, the pad's A at its cursor): where, when, where the map was, and the
-  // tile under it when it was on the map ('' elsewhere: a dialog, a panel)
-  private presses = [
-    { t: -Infinity, x: 0, y: 0, cam: '', tile: '' },
-    { t: -Infinity, x: 0, y: 0, cam: '', tile: '' },
-  ];
   private row: Row | null = null;
   private rotAcc = 0; // Shift+wheel, added up like the zoom
   private selectedId = -1;
@@ -197,6 +186,7 @@ export class GameSession implements PadTarget {
     const hq = s.buildings.find((b) => b.type === 'hq');
     if (hq) this.renderer.centerOn((hq.x + 1.5) * TILE, (hq.y + 1.5) * TILE);
     this.lastDay = day(s);
+    forgetPresses();
     this.bindInput();
   }
 
@@ -871,10 +861,12 @@ export class GameSession implements PadTarget {
     else if (s.tiles[i] === T.RUBBLE) pushMessage(s, t('msg.rubbleInfo'), 'info');
   }
 
+  // Every press anywhere (mouse, finger, the pad's A at its cursor) is remembered (src/ui/presses.ts): the second press
+  // of a double press buys nothing on the map (meantPress) and picks nothing in the catalog (the HUD).
   private notePress(x: number, y: number, onMap: boolean): void {
     const r = this.renderer;
     const tile = onMap ? r.screenToTile(x, y) : null;
-    this.presses = [this.presses[1], { t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tile: tile ? `${tile.x},${tile.y}` : '' }];
+    notePress({ t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tile: tile ? `${tile.x},${tile.y}` : '' });
   }
 
   // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
@@ -884,7 +876,7 @@ export class GameSession implements PadTarget {
   // first press closed, or take up a second layer with the bulldozer (the floor under the fence just removed). On the
   // tile the first press used, a piece or building tool goes ahead: there it can only be refused, with the reason.
   private meantPress(sx: number, sy: number): boolean {
-    const [before, now] = this.presses;
+    const [before, now] = lastPresses();
     const r = this.renderer;
     const cam = `${r.cam.x},${r.cam.y},${r.zoom}`;
     const double = now.t - before.t < DOUBLE_PRESS && cam === before.cam && Math.hypot(sx - before.x, sy - before.y) < DOUBLE_DIST;
