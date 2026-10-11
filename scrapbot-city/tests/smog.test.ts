@@ -3,7 +3,7 @@
 // built from it (src/ui/smog.ts).
 import { describe, expect, it } from 'vitest';
 import { placeBuilding, placeCheck } from '../src/game/actions';
-import { BUILD_ORDER, DAY_LENGTH, SIM_STEP, T } from '../src/game/defs';
+import { BUILDINGS, BUILD_ORDER, DAY_LENGTH, SIM_STEP, T } from '../src/game/defs';
 import type { BuildingType } from '../src/game/defs';
 import { installModule } from '../src/game/pieces';
 import { airEffect, computeDerived, step } from '../src/game/sim';
@@ -140,6 +140,48 @@ describe('where the smog comes from and where it goes', () => {
     expect(s.derived.air.byType.factory).toBeCloseTo(0.09, 12);
     expect(s.derived.air.byType.factory).toBe(airEffect(s, factory));
     expect(s.derived.air.byType.purifier).toBeCloseTo(-0.08, 12);
+  });
+
+  it('with the double arm (more smog) and the filter (less), on overtime and short of power, every step adds up', () => {
+    const s = industrialCity();
+    const factory = s.buildings.find((b) => b.type === 'factory')!;
+    const [filtered, plain] = s.buildings.filter((b) => b.type === 'smelter');
+    expect(filtered.modules).toEqual(['smelterFilter']);
+    expect(installModule(s, 'factoryArm', factory)).toBe(true);
+    expect(installModule(s, 'purifierNozzle', s.buildings.find((b) => b.type === 'purifier')!)).toBe(true);
+    for (const b of s.buildings.filter((o) => o.type === 'solar')) expect(installModule(s, 'solarTracker', b)).toBe(true);
+    s.overtimeUntil = s.time + 30;
+    // the Solar Arrays and the Burner rebuilding (4 s): the HQ alone powers part of the city meanwhile
+    for (const b of s.buildings) if (b.type === 'solar' || b.type === 'burner') b.built = 0;
+    let steps = 0;
+    let short = 0;
+    let overtime = 0;
+    let checked = 0;
+    run(s, 60, () => {
+      steps++;
+      expect(Math.abs(partsSum(s) - s.derived.pollutionRate), `step ${steps}`).toBeLessThan(1e-12);
+      if (s.derived.efficiency < 1 && s.time < s.overtimeUntil) {
+        short++;
+        // each part as the sim applies it: the module's stat × overtime × the power the building gets
+        const eff = s.derived.efficiency;
+        if (factory.status === 'ok' && filtered.status === 'ok' && plain.status === 'ok') {
+          checked++;
+          expect(s.derived.air.byType.factory).toBeCloseTo(0.09 * 1.5 * eff, 12);
+          expect(airEffect(s, filtered)).toBeCloseTo(airEffect(s, plain) * 0.4, 12);
+          expect(s.derived.air.byType.smelter).toBeCloseTo(airEffect(s, plain) * 1.4, 12);
+          expect(airEffect(s, plain)).toBeCloseTo(BUILDINGS.smelter.pollution * 1.5 * eff, 12);
+        }
+      }
+      if (s.time < s.overtimeUntil) overtime++;
+    });
+    expect(short).toBeGreaterThan(0);
+    expect(checked).toBe(short);
+    expect(overtime).toBeGreaterThan(short);
+    // after the overtime, with the power back: the arm's 0.09 a second
+    expect(s.time).toBeGreaterThan(s.overtimeUntil);
+    expect(s.derived.efficiency).toBe(1);
+    expect(factory.status).toBe('ok');
+    expect(s.derived.air.byType.factory).toBeCloseTo(0.09, 12);
   });
 
   it('clean air: nothing to renew at 0%', () => {
