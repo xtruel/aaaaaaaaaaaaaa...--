@@ -299,9 +299,10 @@ describe('building panel modules', () => {
     s.res.parts = 1000;
     expect(installModule(s, 'smelterFilter', smelter)).toBe(true);
     update({ selectedId: smelter.id });
-    // effective numbers with the filter: energy -3, smog 0.8 a day
-    expect(insp.querySelector('dl')!.textContent).toContain('-3');
-    expect(insp.querySelector('dl')!.textContent).toContain('+0.8');
+    // the numbers with the filter: energy -3, smog 0.8 a day (at full power and now)
+    expect(row(insp, 'Energy')).toEqual(['-3', '-3']);
+    expect(row(insp, 'Smog / day')[0]).toBe('+0.8');
+    expect(insp.querySelector('.insp-lines')!.textContent).toBe('Cycle3 scrap → 9 credits');
     const clock = vi.spyOn(performance, 'now').mockReturnValue(20_000);
     try {
       q(insp, '[data-demolish]')!.click();

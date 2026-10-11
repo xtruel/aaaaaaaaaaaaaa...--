@@ -833,7 +833,11 @@ export class Hud {
   private renderInspector(s: GameState, b: Building): void {
     const def = BUILDINGS[b.type];
     // every number from the sim: nominal (buildingStats, with the module) and now (effectiveStats)
-    const rows = buildingRows(s, b);
+    const all = buildingRows(s, b);
+    // what a cycle takes and makes, and the fuel, are sentences: on their own lines above the columns of numbers,
+    // so the numbers' columns stay narrow and the labels keep their room
+    const wide = all.filter((r) => r.key === 'process' || r.key === 'fuel');
+    const rows = all.filter((r) => !wide.includes(r));
     const withNow = rows.some((r) => r.now !== null);
     const head = withNow ? `<dt class="rows-head"></dt><dd class="rows-head">${esc(t('insp.nominal'))}</dd><dd class="rows-head">${esc(t('insp.now'))}</dd>` : '';
     const body = rows
@@ -843,6 +847,7 @@ export class Hud {
           : `<dt>${esc(r.label)}</dt><dd>${esc(r.nominal)}</dd><dd class="now" data-now="${r.key}">${esc(r.now)}</dd>`,
       )
       .join('');
+    const lines = wide.map((r) => `<dt>${esc(r.label)}</dt><dd>${esc(r.nominal)}</dd>`).join('');
     // the modules go with the building: their refunds are part of it
     const refund = costText(demolishRefund(s, b));
     const pausable = b.built >= 1 && (def.process || def.fuel || def.cleanRadius);
@@ -864,7 +869,8 @@ export class Hud {
       </div>
       <p class="insp-status cause-${line.cause}" data-status data-cause="${line.cause}">${statusHtml(line)}</p>
       <div class="progress"><span data-progress></span></div>
-      <dl class="insp-rows${withNow ? '' : ' no-now'}">${head}${body}</dl>
+      ${lines ? `<dl class="insp-lines">${lines}</dl>` : ''}
+      ${body ? `<dl class="insp-rows${withNow ? '' : ' no-now'}">${head}${body}</dl>` : ''}
       <p class="insp-note" data-overtime hidden></p>
       <p class="insp-desc">${esc(bDesc(b.type))}</p>
       ${slots.length ? this.moduleSection(s, b, slots) : ''}

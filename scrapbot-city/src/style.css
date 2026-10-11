@@ -1885,20 +1885,21 @@ select {
   color: var(--muted);
 }
 
-/* nominal (full power) and now, side by side; a value that does not change with power spans both columns */
+/* nominal (full power) and now, side by side; a value that does not change with power spans both columns. A label
+   wraps between its words, never inside one (the label column is never narrower than its longest word) */
 .inspector .insp-rows,
 .inspector .mod-fx.with-now {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(min-content, 1fr) auto auto;
   align-items: baseline;
 }
 
 .inspector .insp-rows.no-now {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(min-content, 1fr) auto;
 }
 
-.inspector .insp-rows dt,
-.inspector .mod-fx dt {
-  overflow-wrap: anywhere;
+/* the cycle's inputs and outputs, the fuel: a line each above the columns, close to them */
+.inspector .insp-lines {
+  margin-block: 12px -6px;
 }
 
 .inspector dd.span {
