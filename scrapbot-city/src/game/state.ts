@@ -399,8 +399,8 @@ export function deserialize(json: string): GameState {
       if (!Array.isArray(entry)) continue;
       const [i, code, r] = entry;
       const kind = solidKind(Number(code));
-      // a solid piece never shares a tile with a building
-      if (!valid(i) || !kind || s.occ[i] !== -1) continue;
+      // a solid piece never shares a tile with a building, junk, sludge or rubble (only ground or grass)
+      if (!valid(i) || !kind || s.occ[i] !== -1 || (s.tiles[i] !== T.GROUND && s.tiles[i] !== T.GRASS)) continue;
       s.solid[i] = Number(code);
       s.rot[i] = normRot(kind, Number(r));
     }

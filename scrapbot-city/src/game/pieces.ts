@@ -9,7 +9,7 @@ import { T, TILE } from './defs';
 import type { Cost, Resource } from './defs';
 import { canAfford, computeStorage, costText, pay, solidReason } from './actions';
 import type { PlaceCheck } from './actions';
-import { MODULES, PIECES, installedModules, moduleRefund, normRot, pieceRefund, solidCode, solidKind } from './piecedefs';
+import { MODULES, PIECES, installedModules, isModuleKind, isPieceKind, moduleRefund, normRot, pieceRefund, solidCode, solidKind } from './piecedefs';
 import type { ModuleKind, PieceKind } from './piecedefs';
 import { buildingCenter, idx, inBounds } from './state';
 import type { Building, GameState } from './state';
@@ -32,8 +32,9 @@ function tileFx(x: number, y: number): { x: number; y: number } {
 // Can `kind` be placed on tile (x, y)? Same shape as placeCheck: costOnly when only the price is missing.
 // The rotation never changes the answer (any value is accepted and brought into range when placing).
 export function pieceCheck(s: GameState, kind: PieceKind, x: number, y: number, _rot = 0): PlaceCheck {
+  // own keys only: a stray 'constructor' or 'toString' from the UI is refused, not looked up on Object
+  if (!isPieceKind(kind)) return { ok: false, reason: t('place.cannot') };
   const def = PIECES[kind];
-  if (!def) return { ok: false, reason: t('place.cannot') };
   if (!inBounds(x, y)) return { ok: false, reason: t('place.outside') };
   const i = idx(x, y);
   if (s.occ[i] !== -1) return { ok: false, reason: t('place.occupied') };
@@ -41,6 +42,8 @@ export function pieceCheck(s: GameState, kind: PieceKind, x: number, y: number, 
   if (tile === T.JUNK) return { ok: false, reason: s.res.scrap >= s.derived.storage ? t('place.junkFull') : t('place.junk') };
   if (tile === T.SLUDGE) return { ok: false, reason: t('place.sludge') };
   if (tile === T.RUBBLE) return { ok: false, reason: t('place.rubble') };
+  // only ground or grass (spec 2): any other tile code, e.g. from a damaged save, is refused
+  if (tile !== T.GROUND && tile !== T.GRASS) return { ok: false, reason: t('place.cannot') };
   if (def.layer === 'surface') {
     // a fence or lamp on the tile does not stop a floor going under it
     if (s.floor[i]) return { ok: false, reason: t('place.paved') };
@@ -161,8 +164,8 @@ const NEEDS: Record<ModuleKind, () => string> = {
 // Can `kind` be installed on b? Only on a finished building of the right type (paused is fine), one of each
 // kind; costOnly when only the price is missing.
 export function moduleCheck(s: GameState, kind: ModuleKind, b: Building): PlaceCheck {
+  if (!isModuleKind(kind)) return { ok: false, reason: t('place.cannot') };
   const def = MODULES[kind];
-  if (!def) return { ok: false, reason: t('place.cannot') };
   if (!s.buildings.includes(b) || b.type !== def.building || b.built < 1) return { ok: false, reason: NEEDS[kind]() };
   if (installedModules(b).filter((k) => k === kind).length >= def.limit) return { ok: false, reason: t('place.modInstalled') };
   if (!canAfford(s, def.cost)) return { ok: false, reason: t('place.costs', { cost: costText(def.cost) }), costOnly: true };
@@ -183,7 +186,8 @@ export function installModule(s: GameState, kind: ModuleKind, b: Building): bool
 // Takes a module off (the building stays) and gives back half its price. Scrap above the storage that is
 // left is lost, as when a Dock is demolished. Null when the module is not there.
 export function removeModule(s: GameState, kind: ModuleKind, b: Building): Cost | null {
-  if (!s.buildings.includes(b) || !b.modules?.includes(kind)) return null;
+  // only a module that really counts on this building (as in demolishRefund) is refunded
+  if (!s.buildings.includes(b) || !b.modules || !installedModules(b).includes(kind)) return null;
   const left = b.modules.filter((k) => k !== kind);
   if (left.length) b.modules = left;
   else delete b.modules;

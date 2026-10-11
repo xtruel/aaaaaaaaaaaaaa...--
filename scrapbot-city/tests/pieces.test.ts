@@ -240,6 +240,26 @@ describe('placing pieces', () => {
     expect(s.res.credits).toBe(credits - 4 * PIECES.fence.cost.credits!);
   });
 
+  it('refuses unknown kinds and tile codes outside ground or grass, for free and without throwing', () => {
+    const s = city();
+    const { x, y } = clearArea(s, 1, 1);
+    const before = resOf(s);
+    for (const kind of ['constructor', 'toString', '__proto__', 'dockStorage', ''] as unknown as PieceKind[]) {
+      expect(pieceCheck(s, kind, x, y, 0)).toMatchObject({ ok: false, reason: t('place.cannot') });
+      expect(placePiece(s, kind, x, y, 0)).toBe(false);
+    }
+    const hq = hqOf(s);
+    for (const kind of ['constructor', 'floor'] as unknown as ModuleKind[]) {
+      expect(moduleCheck(s, kind, hq)).toMatchObject({ ok: false, reason: t('place.cannot') });
+      expect(installModule(s, kind, hq)).toBe(false);
+    }
+    s.tiles[idx(x, y)] = 7; // not a tile kind the game knows (a damaged save)
+    expect(pieceCheck(s, 'floor', x, y, 0)).toMatchObject({ ok: false, reason: t('place.cannot') });
+    expect(pieceCheck(s, 'fence', x, y, 0)).toMatchObject({ ok: false, reason: t('place.cannot') });
+    expect(resOf(s)).toEqual(before);
+    expect(s.solid[idx(x, y)] + s.floor[idx(x, y)]).toBe(0);
+  });
+
   it('cannot buy what it cannot afford (costOnly), and nothing is taken', () => {
     const s = city();
     const { x, y } = clearArea(s, 1, 1);
@@ -527,6 +547,11 @@ describe('modules', () => {
     expect(s.fx[0]).toMatchObject({ kind: 'demolish' });
     expect(removeModule(s, 'dockStorage', dock)).toBeNull(); // only once
     expect(s.res.credits).toBe(before.credits + 15);
+    // a module that does not count on this building (pushed by hand) is never refunded, as in demolishRefund
+    dock.modules = ['smelterFilter'];
+    expect(removeModule(s, 'smelterFilter', dock)).toBeNull();
+    expect(demolishRefund(s, dock)).toEqual({ credits: 20, parts: 5 });
+    expect(s.res.credits).toBe(before.credits + 15);
   });
 
   it('demolishing a building with modules gives back the building and its modules, shown before, and leaves no orphan', () => {
@@ -756,6 +781,9 @@ describe('saves', () => {
     const s = city();
     const dock = build(s, 'dock');
     const hq = hqOf(s);
+    // (1, 0) is plain ground, so the lamp entry below is valid apart from its rotation
+    s.tiles[idx(1, 0)] = T.GROUND;
+    s.amount[idx(1, 0)] = 0;
     const data = JSON.parse(serialize(s));
     data.buildings.find((b: Building) => b.id === dock.id).modules = ['dockStorage', 'dockStorage', 'smelterFilter', 'warpDrive'];
     data.buildings.find((b: Building) => b.id === hq.id).modules = ['dockStorage'];
@@ -770,5 +798,18 @@ describe('saves', () => {
     expect(pieceAt(back, 1, 0)).toEqual({ kind: 'lamp', rot: 2 });
     expect(back.floor.reduce((n, v) => n + v, 0)).toBe(1);
     expect(back.solid.reduce((n, v) => n + (v ? 1 : 0), 0)).toBe(1);
+  });
+
+  it('a damaged save cannot put a solid piece on junk, sludge or rubble (a floor under junk is fine)', () => {
+    const s = city();
+    const first = (kind: number) => s.tiles.findIndex((v, i) => v === kind && s.occ[i] === -1);
+    const [junk, sludge, rubble] = [first(T.JUNK), first(T.SLUDGE), first(T.RUBBLE)];
+    expect(Math.min(junk, sludge, rubble)).toBeGreaterThanOrEqual(0);
+    const data = JSON.parse(serialize(s));
+    data.solids = [[junk, 1, 0], [sludge, 2, 0], [rubble, 3, 0]];
+    data.floors = [junk];
+    const back = deserialize(JSON.stringify(data));
+    expect([junk, sludge, rubble].map((i) => back.solid[i])).toEqual([0, 0, 0]);
+    expect(back.floor[junk]).toBe(1);
   });
 });
