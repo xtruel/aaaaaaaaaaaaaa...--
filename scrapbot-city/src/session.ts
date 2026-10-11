@@ -8,7 +8,7 @@ import { BUILDINGS, BUILD_ORDER, MAP_H, MAP_W, T, TILE } from './game/defs';
 import type { BuildingType } from './game/defs';
 import { freeHintsLeft, hintPrice, suggest } from './game/hints';
 import type { Hint } from './game/hints';
-import { dragPath, installModule, isModuleKind, isPieceKind, moduleCheck, normRot, pieceCheck, placePiece, removeModule, removePieceAt, rotatePieceAt } from './game/pieces';
+import { dragPath, floorAt, installModule, isModuleKind, isPieceKind, moduleCheck, normRot, pieceAt, pieceCheck, placePiece, removeModule, removePieceAt, rotatePieceAt } from './game/pieces';
 import type { CatalogKind, ModuleKind } from './game/pieces';
 import { advance, computeDerived, dayPhase } from './game/sim';
 import { canAutosave, day, idx, inBounds, pushMessage } from './game/state';
@@ -537,6 +537,12 @@ export class GameSession implements PadTarget {
         this.pointers.clear();
         return;
       }
+      // the right button pressed while the left one is down (a chord) cancels, as a right click does: a row
+      // being dragged is not bought on release
+      if (e.pointerType === 'mouse' && e.button === 2 && this.drag?.button === 0) {
+        this.cancelTool();
+        return;
+      }
       if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pinch && this.pointers.size >= 2) {
         // two fingers: their distance zooms, their midpoint drags the map along
@@ -854,6 +860,8 @@ export class GameSession implements PadTarget {
     this.row = null;
     this.selectedId = -1;
     this.selectedPiece = -1;
+    // a press still held ends here too, so its release neither buys nor selects (a map being dragged goes on)
+    if (this.drag && !this.drag.moved) this.drag = null;
   }
 
   // A building (or nothing: -1) takes the right-hand panel, so the catalog closes.
@@ -923,15 +931,24 @@ export class GameSession implements PadTarget {
   }
 
   // A dragged row: each tile is a purchase of its own, made in order; a tile that is taken, or that the money
-  // no longer covers, is skipped and costs nothing.
+  // no longer covers, is skipped and costs nothing. A row carries on over the same piece already there (a fence
+  // row over its fences and gates, as the map shows it, with no ghost): those tiles are neither laid nor skipped.
   private layRow(tiles: { x: number; y: number }[]): void {
     const s = this.s;
     const p = this.piece;
     if (!p || !isPieceKind(p.kind)) return;
+    const kind = p.kind;
+    const there = (q: { x: number; y: number }) => {
+      if (kind === 'floor') return floorAt(s, q.x, q.y);
+      const k = pieceAt(s, q.x, q.y)?.kind;
+      return k === kind || (kind === 'fence' && k === 'gate');
+    };
+    const todo = tiles.filter((q) => !there(q));
+    if (!todo.length) return;
     let laid = 0;
-    for (const tile of tiles) if (placePiece(s, p.kind, tile.x, tile.y, p.rot)) laid++;
-    if (laid === 0) this.refuse(pieceCheck(s, p.kind, tiles[0].x, tiles[0].y).reason);
-    else if (laid < tiles.length) pushMessage(s, t('msg.rowPartial', { n: laid, total: tiles.length }), 'info');
+    for (const tile of todo) if (placePiece(s, kind, tile.x, tile.y, p.rot)) laid++;
+    if (laid === 0) this.refuse(pieceCheck(s, kind, todo[0].x, todo[0].y).reason);
+    else if (laid < todo.length) pushMessage(s, t('msg.rowPartial', { n: laid, total: todo.length }), 'info');
   }
 
   private install(id: number, kind: ModuleKind): void {
