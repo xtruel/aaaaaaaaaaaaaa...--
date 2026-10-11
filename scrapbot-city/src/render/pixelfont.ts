@@ -64,14 +64,15 @@ const UMLAUT: Record<string, string> = { Ä: 'AE', Ö: 'OE', Ü: 'UE' };
 
 // The font only has A–Z: accents are dropped (É → E, Ż → Z, ß → SS) so every language still reads.
 // German writes umlauts out instead (Ü → UE), the way it is done wherever they are missing.
-// Arrows are too small for 3×5 pixels: → is written ->.
+// Arrows are too small for 3×5 pixels: → is written ->. The minus sign and the dash are a hyphen ("−2 -> −3").
 export function foldText(text: string): string {
   const up = text.toUpperCase();
   return (lang() === 'de' ? up.replace(/[ÄÖÜ]/g, (c) => UMLAUT[c]) : up)
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .replace(/[ŁØÆŒẞĐÐÞ]/g, (c) => FOLD[c] ?? c)
-    .replace(/→/g, '->');
+    .replace(/→/g, '->')
+    .replace(/[−–]/g, '-');
 }
 
 export function pixelTextWidth(text: string, scale = 1): number {

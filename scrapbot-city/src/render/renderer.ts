@@ -1719,12 +1719,15 @@ export class Renderer {
   }
 
   // A line of words on the map in a dark box, centred on x (view px) with its top at y: why a placement is refused,
-  // a module's effect. Kept inside the view.
+  // a module's effect. Kept inside the view, clear of the top bar and the build toolbar (insets): at a high zoom the
+  // label of a building in the middle of the screen would otherwise sit under the top bar.
   private drawLabel(text: string, x: number, y: number, color: string): void {
     const ctx = this.ctx;
     const w = pixelTextWidth(text);
+    const top = Math.ceil(this.insets.top / this.pxZoom) + 2;
+    const bottom = this.viewH - Math.ceil(this.insets.bottom / this.pxZoom) - 7;
     const lx = Math.max(2, Math.min(this.viewW - w - 2, Math.round(x - w / 2)));
-    const ly = Math.max(2, Math.min(this.viewH - 7, Math.round(y)));
+    const ly = Math.max(top, Math.min(bottom, Math.round(y)));
     ctx.fillStyle = 'rgba(13,11,22,0.85)';
     ctx.fillRect(lx - 2, ly - 2, w + 4, 9);
     drawPixelText(ctx, text, lx, ly, color);
