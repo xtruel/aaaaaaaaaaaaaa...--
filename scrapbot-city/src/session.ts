@@ -64,8 +64,9 @@ interface Row {
 
 const PAN_SPEED = 260; // screen px per second
 // The owner's comfort rules for building: a press within this many ms of the press before and this close to it
-// (screen px, the map not moved) is the second press of a double click, double tap or A A. On the map it buys nothing,
-// wherever the first press went: on the same tile, across a tile edge, or on a dialog's or panel's button that closed.
+// (screen px, the map not moved) is the second press of a double click, double tap or A A. On the map it buys nothing
+// the first press did not mean: across a tile edge, or behind a dialog or a panel that the first press closed (on the
+// same tile it is only refused, as before; see meantPress).
 const DOUBLE_PRESS = 350;
 const DOUBLE_DIST = 10;
 const CURSOR_SPEED = 900; // controller cursor, screen px per second at full tilt
@@ -99,10 +100,11 @@ export class GameSession implements PadTarget {
   private pieceRot: Partial<Record<CatalogKind, number>> = {};
   private catalog = false;
   private selectedPiece = -1; // tile index of the selected piece (fence, gate, lamp, decoration) or floor
-  // the last two presses anywhere (mouse, finger, the pad's A at its cursor): where, when, and where the map was
+  // the last two presses anywhere (mouse, finger, the pad's A at its cursor): where, when, where the map was, and the
+  // tile under it when it was on the map ('' elsewhere: a dialog, a panel)
   private presses = [
-    { t: -Infinity, x: 0, y: 0, cam: '' },
-    { t: -Infinity, x: 0, y: 0, cam: '' },
+    { t: -Infinity, x: 0, y: 0, cam: '', tile: '' },
+    { t: -Infinity, x: 0, y: 0, cam: '', tile: '' },
   ];
   private row: Row | null = null;
   private rotAcc = 0; // Shift+wheel, added up like the zoom
@@ -537,7 +539,7 @@ export class GameSession implements PadTarget {
   private bindInput(): void {
     const canvas = this.renderer.canvas;
     // every press, on the map or anywhere else (a dialog's button, a panel's ×), before the map's own handlers
-    this.listen(window, 'pointerdown', (e) => this.notePress(e.clientX, e.clientY), { capture: true });
+    this.listen(window, 'pointerdown', (e) => this.notePress(e.clientX, e.clientY, e.target === canvas), { capture: true });
     this.listen(window, 'resize', () => {
       this.renderer.resize();
       this.held = false;
@@ -869,21 +871,26 @@ export class GameSession implements PadTarget {
     else if (s.tiles[i] === T.RUBBLE) pushMessage(s, t('msg.rubbleInfo'), 'info');
   }
 
-  private notePress(x: number, y: number): void {
+  private notePress(x: number, y: number, onMap: boolean): void {
     const r = this.renderer;
-    this.presses = [this.presses[1], { t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}` }];
+    const tile = onMap ? r.screenToTile(x, y) : null;
+    this.presses = [this.presses[1], { t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tile: tile ? `${tile.x},${tile.y}` : '' }];
   }
 
   // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
   // second press of a double click, double tap or A A, the press at (sx, sy) coming within DOUBLE_PRESS ms and
-  // DOUBLE_DIST px of the one before with the map where it was. The first press may have bought on this tile (a second
-  // one would only be refused), on the next tile across an edge (it would buy a second piece), or answered a dialog or
-  // closed a panel that was over this point (the second press lands on the map behind).
+  // DOUBLE_DIST px of the one before with the map where it was, when it would do something the first one did not mean:
+  // land on the next tile across an edge (it would buy a second piece), land on the map behind a dialog or a panel the
+  // first press closed, or take up a second layer with the bulldozer (the floor under the fence just removed). On the
+  // tile the first press used, a piece or building tool goes ahead: there it can only be refused, with the reason.
   private meantPress(sx: number, sy: number): boolean {
     const [before, now] = this.presses;
     const r = this.renderer;
     const cam = `${r.cam.x},${r.cam.y},${r.zoom}`;
-    return !(now.t - before.t < DOUBLE_PRESS && cam === before.cam && Math.hypot(sx - before.x, sy - before.y) < DOUBLE_DIST);
+    const double = now.t - before.t < DOUBLE_PRESS && cam === before.cam && Math.hypot(sx - before.x, sy - before.y) < DOUBLE_DIST;
+    if (!double) return true;
+    const tile = r.screenToTile(sx, sy);
+    return !this.bulldoze && before.tile !== '' && before.tile === `${tile.x},${tile.y}`;
   }
 
   // The bulldozer clears rubble, takes up a fence, gate, lamp or bare floor (half its price back) and selects a
@@ -1094,7 +1101,7 @@ export class GameSession implements PadTarget {
   padFrame(f: PadFrame): boolean {
     if (!this.alive || this.root.hidden || isModalOpen()) {
       // (an A that answers a dialog is a press at the cursor too: an A right after it must not buy behind the dialog)
-      if (this.alive && f.pressed.has('a')) this.notePress(this.cursor.x, this.cursor.y);
+      if (this.alive && f.pressed.has('a')) this.notePress(this.cursor.x, this.cursor.y, false);
       this.padCursor.hidden = true;
       return false;
     }
@@ -1181,7 +1188,7 @@ export class GameSession implements PadTarget {
     const p = f.pressed;
     if (p.has('a')) {
       audio.unlock();
-      this.notePress(c.x, c.y);
+      this.notePress(c.x, c.y, overMap);
       // like a press of the mouse or a finger: anywhere but on the smog panel or its meter, it closes the panel (and on
       // the map does nothing else)
       const closed = this.hud.closeSmogUnless(el);
