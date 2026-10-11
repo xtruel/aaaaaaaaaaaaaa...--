@@ -667,6 +667,13 @@ export const en = {
   'hint.broke.text': 'Credits: {credits}, parts: {parts}. Demolish a building you can spare to get half its price back, pause the ones that burn scrap, and let the taxes come in.',
   'hint.addPower.title': 'Add power',
   'hint.addPower.text': 'Next goal: power. The HQ alone will soon not be enough, and without energy everything slows down. {what} {afford}',
+  'hint.storageCredits.title': "Short of credits, not storage",
+  'hint.storageCredits.smelter': "Scrap storage is {n}/{cap}, but what you are short of is credits: more storage would not help. A Smelter turns scrap straight into credits, with some smoke. {afford}",
+  'hint.storageCredits.fixlab': "Scrap storage is {n}/{cap}, but what you are short of is credits: more storage would not help. A Fix-It Lab turns your Recyclers' parts into credits, cleanly. {afford}",
+  'hint.recyclerPower.title': "Power first",
+  'hint.recyclerPower.text': "Another Recycler needs {need} energy, but you only have {spare} to spare: it would slow every machine down. {what} {afford}",
+  'hint.noScrap.title': "No scrap to recycle",
+  'hint.noScrap.text': "A Recycler needs scrap, and there is none in storage or on the map right now. Storms and your citizens' trash bring more: build Bot Pods meanwhile.",
 
   // ---------- added in 0.7: objects & modules ----------
   'hud.catalog': 'Objects & modules',

@@ -666,6 +666,13 @@ export const de: Dict = {
   'hint.broke.text': 'Credits: {credits}, Teile: {parts}. Reiß ein Gebäude ab, auf das du verzichten kannst, um den halben Preis zurückzubekommen, pausiere alles, was Schrott verbrennt, und lass die Steuern reinkommen.',
   'hint.addPower.title': 'Strom her',
   'hint.addPower.text': 'Nächstes Ziel: Strom. Das HQ allein reicht bald nicht mehr, und ohne Energie läuft alles langsamer. {what} {afford}',
+  'hint.storageCredits.title': "Es fehlen Credits, kein Lagerplatz",
+  'hint.storageCredits.smelter': "Das Schrottlager ist bei {n}/{cap}, aber dir fehlen Credits: Mehr Lagerplatz würde nichts bringen. Ein Schmelzofen macht aus Schrott direkt Credits, mit etwas Rauch. {afford}",
+  'hint.storageCredits.fixlab': "Das Schrottlager ist bei {n}/{cap}, aber dir fehlen Credits: Mehr Lagerplatz würde nichts bringen. Ein Flicklabor macht aus den Teilen deiner Recycler Credits, ganz ohne Rauch. {afford}",
+  'hint.recyclerPower.title': "Erst Strom",
+  'hint.recyclerPower.text': "Ein weiterer Recycler braucht {need} Energie, du hast aber nur {spare} übrig: Er würde alle Maschinen bremsen. {what} {afford}",
+  'hint.noScrap.title': "Kein Schrott zum Recyceln",
+  'hint.noScrap.text': "Ein Recycler braucht Schrott, und gerade gibt es keinen, weder im Lager noch auf der Karte. Stürme und der Müll deiner Einwohner bringen neuen: Bau solange Bot-Kapseln.",
 
   // ---------- added in 0.7: objects & modules ----------
   'hud.catalog': 'Objekte & Module',

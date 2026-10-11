@@ -669,6 +669,13 @@ export const es: Dict = {
   'hint.broke.text': 'Créditos: {credits}, piezas: {parts}. Derriba un edificio del que puedas prescindir para recuperar la mitad de su precio, pausa los que queman chatarra y deja que lleguen los impuestos.',
   'hint.addPower.title': 'Hace falta energía',
   'hint.addPower.text': 'Siguiente objetivo: energía. La Base sola pronto no bastará, y sin energía todo va más lento. {what} {afford}',
+  'hint.storageCredits.title': "Faltan créditos, no almacén",
+  'hint.storageCredits.smelter': "El almacén de chatarra está a {n}/{cap}, pero lo que te falta son créditos: más almacén no serviría de nada. Una Fundición convierte la chatarra directamente en créditos, con algo de humo. {afford}",
+  'hint.storageCredits.fixlab': "El almacén de chatarra está a {n}/{cap}, pero lo que te falta son créditos: más almacén no serviría de nada. Un Taller Manitas convierte en créditos las piezas de tus Recicladores, sin humo. {afford}",
+  'hint.recyclerPower.title': "Primero, energía",
+  'hint.recyclerPower.text': "Otro Reciclador necesita {need} de energía, pero solo te sobran {spare}: frenaría todas las máquinas. {what} {afford}",
+  'hint.noScrap.title': "No hay chatarra que reciclar",
+  'hint.noScrap.text': "Un Reciclador necesita chatarra, y ahora no hay ni en el almacén ni en el mapa. Las tormentas y la basura de los ciudadanos traen más: mientras tanto, construye Cápsulas bot.",
 
   // ---------- added in 0.7: objects & modules ----------
   'hud.catalog': 'Objetos y módulos',

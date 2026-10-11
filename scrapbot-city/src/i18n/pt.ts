@@ -666,6 +666,13 @@ export const pt: Dict = {
   'hint.broke.text': 'Créditos: {credits}, peças: {parts}. Demole um edifício que possas dispensar para recuperar metade do preço, põe em pausa os que queimam sucata e deixa os impostos entrar.',
   'hint.addPower.title': 'Falta energia',
   'hint.addPower.text': 'Próximo objetivo: energia. O QG sozinho em breve não chega, e sem energia tudo abranda. {what} {afford}',
+  'hint.storageCredits.title': "Faltam créditos, não armazém",
+  'hint.storageCredits.smelter': "O armazenamento de sucata está em {n}/{cap}, mas o que te falta são créditos: mais armazém não ajudava. Uma Fundição transforma sucata diretamente em créditos, com algum fumo. {afford}",
+  'hint.storageCredits.fixlab': "O armazenamento de sucata está em {n}/{cap}, mas o que te falta são créditos: mais armazém não ajudava. Um Lab Arranja-Tudo transforma as peças das tuas Recicladoras em créditos, sem fumo. {afford}",
+  'hint.recyclerPower.title': "Primeiro a energia",
+  'hint.recyclerPower.text': "Outra Recicladora precisa de {need} de energia, mas só te sobram {spare}: ia abrandar todas as máquinas. {what} {afford}",
+  'hint.noScrap.title': "Não há sucata para reciclar",
+  'hint.noScrap.text': "Uma Recicladora precisa de sucata, e agora não há nem no armazém nem no mapa. As tempestades e o lixo dos cidadãos trazem mais: entretanto, constrói Cápsulas de Bots.",
 
   // ---------- added in 0.7: objects & modules ----------
   'hud.catalog': 'Objetos e módulos',

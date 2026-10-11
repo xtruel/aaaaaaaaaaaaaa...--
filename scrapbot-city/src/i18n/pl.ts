@@ -669,6 +669,13 @@ export const pl: Dict = {
   'hint.broke.text': 'Kredyty: {credits}, części: {parts}. Zburz budynek, bez którego się obejdziesz, żeby odzyskać połowę ceny, wstrzymaj te, które spalają złom, i poczekaj na podatki.',
   'hint.addPower.title': 'Potrzebna energia',
   'hint.addPower.text': 'Następny cel: energia. Sama baza wkrótce nie wystarczy, a bez energii wszystko zwalnia. {what} {afford}',
+  'hint.storageCredits.title': "Brakuje kredytów, nie miejsca",
+  'hint.storageCredits.smelter': "Magazyn złomu {n}/{cap}, ale brakuje ci kredytów: większy magazyn nic tu nie da. Huta zamienia złom prosto w kredyty, choć trochę przy tym kopci. {afford}",
+  'hint.storageCredits.fixlab': "Magazyn złomu {n}/{cap}, ale brakuje ci kredytów: większy magazyn nic tu nie da. Naprawialnia zamienia części z twoich recyklerów na kredyty, bez dymu. {afford}",
+  'hint.recyclerPower.title': "Najpierw energia",
+  'hint.recyclerPower.text': "Kolejny recykler potrzebuje {need} energii, a zapas to tylko {spare}: spowolniłby wszystkie maszyny. {what} {afford}",
+  'hint.noScrap.title': "Brak złomu do przerobu",
+  'hint.noScrap.text': "Recykler potrzebuje złomu, a teraz nie ma go ani w magazynie, ani na mapie. Burze i śmieci mieszkańców przyniosą więcej: w międzyczasie buduj Kapsuły botów.",
 
   // ---------- added in 0.7: objects & modules ----------
   'hud.catalog': 'Obiekty i moduły',

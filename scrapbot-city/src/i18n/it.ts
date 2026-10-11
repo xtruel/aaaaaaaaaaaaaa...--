@@ -667,6 +667,13 @@ export const it: Dict = {
   'hint.broke.text': 'Crediti: {credits}, pezzi: {parts}. Demolisci un edificio di cui puoi fare a meno per riavere metà del prezzo, metti in pausa quelli che bruciano rottami e lascia arrivare le tasse.',
   'hint.addPower.title': 'Serve energia',
   'hint.addPower.text': 'Prossimo obiettivo: l\'energia. Il QG da solo presto non basterà, e senza energia tutto rallenta. {what} {afford}',
+  'hint.storageCredits.title': "Mancano crediti, non spazio",
+  'hint.storageCredits.smelter': "Il magazzino dei rottami è a {n}/{cap}, ma quello che ti manca sono i crediti: più spazio non servirebbe. Una Fonderia trasforma i rottami direttamente in crediti, con un po' di fumo. {afford}",
+  'hint.storageCredits.fixlab': "Il magazzino dei rottami è a {n}/{cap}, ma quello che ti manca sono i crediti: più spazio non servirebbe. Un Lab Riparatutto trasforma in crediti i pezzi dei tuoi Riciclatori, senza fumo. {afford}",
+  'hint.recyclerPower.title': "Prima l'energia",
+  'hint.recyclerPower.text': "Un altro Riciclatore consuma {need} di energia, ma te ne avanza solo {spare}: rallenterebbe tutte le macchine. {what} {afford}",
+  'hint.noScrap.title': "Niente rottami da riciclare",
+  'hint.noScrap.text': "Un Riciclatore ha bisogno di rottami, e ora non ce ne sono né in magazzino né sulla mappa. Le tempeste e i rifiuti dei cittadini ne portano altri: intanto costruisci delle Capsule Bot.",
 
   // ---------- added in 0.7: objects & modules ----------
   'hud.catalog': "Oggetti e moduli",

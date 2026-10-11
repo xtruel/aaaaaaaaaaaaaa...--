@@ -666,6 +666,13 @@ export const nl: Dict = {
   'hint.broke.text': 'Credits: {credits}, onderdelen: {parts}. Sloop een gebouw dat je kunt missen om de helft van de prijs terug te krijgen, pauzeer wat schroot verbrandt en laat de belastingen binnenkomen.',
   'hint.addPower.title': 'Stroom erbij',
   'hint.addPower.text': 'Volgend doel: stroom. Het HQ alleen is straks niet genoeg, en zonder energie gaat alles trager. {what} {afford}',
+  'hint.storageCredits.title': "Je komt credits tekort, geen opslag",
+  'hint.storageCredits.smelter': "De schrootopslag zit op {n}/{cap}, maar wat je tekortkomt zijn credits: meer opslag helpt niet. Een Smelterij maakt van schroot meteen credits, met wat rook. {afford}",
+  'hint.storageCredits.fixlab': "De schrootopslag zit op {n}/{cap}, maar wat je tekortkomt zijn credits: meer opslag helpt niet. Een Repareerlab maakt van de onderdelen van je Recyclers credits, zonder rook. {afford}",
+  'hint.recyclerPower.title': "Eerst stroom",
+  'hint.recyclerPower.text': "Nog een Recycler heeft {need} energie nodig, maar je hebt er maar {spare} over: hij zou alle machines afremmen. {what} {afford}",
+  'hint.noScrap.title': "Geen schroot om te recyclen",
+  'hint.noScrap.text': "Een Recycler heeft schroot nodig, en dat is er nu niet, in de opslag noch op de kaart. Stormen en het afval van je inwoners brengen nieuw schroot: bouw intussen Botpods.",
 
   // ---------- added in 0.7: objects & modules ----------
   'hud.catalog': 'Objecten & modules',
