@@ -26,7 +26,9 @@
   può ruotare (altrimenti `Y` resta il suggerimento); sul touch il pulsante «⟳ Ruota» nel pannello. Un oggetto già
   posato si seleziona con un clic e si ruota o si rimuove dal suo pannello.
 - **Rimozione e rimborsi**: la ruspa, o «Rimuovi» nel pannello, su una recinzione, un cancello o un lampione rende
-  metà del prezzo; su un pavimento libero 1 credito; su un edificio lo seleziona come prima.
+  metà del prezzo; su un pavimento libero 1 credito; su un edificio lo seleziona come prima. Come già per le macerie,
+  la ruspa toglie anche un oggetto che sta sulla casella indicata dietro un edificio (che mostra in trasparenza), anche
+  se l'edificio lo nasconde del tutto.
 - **Moduli nel pannello dell'edificio** (Hangar Bot, Fonderia): sezione «Moduli» con lo slot, l'effetto prima → dopo
   (deposito, smog, energia), il limite 0/1 o 1/1, «Installa» (disattivato con il motivo) e «Rimuovi (+rimborso)» con
   conferma, che avvisa se dei rottami andranno persi. I numeri del pannello (energia, smog, deposito) contano i moduli.
