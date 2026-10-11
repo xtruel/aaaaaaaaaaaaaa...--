@@ -100,6 +100,7 @@ const POOL = [5, 10, 14, 16, 14, 10, 5]; // half-widths of a lamp's light pool, 
 // frames: a fence by the mask of its fence/gate neighbours (alone: along x or y by its rotation), a gate by its
 // rotation (0 along x, 1 along y), a lamp by the direction of its arm (0 +x, 1 +y, 2 −x, 3 −y).
 const PIECE_H: Record<SolidKind, number> = { fence: 10, gate: 12, lamp: 22 };
+const PIECE_REACH = 64; // no piece's sprite or shadow reaches this far (px) from its tile: farther off-view ones are skipped early
 const FENCE_FRAMES = Array.from({ length: 16 }, (_, mask) => `pc/fence/${mask}`);
 const GATE_FRAMES = ['pc/gate/x', 'pc/gate/y'];
 const LAMP_FRAMES = [0, 1, 2, 3].map((dir) => `pc/lamp/${dir}`);
@@ -1023,10 +1024,11 @@ export class Renderer {
       if (!kind) continue;
       const tx = i % MAP_W;
       const ty = (i - tx) / MAP_W;
+      const top = tileTop(tx, ty);
+      if (top.X + PIECE_REACH < vx0 || top.X - PIECE_REACH > vx1 || top.Y + PIECE_REACH < vy0 || top.Y - PIECE_REACH > vy1) continue;
       const name = this.pieceFrameName(s, tx, ty, i);
       const f = frame(name);
       if (!f) continue;
-      const top = tileTop(tx, ty);
       const sx = top.X - f.ax;
       const sy = top.Y - f.ay;
       if (sx > vx1 || sy > vy1 || sx + f.w < vx0 || sy + f.h < vy0) continue;
@@ -1243,9 +1245,10 @@ export class Renderer {
       if (!s.solid[i] || !solidKind(s.solid[i])) continue;
       const tx = i % MAP_W;
       const ty = (i - tx) / MAP_W;
+      const top = tileTop(tx, ty);
+      if (top.X + PIECE_REACH < camX || top.X - PIECE_REACH > camX + this.viewW || top.Y + PIECE_REACH < camY || top.Y - PIECE_REACH > camY + this.viewH) continue;
       const f = frame(shadowOf(this.pieceFrameName(s, tx, ty, i)));
       if (!f) continue;
-      const top = tileTop(tx, ty);
       const x = top.X - f.ax - camX;
       const y = top.Y - f.ay - camY;
       if (x > this.viewW || y > this.viewH || x + f.w < 0 || y + f.h < 0) continue;
@@ -2007,7 +2010,10 @@ export class Renderer {
       const d = this.drawn[k];
       if (d.kind !== K_PIECE) continue;
       const g = frame(glowOf(this.pieceNames[d.ref]));
-      if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, d.sx - camX, d.sy - camY, g.w, g.h);
+      if (!g) continue;
+      const tx = d.ref % MAP_W;
+      const top = tileTop(tx, (d.ref - tx) / MAP_W);
+      ctx.drawImage(img, g.x, g.y, g.w, g.h, top.X - g.ax - camX, top.Y - g.ay - camY, g.w, g.h);
     }
     for (let k = 0; k < this.drawnCount; k++) {
       const d = this.drawn[k];
