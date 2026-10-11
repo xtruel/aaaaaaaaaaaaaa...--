@@ -19,8 +19,8 @@ modifica il codice: nessuna dimensione, nessun numero di gioco, nessuna città s
   la Guglia. Restano edificabili 1468 caselle (72,8%). Ci stanno ancora 130 lotti 2×2 con una strada attorno (261 senza strada)
   e 64 lotti 3×3 con strada. Si esauriscono prima i grandi rettangoli liberi: dopo questa città, e solo dopo aver tolto rottami
   e macerie, ci stanno ancora un isolato 19×16 e uno 14×14, oppure cinque isolati 10×10.
-- **Interfaccia**: a 1280 px di larghezza copre il 34–40% dello schermo (la barra di costruzione da sola il 21–25%), a
-  1920×1080 il 22–24%. Con il pannello del catalogo aperto si arriva al 51–58%.
+- **Interfaccia**: a 1280 px di larghezza copre il 33–40% dello schermo (la barra di costruzione da sola il 21–25%), a
+  1920×1080 il 22–24%. Con il pannello del catalogo aperto si arriva al 52–58%.
 - **Navigazione e bordi**: tutti gli isolati sono a meno di una schermata dalla vista iniziale (al massimo 3,6 s con le
   frecce a 1280×800). Si raggiungono tutti i bordi e gli angoli, a ogni zoom e con ogni comando (camera-check 13/13 e
   edge-access su 4 risoluzioni). **Nessun intervento su inquadratura, pan o bordi: le misure non mostrano un problema.**
@@ -221,25 +221,33 @@ Schermate (1280×800 e 1920×1080, italiano): `map/shots/overview-z1-1920x1080-i
 
 Città a isolati, telecamera sul QG, zoom iniziale. La percentuale è la parte dello schermo coperta dall'unione dei pannelli,
 campionata ogni 2 px. "Caselle visibili" sono le caselle della mappa con il centro sullo schermo e non sotto l'HUD.
+Per questa misura crediti e parti della città sono riportati a cifre da partita (2.500 e 400): le risorse concesse per
+costruirla (136.792 crediti e 10.000 parti, mostrati «136.9k» e «10.0k») allargano la barra in alto e a 1280 px la mandano
+su due righe, cosa che con cifre normali non succede (vedi sotto).
 
 | Finestra | Lingua | Zoom | Margine alto / basso (px) | Altezza libera | HUD di base (barra in alto · obiettivi · costruzione) | + scheda edificio | + catalogo | Caselle visibili (base / scheda / catalogo) |
 |---|---|---|---|---|---|---|---|---|
-| 1024×768 | it | 2 | 139 / 174 | 455 | **38,5%** (8,9 · 8,5 · 20,9) | 49,4% | 58,0% | 480 / 393 / 330 |
-| 1024×768 | en | 2 | 139 / 174 | 455 | 37,4% (8,8 · 7,6 · 20,9) | 47,7% | 56,9% | 487 / 405 / 337 |
-| 1280×720 | it | 2 | 139 / 193 | 388 | **39,8%** (7,6 · 7,2 · 25,2) | 49,2% | 53,9% | 537 / 451 / 410 |
-| 1280×720 | en | 2 | 74 / 180 | 466 | 37,3% (7,5 · 6,5 · 23,5) | 46,2% | 54,4% | 579 / 477 / 409 |
-| 1280×800 | it | 2 | 139 / 193 | 468 | **35,8%** (6,9 · 6,5 · 22,6) | 44,3% | 51,3% | 618 / 531 / 468 |
-| 1280×800 | en | 2 | 74 / 180 | 546 | 33,6% (6,7 · 5,9 · 21,2) | 41,5% | 51,8% | 648 / 574 / 474 |
-| 1920×1080 | it | 3 | 74 / 193 | 813 | **23,9%** (3,8 · 3,3 · 16,9) | 28,1% | 33,4% | 666 / 637 / 599 |
-| 1920×1080 | en | 3 | 74 / 180 | 826 | 22,4% (3,8 · 2,9 · 15,8) | 26,3% | 31,6% | 669 / 663 / 621 |
+| 1024×768 | it | 2 | 139 / 174 | 455 | **38,3%** (8,7 · 8,5 · 20,9) | 49,2% | 57,8% | 484 / 396 / 333 |
+| 1024×768 | en | 2 | 139 / 174 | 455 | 37,2% (8,6 · 7,6 · 20,9) | 47,5% | 56,7% | 489 / 406 / 338 |
+| 1280×720 | it | 2 | 74 / 193 | 453 | **39,7%** (7,5 · 7,2 · 25,2) | 49,0% | 56,6% | 551 / 449 / 386 |
+| 1280×720 | en | 2 | 74 / 180 | 466 | 37,1% (7,3 · 6,5 · 23,5) | 45,9% | 54,5% | 581 / 478 / 405 |
+| 1280×800 | it | 2 | 74 / 193 | 533 | **35,7%** (6,7 · 6,5 · 22,6) | 44,1% | 53,8% | 624 / 547 / 456 |
+| 1280×800 | en | 2 | 74 / 180 | 546 | 33,4% (6,6 · 5,9 · 21,2) | 41,3% | 51,9% | 649 / 576 / 476 |
+| 1920×1080 | it | 3 | 74 / 193 | 813 | **23,8%** (3,8 · 3,3 · 16,9) | 28,0% | 33,3% | 669 / 640 / 602 |
+| 1920×1080 | en | 3 | 74 / 180 | 826 | 22,3% (3,7 · 2,9 · 15,8) | 26,2% | 31,5% | 672 / 665 / 623 |
 
 - La barra di costruzione è il pannello più grande: 21–25% fino a 1280 px, 16–17% a 1920. In italiano è più alta di 13 px,
   perché nomi come «Giardino Pixel» vanno su due righe.
-- In italiano, fino a 1280 px di larghezza, la barra in alto va su due righe: orologio e velocità scendono a destra. Il
-  margine alto passa così da 74 a 139 px e, con la barra di costruzione più alta, l'altezza libera scende di 78 px. In
-  inglese la barra va su due righe solo a 1024.
+- La barra in alto va su due righe a 1024 px, in italiano e in inglese: il margine alto passa da 74 a 139 px. A 1280 px
+  resta su una riga in entrambe le lingue con le cifre di una partita (le partite del bilanciamento arrivano al massimo a
+  circa 1.500 crediti e 460 parti; provati anche 25.000 crediti con 10.000 parti). In italiano va su due righe solo da
+  100.000 crediti in su (con almeno 1.000 parti) o da 100.000 parti, in inglese solo dal milione di crediti, come nella
+  città costruita con le risorse concesse. La prima versione di questo studio aveva misurato l'italiano a 1280 px con
+  quelle cifre e ne aveva dedotto 65 px di altezza in meno «in italiano»: era un effetto delle risorse concesse, non
+  della lingua.
 - La scheda degli obiettivi (in campagna «Obiettivi stella») resta in alto a sinistra e copre il 3–9%. A 1280×800, zoom 1,
-  nasconde l'isolato del monumento nella vista d'insieme (6 edifici su 9: `overview-z1-1280x800-it.png`).
+  nasconde l'isolato del monumento nella vista d'insieme (8 edifici su 9 in italiano, 6 su 9 in inglese:
+  `overview-z1-1280x800-it.png`).
 - Lo spazio visibile è comunque ampio: 480–670 caselle libere alla vista iniziale, cioè un quarto o un terzo della mappa.
 
 Schermate con i pannelli evidenziati in rosso: `map/shots/hud-base-<finestra>-<lingua>.png`, `hud-inspector-…`,
@@ -302,19 +310,20 @@ Non si possono però né ruotare né spostare (§9.2).
 Dalla vista iniziale (QG al centro della zona libera) fino a portare al centro ciascun isolato. Distanza in px CSS, tempo
 con le frecce (`PAN_SPEED` 260 px/s per asse, in diagonale tutti e due gli assi) e schermate (lo spostamento diviso per la
 larghezza, o per l'altezza libera). Tra parentesi gli edifici dell'isolato già visibili e fuori dall'HUD senza muoversi.
+Misure in italiano, con crediti e parti a cifre da partita come al §5.
 
 | Finestra · zoom | Produzione (28) | Abitazioni (22) | Piazza (16) | Monumento (9) |
 |---|---|---|---|---|
-| 1280×800 · 2 (iniziale) | 786 px · 3,0 s · 0,61 (6 visibili) | 334 px · 1,2 s · 0,68 (9) | 187 px · 0,6 s · 0,21 (16) | 977 px · 3,6 s · 0,72 (0) |
+| 1280×800 · 2 (iniziale) | 786 px · 3,0 s · 0,61 (6 visibili) | 334 px · 1,2 s · 0,60 (8) | 187 px · 0,6 s · 0,18 (15) | 977 px · 3,6 s · 0,72 (0) |
 | 1280×800 · 1 | 393 px · 1,5 s (28) | 167 px · 0,6 s (22) | 93 px (16) | 488 px · 1,8 s (0: sotto la scheda obiettivi) |
-| 1280×800 · 5 | 1965 px · 7,5 s · 1,53 | 835 px · 3,1 s · 1,71 | 466 px · 1,5 s · 0,51 | 2441 px · 8,9 s · 1,81 |
+| 1280×800 · 5 | 1965 px · 7,5 s · 1,53 | 835 px · 3,1 s · 1,50 | 466 px · 1,5 s · 0,45 | 2441 px · 8,9 s · 1,81 |
 | 1920×1080 · 3 (iniziale) | 1179 px · 4,5 s · 0,61 (6) | 501 px · 1,8 s · 0,59 (8) | 280 px · 0,9 s · 0,18 (16) | 1465 px · 5,4 s · 0,72 (0) |
 | 1920×1080 · 1 | tutta visibile | tutta visibile | tutta visibile | tutta visibile |
 | 1024×768 · 2 (iniziale) | 786 px · 3,0 s · 0,77 (3) | 334 px · 1,2 s · 0,70 (8) | 187 px · 0,6 s · 0,21 (16) | 977 px · 3,6 s · 0,91 (0) |
 
 Allo zoom iniziale ogni isolato è a meno di una schermata. Anche a zoom 5 servono al massimo 2,3 schermate o 9 s di frecce.
-Il tasto H (o Home) riporta al QG. A 1920×1080, zoom 1, si vede tutta la città; a 1280×800, zoom 1, tutta tranne una parte del
-monumento, coperta dalla scheda obiettivi.
+Il tasto H (o Home) riporta al QG. A 1920×1080, zoom 1, si vede tutta la città; a 1280×800, zoom 1, tutta tranne il
+monumento, quasi tutto coperto dalla scheda obiettivi.
 
 ### Bordi
 
@@ -379,7 +388,9 @@ cioè renderer e sessione. Vanno approvati a parte.
    possono ruotare, e con l'incremento 2 non si potranno spostare: «Sposta» (§3c di MODULAR-INC2) parte dal pannello
    dell'oggetto. Proposta: un secondo clic nello stesso punto passa a ciò che c'è dietro, cioè all'oggetto sulla casella sotto
    il puntatore.
-3. **Barra in alto su due righe in italiano fino a 1280 px.** Toglie 65 px di altezza libera (§5). Riguarda `hud.ts` e
+3. **Barra in alto su due righe.** A 1024 px succede in tutte e due le lingue e toglie 65 px di altezza libera (§5). A
+   1280 px non succede con le cifre di una partita: solo da 100.000 crediti (in italiano) o da un milione (in inglese).
+   Non è un problema della lingua e non serve una decisione per la mappa; se un giorno servisse, riguarda `hud.ts` e
    `style.css`, dove sta lavorando chi si occupa dell'HUD.
 
 ## 10. Riproducibilità

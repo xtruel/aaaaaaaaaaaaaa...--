@@ -92,7 +92,8 @@ Le copie `.sav.bak` restano solo sul computer (il pattern `*.sav` non le prende)
 Prima di sovrascrivere per la prima volta un salvataggio scritto da un'altra versione (0.6 e 0.7.0-alpha.1 scrivono la
 versione 2, le nuove la 3), il gioco ne tiene una copia identica, una volta sola per slot e versione:
 `backup_save_<slot>_v2.sav` (e `backup_meta_<slot>_v2.sav`). Non viene mai cancellata; si sincronizza con il cloud
-come gli altri `.sav`. Per riaprirla basta rinominarla in `save_<slot>.sav` (e `meta_<slot>.sav`) a gioco chiuso.
+come gli altri `.sav`. Per riaprirla, a gioco chiuso, copiala (non rinominarla, così la copia resta) sopra
+`save_<slot>.sav`, e `backup_meta_<slot>_v2.sav` sopra `meta_<slot>.sav`.
 Il pulsante **"Open the saves folder"** nelle impostazioni apre la cartella (utile per l'assistenza ai giocatori).
 Chi aveva già giocato con la 0.4 desktop non perde niente: al primo avvio i vecchi dati vengono copiati nei file.
 
