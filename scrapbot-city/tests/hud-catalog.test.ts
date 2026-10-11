@@ -13,6 +13,7 @@ import type { Building, GameState } from '../src/game/state';
 import { setLang } from '../src/i18n';
 import { Hud } from '../src/ui/hud';
 import type { HudHandlers, HudView } from '../src/ui/hud';
+import { DOUBLE_PRESS_MS, PRESS_GUARD_MS } from '../src/ui/pick';
 
 // jsdom has no canvas, images or audio: the pictures and the sounds are not what is tested here
 vi.mock('../src/render/icons', () => ({ iconUrl: () => '', toolThumb: () => '', portraitUrl: () => '', pathColor: () => 'var(--muted)' }));
@@ -325,47 +326,52 @@ describe('building panel modules', () => {
     const rec = build(s, 'recycler');
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100_000);
     const at = (ms: number) => clock.mockReturnValue(100_000 + ms);
+    // 500 ms and a margin: a press reaches the page a frame or so late, so presses 500 ms apart can look 510 apart
+    expect(PRESS_GUARD_MS).toBe(600);
+    expect(PRESS_GUARD_MS).toBeGreaterThan(DOUBLE_PRESS_MS);
     try {
       update({ selectedId: rec.id });
       const insp = q(root, '[data-inspector]')!;
       expect(installModule(s, 'recyclerMagnet', rec)).toBe(true);
       update({ selectedId: rec.id });
-      // Remove, then its confirmation pressed 352, 450 and 499 ms later (the second press of a slow double click,
-      // a double tap, A twice): no removal
+      // Remove, then its confirmation pressed 352, 450, 500, 520 and 599 ms later (the second press of a slow double
+      // click, a double tap, A twice, seen a little late): no removal
       at(1000);
       q(insp, '[data-remove="recyclerMagnet"]')!.click();
       update({ selectedId: rec.id });
-      for (const ms of [352, 450, 499]) {
+      for (const ms of [352, 450, 500, 520, 599]) {
         at(1000 + ms);
         q(insp, '[data-remove-confirm="recyclerMagnet"]')!.click();
         expect(calls.some((c) => c[0] === 'onRemoveModule'), `${ms} ms`).toBe(false);
       }
-      // a press of its own on the confirmation, once it has been up for 500 ms: removed
-      at(1500);
+      // a press of its own on the confirmation, once it has been up for 600 ms: removed
+      at(1600);
       q(insp, '[data-remove-confirm="recyclerMagnet"]')!.click();
       expect(calls.at(-1)).toEqual(['onRemoveModule', rec.id, 'recyclerMagnet']);
       expect(removeModule(s, 'recyclerMagnet', rec)).not.toBeNull();
       update({ selectedId: rec.id });
-      // Install comes up where the confirmation was: pressed 352-499 ms after the removal it buys nothing back
+      // Install comes up where the confirmation was: pressed 352-599 ms after the removal it buys nothing back
       const n = calls.length;
-      for (const ms of [352, 450, 499]) {
-        at(1500 + ms);
+      for (const ms of [352, 450, 500, 520, 599]) {
+        at(1600 + ms);
         update({ selectedId: rec.id });
         q(insp, '[data-install="recyclerMagnet"]')!.click();
         expect(calls.length, `${ms} ms`).toBe(n);
       }
-      at(2000);
+      at(2200);
       update({ selectedId: rec.id });
       q(insp, '[data-install="recyclerMagnet"]')!.click();
       expect(calls.at(-1)).toEqual(['onInstall', rec.id, 'recyclerMagnet']);
-      // Demolish, then its confirmation 450 ms later: the building stays; 500 ms later it goes
+      // Demolish, then its confirmation 450, 500 and 599 ms later: the building stays; 600 ms later it goes
       at(5000);
       q(insp, '[data-demolish]')!.click();
       update({ selectedId: rec.id });
-      at(5450);
-      q(insp, '[data-confirm]')!.click();
-      expect(calls.some((c) => c[0] === 'onDemolish')).toBe(false);
-      at(5500);
+      for (const ms of [450, 500, 599]) {
+        at(5000 + ms);
+        q(insp, '[data-confirm]')!.click();
+        expect(calls.some((c) => c[0] === 'onDemolish'), `${ms} ms`).toBe(false);
+      }
+      at(5600);
       q(insp, '[data-confirm]')!.click();
       expect(calls.at(-1)).toEqual(['onDemolish', rec.id]);
     } finally {
