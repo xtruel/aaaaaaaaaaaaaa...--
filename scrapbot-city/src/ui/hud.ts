@@ -186,6 +186,7 @@ export class Hud {
   private confirmDemolishAt = 0; // when it was asked for (performance.now())
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
+  private slotChangedAt = 0; // when the last module removal was confirmed (performance.now())
   private renderedId = -1; // the building whose panel was drawn last (a piece's panel: -1)
   private catalogKey = '';
   private starsKey = '';
@@ -907,6 +908,10 @@ export class Hud {
     });
     for (const btn of panel.querySelectorAll<HTMLButtonElement>('[data-install]')) {
       btn.addEventListener('click', () => {
+        // After a removal the slot is drawn again with Install where the confirmation was: the second click of a
+        // double click, a double tap or a double A press on the confirmation must not buy the module back (it
+        // cost the full price for half of it back).
+        if (performance.now() - this.slotChangedAt < CONFIRM_DELAY) return;
         // one click, one module: the second click of a double click finds the button greyed out (it comes back
         // with the next update if the module could not go on)
         btn.disabled = true;
@@ -932,6 +937,7 @@ export class Hud {
       const kind = (e.currentTarget as HTMLElement).dataset.removeConfirm as ModuleKind;
       this.confirmRemove = null;
       this.inspectorKey = `${b.id}:`;
+      this.slotChangedAt = performance.now();
       this.handlers.onRemoveModule(b.id, kind);
     });
   }

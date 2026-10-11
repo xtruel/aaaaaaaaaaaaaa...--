@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { placeBuilding, placeCheck } from '../src/game/actions';
 import { MAP_H, MAP_W, T } from '../src/game/defs';
 import type { BuildingType } from '../src/game/defs';
-import { installModule, placePiece } from '../src/game/pieces';
+import { installModule, placePiece, removeModule } from '../src/game/pieces';
 import type { CatalogKind, ModuleKind } from '../src/game/pieces';
 import { computeDerived } from '../src/game/sim';
 import { createGame, idx } from '../src/game/state';
@@ -280,6 +280,41 @@ describe('building panel modules', () => {
       clock.mockReturnValue(11_000);
       q(insp, '[data-remove-confirm]')!.click();
       expect(calls.at(-1)).toEqual(['onRemoveModule', dock.id, 'dockStorage']);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('a removal confirmed with a double click does not buy the module back (Install comes up where the confirmation was)', () => {
+    const { s, root, calls, update } = setup();
+    const rec = build(s, 'recycler');
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(50_000);
+    try {
+      update({ selectedId: rec.id });
+      const insp = q(root, '[data-inspector]')!;
+      q(insp, '[data-install="recyclerMagnet"]')!.click();
+      expect(calls.at(-1)).toEqual(['onInstall', rec.id, 'recyclerMagnet']);
+      expect(installModule(s, 'recyclerMagnet', rec)).toBe(true);
+      update({ selectedId: rec.id });
+      // Remove, then the confirmation with a click of its own...
+      clock.mockReturnValue(51_000);
+      q(insp, '[data-remove="recyclerMagnet"]')!.click();
+      update({ selectedId: rec.id });
+      clock.mockReturnValue(52_000);
+      q(insp, '[data-remove-confirm="recyclerMagnet"]')!.click();
+      expect(calls.at(-1)).toEqual(['onRemoveModule', rec.id, 'recyclerMagnet']);
+      expect(removeModule(s, 'recyclerMagnet', rec)).not.toBeNull();
+      update({ selectedId: rec.id });
+      // ...whose second click lands on the Install drawn where the confirmation was: nothing is bought again
+      const n = calls.length;
+      clock.mockReturnValue(52_150);
+      q(insp, '[data-install="recyclerMagnet"]')!.click();
+      expect(calls.length).toBe(n);
+      // a click of its own installs
+      clock.mockReturnValue(53_000);
+      update({ selectedId: rec.id });
+      q(insp, '[data-install="recyclerSorter"]')!.click();
+      expect(calls.at(-1)).toEqual(['onInstall', rec.id, 'recyclerSorter']);
     } finally {
       clock.mockRestore();
     }
