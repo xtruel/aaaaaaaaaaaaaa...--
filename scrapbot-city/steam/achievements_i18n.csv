@@ -1,0 +1,145 @@
+﻿api_name,language,display_name,description
+ACH_TUTORIAL,english,Bootcamp Graduate,Finish the tutorial.
+ACH_TUTORIAL,italian,Diploma in Rottamologia,Completa il tutorial.
+ACH_TUTORIAL,german,Bootcamp bestanden,Schließ das Tutorial ab.
+ACH_TUTORIAL,french,Classes terminées,Terminer le tutoriel.
+ACH_TUTORIAL,spanish,Prácticas superadas,Termina el tutorial.
+ACH_TUTORIAL,portuguese,Recruta concluída,Termina o tutorial.
+ACH_TUTORIAL,polish,Szkolenie zaliczone,Ukończ samouczek.
+ACH_TUTORIAL,dutch,Diploma op zak,Voltooi de tutorial.
+ACH_RECYCLER,english,Junk to Jewels,Build your first Recycler.
+ACH_RECYCLER,italian,Dai rifiuti ai gioielli,Costruisci il tuo primo Riciclatore.
+ACH_RECYCLER,german,Aus Müll mach Gold,Baue deinen ersten Recycler.
+ACH_RECYCLER,french,Des ordures en or,Construire ton premier Recycleur.
+ACH_RECYCLER,spanish,Del vertedero al joyero,Construye tu primer Reciclador.
+ACH_RECYCLER,portuguese,Do lixo ao luxo,Constrói a tua primeira Recicladora.
+ACH_RECYCLER,polish,Złom w złoto,Zbuduj pierwszy recykler.
+ACH_RECYCLER,dutch,Van rommel tot robijn,Bouw je eerste Recycler.
+ACH_CITIZENS,english,Neighbours,Welcome your first citizen.
+ACH_CITIZENS,italian,Vicini di casa,Accogli il tuo primo cittadino.
+ACH_CITIZENS,german,Nachbarschaft,Begrüße deinen ersten Einwohner.
+ACH_CITIZENS,french,Bon voisinage,Accueillir ton premier habitant.
+ACH_CITIZENS,spanish,Vecindario,Da la bienvenida a tu primer ciudadano.
+ACH_CITIZENS,portuguese,Novos vizinhos,Dá as boas-vindas ao teu primeiro cidadão.
+ACH_CITIZENS,polish,Sąsiedzi,Przywitaj pierwszego mieszkańca.
+ACH_CITIZENS,dutch,Buren,Verwelkom je eerste inwoner.
+ACH_POP50,english,Busy Streets,Reach 50 citizens in one city.
+ACH_POP50,italian,Strade animate,Raggiungi 50 cittadini in una città.
+ACH_POP50,german,Belebte Straßen,Erreiche 50 Einwohner in einer Stadt.
+ACH_POP50,french,Rues animées,Atteindre 50 habitants dans une ville.
+ACH_POP50,spanish,Hora punta,Llega a 50 ciudadanos en una ciudad.
+ACH_POP50,portuguese,Ruas movimentadas,Chega aos 50 cidadãos numa cidade.
+ACH_POP50,polish,Tłok na ulicach,Dobij do 50 mieszkańców w jednym mieście.
+ACH_POP50,dutch,Het loopt storm,Groei naar 50 inwoners in één stad.
+ACH_POP100,english,Metropixel,Reach 100 citizens in one city.
+ACH_POP100,italian,Metropixel,Raggiungi 100 cittadini in una città.
+ACH_POP100,german,Metropixel,Erreiche 100 Einwohner in einer Stadt.
+ACH_POP100,french,Métropixel,Atteindre 100 habitants dans une ville.
+ACH_POP100,spanish,Metropíxel,Llega a 100 ciudadanos en una ciudad.
+ACH_POP100,portuguese,Metrópixel,Chega aos 100 cidadãos numa cidade.
+ACH_POP100,polish,Metropiksel,Dobij do 100 mieszkańców w jednym mieście.
+ACH_POP100,dutch,Metropixel,Groei naar 100 inwoners in één stad.
+ACH_RICH,english,Credit Score,"Earn 10,000 credits in one city."
+ACH_RICH,italian,Merito creditizio,Guadagna 10.000 crediti in una città.
+ACH_RICH,german,Kreditwürdig,Verdiene 10.000 Credits in einer Stadt.
+ACH_RICH,french,Plein aux as,Gagner 10 000 crédits dans une ville.
+ACH_RICH,spanish,Historial crediticio,Gana 10.000 créditos en una ciudad.
+ACH_RICH,portuguese,Crédito na praça,Ganha 10 000 créditos numa cidade.
+ACH_RICH,polish,Zdolność kredytowa,Zarób 10 000 kredytów w jednym mieście.
+ACH_RICH,dutch,Kredietwaardig,Verdien 10.000 credits in één stad.
+ACH_CLEAN,english,Sludge Buster,Clean 25 sludge tiles in one city.
+ACH_CLEAN,italian,Acchiappamelma,Bonifica 25 caselle di melma in una città.
+ACH_CLEAN,german,Schlammbuster,Reinige 25 Felder Giftschlamm in einer Stadt.
+ACH_CLEAN,french,SOS Gadoue,Nettoyer 25 cases de boue dans une ville.
+ACH_CLEAN,spanish,Cazalodos,Limpia 25 casillas de lodo en una ciudad.
+ACH_CLEAN,portuguese,Caça-Lodo,Limpa 25 quadrados de lodo numa cidade.
+ACH_CLEAN,polish,Pogromcy szlamu,Oczyść 25 pól szlamu w jednym mieście.
+ACH_CLEAN,dutch,Slibbuster,Ruim 25 vakjes gifslib op in één stad.
+ACH_MISO,english,Cat Person,Pet Miso 10 times.
+ACH_MISO,italian,Coccole feline,Accarezza Miso 10 volte.
+ACH_MISO,german,Katzenmensch,Streichle Miso 10-mal.
+ACH_MISO,french,Câlins félins,Caresser Miso 10 fois.
+ACH_MISO,spanish,Amante de los gatos,Acaricia a Miso 10 veces.
+ACH_MISO,portuguese,Pessoa de gatos,Faz festas à Miso 10 vezes.
+ACH_MISO,polish,Kocia dusza,Pogłaszcz Miso 10 razy.
+ACH_MISO,dutch,Kattenmens,Aai Miso 10 keer.
+ACH_HINT,english,Ask the Expert,Ask USA-9 for a hint.
+ACH_HINT,italian,Chiedi all'esperto,Chiedi un suggerimento a USA-9.
+ACH_HINT,german,Expertenrat,Bitte USA-9 um einen Tipp.
+ACH_HINT,french,L'avis de l'expert,Demander un conseil à USA-9.
+ACH_HINT,spanish,Pregunta a quien sabe,Pide una pista a USA-9.
+ACH_HINT,portuguese,Opinião de especialista,Pede uma dica a USA-9.
+ACH_HINT,polish,Zapytaj eksperta,Poproś USA-9 o podpowiedź.
+ACH_HINT,dutch,Vraag het de expert,Vraag USA-9 om een tip.
+ACH_SPIRE,english,Reach for the Sky,Finish a Scrap Spire.
+ACH_SPIRE,italian,Verso il cielo,Completa una Guglia di Rottami.
+ACH_SPIRE,german,Himmelwärts,Stell einen Schrottturm fertig.
+ACH_SPIRE,french,Toucher le ciel,Achever une Tour Ferraille.
+ACH_SPIRE,spanish,Tocar el cielo,Termina una Aguja de Chatarra.
+ACH_SPIRE,portuguese,Rumo ao céu,Termina uma Torre de Sucata.
+ACH_SPIRE,polish,Sięgnij nieba,Ukończ Złomową Iglicę.
+ACH_SPIRE,dutch,Torenhoog,Maak een Schroottoren af.
+ACH_GREEN,english,Garden City,Reach the Green ending.
+ACH_GREEN,italian,Città Giardino,Raggiungi il finale verde.
+ACH_GREEN,german,Gartenstadt,Erreiche das grüne Ende.
+ACH_GREEN,french,Cité-jardin,Obtenir la fin verte.
+ACH_GREEN,spanish,Ciudad Jardín,Consigue el final verde.
+ACH_GREEN,portuguese,Cidade-Jardim,Chega ao final verde.
+ACH_GREEN,polish,Miasto-ogród,Zdobądź zielone zakończenie.
+ACH_GREEN,dutch,Tuinstad,Bereik het groene einde.
+ACH_INDUSTRIAL,english,Megacity,Reach the Industrial ending.
+ACH_INDUSTRIAL,italian,Megalopoli,Raggiungi il finale industriale.
+ACH_INDUSTRIAL,german,Megastadt,Erreiche das industrielle Ende.
+ACH_INDUSTRIAL,french,Mégapole,Obtenir la fin industrielle.
+ACH_INDUSTRIAL,spanish,Megaciudad,Consigue el final industrial.
+ACH_INDUSTRIAL,portuguese,Megacidade,Chega ao final industrial.
+ACH_INDUSTRIAL,polish,Megamiasto,Zdobądź przemysłowe zakończenie.
+ACH_INDUSTRIAL,dutch,Megastad,Bereik het industriële einde.
+ACH_BALANCED,english,Both Ways,Reach the Balanced ending.
+ACH_BALANCED,italian,La via di mezzo,Raggiungi il finale equilibrato.
+ACH_BALANCED,german,Goldene Mitte,Erreiche das ausgewogene Ende.
+ACH_BALANCED,french,Le juste milieu,Obtenir la fin équilibrée.
+ACH_BALANCED,spanish,Entre dos aguas,Consigue el final equilibrado.
+ACH_BALANCED,portuguese,Nem oito nem oitenta,Chega ao final equilibrado.
+ACH_BALANCED,polish,Złoty środek,Zdobądź zrównoważone zakończenie.
+ACH_BALANCED,dutch,Van twee walletjes,Bereik het evenwichtige einde.
+ACH_SMOG,english,Learned the Hard Way,Lose a city to the smog.
+ACH_SMOG,italian,Sbagliando s'impara,Perdi una città a causa dello smog.
+ACH_SMOG,german,Lehrgeld bezahlt,Verliere eine Stadt an den Smog.
+ACH_SMOG,french,Appris à la dure,Perdre une ville à cause du smog.
+ACH_SMOG,spanish,Por las malas,Pierde una ciudad por culpa del smog.
+ACH_SMOG,portuguese,Da pior maneira,Perde uma cidade para o smog.
+ACH_SMOG,polish,Nauczka,Strać miasto przez smog.
+ACH_SMOG,dutch,Door schade en schande,Verlies een stad aan de smog.
+ACH_CLEANHANDS,english,Clean Hands,Finish a Spire without building any industry.
+ACH_CLEANHANDS,italian,Mani pulite,Completa una Guglia senza costruire nessun edificio industriale.
+ACH_CLEANHANDS,german,Weiße Weste,"Stell einen Schrottturm fertig, ohne ein einziges Industriegebäude zu bauen."
+ACH_CLEANHANDS,french,Mains propres,Achever une Tour sans construire aucun bâtiment industriel.
+ACH_CLEANHANDS,spanish,Sin mancharte las manos,Termina una Aguja sin construir ningún edificio industrial.
+ACH_CLEANHANDS,portuguese,Mãos limpas,Termina uma Torre sem construir indústria nenhuma.
+ACH_CLEANHANDS,polish,Czyste ręce,"Ukończ Iglicę, nie budując żadnego przemysłu."
+ACH_CLEANHANDS,dutch,Schone handen,Maak een Schroottoren af zonder industrie te bouwen.
+ACH_ROADTRIP,english,Road Trip,Unlock a second city on the Scrap Coast.
+ACH_ROADTRIP,italian,Gita fuori porta,Sblocca una seconda città sulla Costa dei Rottami.
+ACH_ROADTRIP,german,Roadtrip,Schalte eine zweite Stadt an der Schrottküste frei.
+ACH_ROADTRIP,french,En route !,Débloquer une deuxième ville sur la Côte Ferraille.
+ACH_ROADTRIP,spanish,Carretera y manta,Desbloquea una segunda ciudad en la Costa Chatarra.
+ACH_ROADTRIP,portuguese,Pé na estrada,Desbloqueia uma segunda cidade na Costa da Sucata.
+ACH_ROADTRIP,polish,W trasę!,Odblokuj drugie miasto na Złomowym Wybrzeżu.
+ACH_ROADTRIP,dutch,Roadtrip,Speel een tweede stad vrij aan de Schrootkust.
+ACH_COAST,english,Coast to Coast,Finish the Spire in all five cities.
+ACH_COAST,italian,Da costa a costa,Completa la Guglia in tutte e cinque le città.
+ACH_COAST,german,Von Küste zu Küste,Stell den Turm in allen fünf Städten fertig.
+ACH_COAST,french,Côte à côte,Achever la Tour dans les cinq villes.
+ACH_COAST,spanish,De punta a punta,Termina la Aguja en las cinco ciudades.
+ACH_COAST,portuguese,De ponta a ponta,Termina a Torre nas cinco cidades.
+ACH_COAST,polish,Od brzegu do brzegu,Ukończ Iglicę we wszystkich pięciu miastach.
+ACH_COAST,dutch,Van kust tot kust,Maak de Schroottoren af in alle vijf de steden.
+ACH_SUPERSTAR,english,Superstar,Earn all 15 stars.
+ACH_SUPERSTAR,italian,Superstar,Conquista tutte e 15 le stelle.
+ACH_SUPERSTAR,german,Superstar,Verdiene alle 15 Sterne.
+ACH_SUPERSTAR,french,Star absolue,Gagner les 15 étoiles.
+ACH_SUPERSTAR,spanish,Superestrella,Consigue las 15 estrellas.
+ACH_SUPERSTAR,portuguese,Superestrela,Ganha as 15 estrelas todas.
+ACH_SUPERSTAR,polish,Supergwiazda,Zdobądź wszystkie 15 gwiazdek.
+ACH_SUPERSTAR,dutch,Superster,Verdien alle 15 sterren.

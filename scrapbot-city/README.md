@@ -17,7 +17,7 @@ npm run i18n:check   # controlla che le 7 traduzioni abbiano tutte le chiavi, i 
 npm run art          # rigenera gli sprite isometrici dai modelli voxel (atlante + PNG singoli + foglio di controllo)
 npm test             # test automatici (proiezione, ordine di disegno, salvataggi, simulazione)
 npm run desktop      # app desktop (Electron)
-npm run dist:win     # build per Steam in release/ (anche dist:linux, dist:mac)
+npm run dist:steam   # build Windows + Linux per Steam: release/ e steam/content/ (guida: docs/STEAM.md)
 ```
 
 Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, Steam Cloud, Steam Deck, upload,
@@ -131,4 +131,4 @@ docs/PLAYTEST.md       come organizzare un playtest e cosa osservare
 ## Ancora da fare
 
 - Musica di un compositore, passata grafica di un artista pixel, playtest con persone nuove, revisione madrelingua delle traduzioni.
-- Dettagli in [docs/STEAM.md](docs/STEAM.md), sezione 9.
+- Dettagli in [docs/STEAM.md](docs/STEAM.md), sezione 15.

@@ -1,0 +1,25 @@
+// SteamPipe depot script: Linux x64 build of Scrapbot City (executable "scrapbot-city"), also the one
+// Steam Deck runs. Content: steam/content/linux, written by "npm run dist:steam" (copy of release/linux-unpacked).
+// Upload this depot from Linux or macOS (steam/upload.sh) so the executable permission of scrapbot-city,
+// chrome_crashpad_handler and chrome-sandbox is kept.
+
+"DepotBuild"
+{
+	// PLACEHOLDER: replace 0000002 with the Linux depot ID (same number as in app_build.vdf)
+	"DepotID" "0000002"
+
+	// Overrides the ContentRoot of app_build.vdf for this depot (relative to steam/sdk).
+	"ContentRoot" "../content/linux/"
+
+	// Everything in the folder, subfolders included, goes to the root of the install folder.
+	"FileMapping"
+	{
+		"LocalPath" "*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+
+	// Never shipped: debug symbols, and the App ID file used only for local tests (npm run steam:appid).
+	"FileExclusion" "*.pdb"
+	"FileExclusion" "steam_appid.txt"
+}

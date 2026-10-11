@@ -1,0 +1,46 @@
+// SteamPipe app build script for Scrapbot City.
+// Uploaded by steam/upload.sh (Linux, macOS) or steam\upload.bat (Windows): see steam/README.md.
+//
+// FILL IN BEFORE THE FIRST UPLOAD (Steamworks > your app > SteamPipe > Depots shows the numbers):
+//   0000000 = PLACEHOLDER for the App ID           (here, "AppID")
+//   0000001 = PLACEHOLDER for the Windows depot ID (here, and "DepotID" in depot_build_windows.vdf)
+//   0000002 = PLACEHOLDER for the Linux depot ID   (here, and "DepotID" in depot_build_linux.vdf)
+// The upload scripts refuse to run while any placeholder is left.
+//
+// Relative paths are relative to this folder (steam/sdk).
+
+"AppBuild"
+{
+	// PLACEHOLDER: replace 0000000 with your App ID
+	"AppID" "0000000"
+
+	// Only you see it, in Steamworks > SteamPipe > Builds. The upload scripts replace it with
+	// "Scrapbot City <version> (<git commit>) <date>" so every build is recognisable.
+	"Desc" "Scrapbot City"
+
+	// steam/content, filled by "npm run dist:steam". Each depot script narrows it to its own folder
+	// (../content/windows, ../content/linux).
+	"ContentRoot" "../content/"
+
+	// steamcmd logs and cache go to steam/output (not in git).
+	"BuildOutput" "../output/"
+
+	// "1" = dry run: steamcmd reads every file and writes the logs and manifests to steam/output,
+	// but uploads nothing. The upload scripts set it with --preview.
+	"Preview" "0"
+
+	// Branch to set this build live on after the upload; "" = none (set it by hand in Steamworks >
+	// SteamPipe > Builds). Valve never lets a script set the "default" branch (what players get):
+	// that is always done by hand on the website.
+	// Beta branch example: create a branch named "beta" (with a password) in Steamworks > SteamPipe >
+	// Builds, then upload with "steam/upload.sh <user> --beta beta" (or write "beta" here).
+	"SetLive" ""
+
+	"Depots"
+	{
+		// PLACEHOLDER: replace 0000001 with the Windows depot ID
+		"0000001" "depot_build_windows.vdf"
+		// PLACEHOLDER: replace 0000002 with the Linux depot ID (also used by Steam Deck)
+		"0000002" "depot_build_linux.vdf"
+	}
+}

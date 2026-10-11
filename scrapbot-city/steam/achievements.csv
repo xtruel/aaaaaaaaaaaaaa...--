@@ -1,0 +1,19 @@
+api_name,display_name,description,hidden,set_by,game_id
+ACH_TUTORIAL,Bootcamp Graduate,Finish the tutorial.,0,Client,tutorial
+ACH_RECYCLER,Junk to Jewels,Build your first Recycler.,0,Client,recycler
+ACH_CITIZENS,Neighbours,Welcome your first citizen.,0,Client,citizens
+ACH_POP50,Busy Streets,Reach 50 citizens in one city.,0,Client,pop50
+ACH_POP100,Metropixel,Reach 100 citizens in one city.,0,Client,pop100
+ACH_RICH,Credit Score,"Earn 10,000 credits in one city.",0,Client,rich
+ACH_CLEAN,Sludge Buster,Clean 25 sludge tiles in one city.,0,Client,clean
+ACH_MISO,Cat Person,Pet Miso 10 times.,0,Client,miso
+ACH_HINT,Ask the Expert,Ask USA-9 for a hint.,0,Client,hint
+ACH_SPIRE,Reach for the Sky,Finish a Scrap Spire.,0,Client,spire
+ACH_GREEN,Garden City,Reach the Green ending.,0,Client,green
+ACH_INDUSTRIAL,Megacity,Reach the Industrial ending.,0,Client,industrial
+ACH_BALANCED,Both Ways,Reach the Balanced ending.,0,Client,balanced
+ACH_SMOG,Learned the Hard Way,Lose a city to the smog.,0,Client,smog
+ACH_CLEANHANDS,Clean Hands,Finish a Spire without building any industry.,0,Client,cleanhands
+ACH_ROADTRIP,Road Trip,Unlock a second city on the Scrap Coast.,0,Client,roadtrip
+ACH_COAST,Coast to Coast,Finish the Spire in all five cities.,0,Client,coast
+ACH_SUPERSTAR,Superstar,Earn all 15 stars.,0,Client,superstar

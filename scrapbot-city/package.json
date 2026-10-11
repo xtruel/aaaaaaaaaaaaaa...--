@@ -18,7 +18,9 @@
     "dist:mac": "vite build && electron-builder --mac dir",
     "i18n:check": "esbuild scripts/i18n-check.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/i18n-check.mjs --log-level=warning && node node_modules/.cache/i18n-check.mjs",
     "test": "vitest run",
-    "art": "esbuild scripts/art/build.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/art.mjs --log-level=warning && node node_modules/.cache/art.mjs"
+    "art": "esbuild scripts/art/build.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/art.mjs --log-level=warning && node node_modules/.cache/art.mjs",
+    "dist:steam": "npm run build && electron-builder --win dir --linux dir --x64 && node scripts/steam-content.cjs",
+    "steam:appid": "node scripts/steam-appid.cjs"
   },
   "dependencies": {
     "@fontsource/bungee": "^5.3.0",
@@ -26,13 +28,15 @@
     "@fontsource/lilita-one": "^5.3.0",
     "@fontsource/nunito": "^5.3.0",
     "@fontsource/permanent-marker": "^5.3.0",
-    "@fontsource/silkscreen": "^5.3.0"
+    "@fontsource/silkscreen": "^5.3.0",
+    "steamworks.js": "^0.4.0"
   },
   "devDependencies": {
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8",
     "esbuild": "^0.25.12",
     "jsdom": "^25.0.1",
+    "resedit": "^3.1.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-singlefile": "^2.3.3",
@@ -41,22 +45,39 @@
   "build": {
     "appId": "com.qwerty3d.scrapbotcity",
     "productName": "Scrapbot City",
+    "copyright": "© 2026 Qwerty3D Games",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
+    "icon": "build/icon.png",
+    "afterPack": "scripts/after-pack.cjs",
+    "npmRebuild": false,
+    "publish": null,
     "files": [
       "dist/**",
       "electron/**",
-      "package.json"
+      "package.json",
+      "!node_modules/@fontsource/**",
+      "!node_modules/@types/**",
+      "!node_modules/undici-types/**",
+      "!node_modules/steamworks.js/dist/**/*.lib"
     ],
     "asarUnpack": [
       "node_modules/steamworks.js/**"
     ],
     "win": {
-      "target": "dir"
+      "target": "dir",
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "signtoolOptions": {
+        "publisherName": "Qwerty3D Games"
+      }
     },
     "linux": {
       "target": "dir",
+      "executableName": "scrapbot-city",
+      "icon": "build/icons",
       "category": "Game"
     },
     "mac": {
