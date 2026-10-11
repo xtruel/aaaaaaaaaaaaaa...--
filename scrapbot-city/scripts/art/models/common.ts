@@ -5,8 +5,9 @@ import { Vox } from '../voxel';
 export interface BuildingArt {
   frames: number; // animation frames while working (1 = static)
   fps: number;
-  // frame index, working (powered, supplied, not paused)
-  model(frame: number, working: boolean): Vox;
+  // frame index, working (powered, supplied, not paused), installed modules (absent or empty = the plain
+  // building, pixel-identical to the frames without modules)
+  model(frame: number, working: boolean, modules?: readonly string[]): Vox;
 }
 
 export const TILE = 16;
@@ -114,4 +115,15 @@ export function placeholder(wTiles: number, hTiles: number, height: number, body
       return v;
     },
   };
+}
+
+// A rounded tank: a squircle prism (|dx|^p + |dy|^p <= r^p) centred on (cx, cy). p = 4 keeps the faces flat (they
+// read clean and white in the iso light, no staircase ribbing) and rounds the corners over ~3 voxels; p = 2 is a
+// plain cylinder. 'inner' > 0 keeps only the shell outside that radius.
+export function tank(v: Vox, cx: number, cy: number, r: number, z0: number, z1: number, m: number, inner = -1, p = 4): void {
+  for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
+    for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
+      const d = Math.abs(x + 0.5 - cx) ** p + Math.abs(y + 0.5 - cy) ** p;
+      if (d <= r ** p && (inner < 0 || d > inner ** p)) for (let z = z0; z < z1; z++) v.set(x, y, z, m);
+    }
 }
