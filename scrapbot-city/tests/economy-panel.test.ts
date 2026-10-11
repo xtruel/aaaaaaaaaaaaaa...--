@@ -293,13 +293,17 @@ describe('why a building is in its state, in words', () => {
     expect(text.ok).toBe('Working normally');
   });
 
-  it('overtime: how long it still speeds up a process or industry smog, nothing for a home', () => {
+  it('overtime: how long it still speeds up a process or industry smog, nothing for a home or a paused building', () => {
     const s = lab();
     const f = build(s, 'factory');
     const p = build(s, 'pods');
     s.overtimeUntil = s.time + 42.3;
     expect(overtimeLeft(s, f)).toBe(43);
     expect(overtimeLeft(s, p)).toBe(0);
+    // a paused Factory: overtime does nothing for it, the panel does not say it does
+    f.paused = true;
+    expect(overtimeLeft(s, f)).toBe(0);
+    f.paused = false;
     s.overtimeUntil = 0;
     expect(overtimeLeft(s, f)).toBe(0);
   });

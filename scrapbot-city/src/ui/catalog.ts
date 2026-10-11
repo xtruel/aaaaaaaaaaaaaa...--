@@ -338,10 +338,11 @@ export function statusLine(s: GameState, b: Building): StatusLine {
   return { cause: info.cause, text, icon: CAUSE_ICON[info.cause] };
 }
 
-// Overtime, while it runs, for a building it speeds up (a process; industry smog): how long is left. 0 otherwise.
+// Overtime, while it runs, for a building it speeds up (a process; industry smog): how long is left. 0 otherwise, and
+// for a building that is not running (paused, or a Burner out of fuel): overtime does nothing for it.
 export function overtimeLeft(s: GameState, b: Building): number {
   const eff = effectiveStats(s, b);
-  if (eff.overtime <= 1 || b.built < 1) return 0;
+  if (eff.overtime <= 1 || !eff.running) return 0;
   const st = buildingStats(b);
   return st.cycle > 0 || st.pollution > 0 ? Math.ceil(eff.overtimeLeft) : 0;
 }
