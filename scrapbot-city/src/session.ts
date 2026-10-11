@@ -22,7 +22,8 @@ import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
-import { isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo } from './ui/catalog';
+import { dozeTarget, isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo } from './ui/catalog';
+import type { DozeTarget } from './ui/catalog';
 import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEvent, openTrade } from './ui/dialogs';
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
@@ -97,6 +98,7 @@ export class GameSession implements PadTarget {
   private selectedId = -1;
   private hover: { x: number; y: number } | null = null;
   private hoverId = -1; // building under the pointer (its visible pixels)
+  private dozeTile = -1; // with the bulldozer: the tile its click acts on when that is not a building (-1 none)
   private pointer = { x: -1, y: -1, inside: false };
   private keys = new Set<string>();
   private drag: Drag | null = null;
@@ -349,10 +351,12 @@ export class GameSession implements PadTarget {
           bulldoze: this.bulldoze,
           selectedId: this.selectedId,
           hoverId: this.hoverId,
+          dozeTile: this.dozeTile,
           reducedMotion: this.settings.reducedMotion,
           piece: this.piece,
           selectedPiece: this.selectedPiece,
-          pieceRow: this.row && this.row.tiles.length > 1 ? this.row.tiles : null,
+          // a row dragged over a panel or the toolbar is not laid there: its ghosts go until it is back on the map
+          pieceRow: this.row && this.row.tiles.length > 1 && this.pointer.inside ? this.row.tiles : null,
           pieceLabel: this.pieceLabel(),
         },
         dt,
@@ -447,15 +451,34 @@ export class GameSession implements PadTarget {
   }
 
   private updateHover(): void {
+    this.dozeTile = -1;
     if (!this.pointer.inside || (this.drag && this.drag.moved)) {
       this.hover = this.pointer.inside && (this.build || this.piece) ? this.hover : null;
       this.hoverId = -1;
       return;
     }
     this.hover = this.renderer.screenToTile(this.pointer.x, this.pointer.y);
+    if (this.bulldoze) {
+      // what the bulldozer's click acts on is what lights up: a fence hidden behind a building, not the building
+      const target = this.dozeTarget(this.pointer.x, this.pointer.y);
+      this.hoverId = target.kind === 'building' ? target.id : -1;
+      if (target.kind !== 'building') this.dozeTile = target.i;
+      return;
+    }
     // with a building or a piece in hand the ghost is what counts; a module goes on the building pointed at
     const placing = this.build || (this.piece && !isModuleKind(this.piece.kind));
     this.hoverId = placing ? -1 : this.renderer.pickBuilding(this.pointer.x, this.pointer.y);
+  }
+
+  private dozeTarget(sx: number, sy: number): DozeTarget {
+    const r = this.renderer;
+    const tile = r.screenToTile(sx, sy);
+    return dozeTarget(this.s, tile.x, tile.y, r.pickBuilding(sx, sy), () => r.pickPiece(sx, sy));
+  }
+
+  // The map is what a press at this screen point reaches, not a panel, the toolbar or other HUD over it.
+  private onMap(x: number, y: number): boolean {
+    return document.elementFromPoint(x, y) === this.renderer.canvas;
   }
 
   // The dragged row follows the tile under the pointer (also while the keys move the map), up to the map's edge.
@@ -535,7 +558,9 @@ export class GameSession implements PadTarget {
       }
     });
     this.listen(canvas, 'pointermove', (e) => {
-      this.pointer = { x: e.clientX, y: e.clientY, inside: true };
+      // while the left mouse button is held the canvas keeps getting the pointer, also over a panel or the toolbar
+      const held = this.drag?.button === 0 && this.drag.pointerType === 'mouse';
+      this.pointer = { x: e.clientX, y: e.clientY, inside: !held || this.onMap(e.clientX, e.clientY) };
       // a press that began before a dialog opened (a story event, an ending) must not pan or build behind it
       if (isModalOpen()) {
         this.drag = null;
@@ -608,6 +633,9 @@ export class GameSession implements PadTarget {
       const row = this.row;
       this.row = null;
       if (!d || d.moved || isModalOpen()) return;
+      // released over a panel or the toolbar: nothing happens to the map hidden under it (a dragged row is not laid
+      // and costs nothing, a building is not placed out of sight)
+      if (d.button === 0 && !this.onMap(e.clientX, e.clientY)) return;
       // a left-button drag with no tool in hand is not a click (it used to move the map; now it does nothing)
       if (d.far && !this.build && !this.bulldoze && !this.piece) return;
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
@@ -779,48 +807,33 @@ export class GameSession implements PadTarget {
       else if (type === 'spire') this.build = null;
       return;
     }
-    // what you see is what you click: a building's roof or walls select it even over another tile. The bulldozer
-    // works on the ground tile under the pointer (it draws the buildings in front of it see-through): rubble there,
-    // or a fence, gate or lamp, which a building in front can hide entirely, is cleared instead
+    if (this.bulldoze) {
+      this.doze(sx, sy);
+      return;
+    }
+    // what you see is what you click: a building's roof or walls select it even over another tile
     const picked = this.renderer.pickBuilding(sx, sy);
-    const ground = inBounds(tile.x, tile.y) ? idx(tile.x, tile.y) : -1;
-    const clears = this.bulldoze && ground >= 0 && s.occ[ground] === -1 && (s.tiles[ground] === T.RUBBLE || s.solid[ground] !== 0);
-    if (picked >= 0 && !clears) {
+    if (picked >= 0) {
       this.selectBuilding(picked);
       audio.play('click');
       return;
     }
-    if (picked === -2 && !this.bulldoze) {
+    if (picked === -2) {
       this.petCat();
       return;
     }
-    // then a fence, gate or lamp drawn there (else a floor): a click selects it, the bulldozer takes it up
+    // then a fence, gate or lamp drawn there (else a floor)
     const piece = this.renderer.pickPiece(sx, sy);
     if (piece >= 0) {
-      if (!this.bulldoze) {
-        this.selectPiece(piece);
-        audio.play('click');
-        return;
-      }
-      if (removePieceAt(s, piece % MAP_W, Math.floor(piece / MAP_W))) return;
+      this.selectPiece(piece);
+      audio.play('click');
+      return;
     }
     if (!inBounds(tile.x, tile.y)) {
       this.selectBuilding(-1);
       return;
     }
     const i = idx(tile.x, tile.y);
-    if (this.bulldoze) {
-      if (s.tiles[i] === T.RUBBLE) {
-        if (!bulldozeRubble(s, tile.x, tile.y)) audio.play('error');
-      } else if (s.occ[i] !== -1) {
-        this.selectBuilding(s.occ[i]);
-        audio.play('click');
-      } else if (!removePieceAt(s, tile.x, tile.y)) {
-        // nothing to take up (a fence, gate or lamp, else a bare floor, goes with half its price back)
-        pushMessage(s, t('msg.bulldozeHelp'), 'info');
-      }
-      return;
-    }
     if (s.occ[i] !== -1) {
       this.selectBuilding(s.occ[i]);
       audio.play('click');
@@ -835,6 +848,25 @@ export class GameSession implements PadTarget {
     if (s.tiles[i] === T.JUNK) pushMessage(s, t(s.res.scrap >= s.derived.storage ? 'msg.junkInfoFull' : 'msg.junkInfo', { n: s.amount[i] }), 'info');
     else if (s.tiles[i] === T.SLUDGE) pushMessage(s, t('msg.sludgeInfo'), 'info');
     else if (s.tiles[i] === T.RUBBLE) pushMessage(s, t('msg.rubbleInfo'), 'info');
+  }
+
+  // The bulldozer clears rubble, takes up a fence, gate, lamp or bare floor (half its price back) and selects a
+  // building (its panel demolishes it): whatever dozeTarget says, which is also what is highlighted under the pointer.
+  private doze(sx: number, sy: number): void {
+    const s = this.s;
+    const target = this.dozeTarget(sx, sy);
+    if (target.kind === 'building') {
+      this.selectBuilding(target.id);
+      audio.play('click');
+    } else if (target.kind === 'rubble') {
+      if (!bulldozeRubble(s, target.i % MAP_W, Math.floor(target.i / MAP_W))) audio.play('error');
+    } else if (target.kind === 'piece') {
+      removePieceAt(s, target.i % MAP_W, Math.floor(target.i / MAP_W));
+    } else if (target.i < 0) {
+      this.selectBuilding(-1);
+    } else {
+      pushMessage(s, t('msg.bulldozeHelp'), 'info');
+    }
   }
 
   private petCat(): void {

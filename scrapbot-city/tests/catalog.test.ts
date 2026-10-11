@@ -1,6 +1,6 @@
 // The words and numbers of the Objects & modules interface (src/ui/catalog.ts): what can be bought and why
-// not, the module effects before -> after, the map label, the scrap a smaller storage loses, and what the
-// panel of a selected piece offers.
+// not, the module effects before -> after, the map label, the scrap a smaller storage loses, what the
+// panel of a selected piece offers, and what a bulldozer click acts on (which is also what lights up).
 import { describe, expect, it } from 'vitest';
 import { placeBuilding, placeCheck } from '../src/game/actions';
 import { MAP_H, MAP_W, T } from '../src/game/defs';
@@ -19,6 +19,7 @@ import {
   catalogName,
   catalogState,
   demolishStorageDrop,
+  dozeTarget,
   installState,
   isRotatable,
   isRowKind,
@@ -200,5 +201,48 @@ describe('a selected piece', () => {
     expect(placePiece(s, 'floor', p.x, p.y)).toBe(true);
     expect(placeBuilding(s, 'garden', p.x, p.y)).not.toBeNull();
     expect(pieceInfo(s, idx(p.x, p.y))).toMatchObject({ kind: 'floor', removable: false });
+  });
+});
+
+describe('bulldozer target', () => {
+  // `picked` is the building drawn under the pointer (-1 none, -2 the cat), `drawn` the piece drawn there
+  const none = () => -1;
+
+  it('a fence, gate or lamp on the tile under the pointer wins over the building drawn in front of it', () => {
+    const s = city();
+    const b = build(s, 'pods');
+    // the tile right behind the building's north corner: the building can hide it entirely
+    const behind = { x: b.x, y: b.y - 1 };
+    expect(s.occ[idx(behind.x, behind.y)]).toBe(-1);
+    expect(dozeTarget(s, behind.x, behind.y, b.id, none)).toEqual({ kind: 'building', id: b.id });
+    for (const kind of ['fence', 'gate', 'lamp'] as const) {
+      expect(placePiece(s, kind, behind.x, behind.y)).toBe(true);
+      expect(dozeTarget(s, behind.x, behind.y, b.id, none), kind).toEqual({ kind: 'piece', i: idx(behind.x, behind.y) });
+      s.solid[idx(behind.x, behind.y)] = 0;
+    }
+    // so is rubble (since 0.6); a bare floor is not hidden by the building: the building is the target
+    s.tiles[idx(behind.x, behind.y)] = T.RUBBLE;
+    expect(dozeTarget(s, behind.x, behind.y, b.id, none)).toEqual({ kind: 'rubble', i: idx(behind.x, behind.y) });
+    s.tiles[idx(behind.x, behind.y)] = T.GROUND;
+    expect(placePiece(s, 'floor', behind.x, behind.y)).toBe(true);
+    expect(dozeTarget(s, behind.x, behind.y, b.id, none)).toEqual({ kind: 'building', id: b.id });
+  });
+
+  it('then a piece drawn under the pointer, then what lies on the tile', () => {
+    const s = city();
+    const b = build(s, 'pods');
+    const [a, c] = row3(s);
+    expect(placePiece(s, 'lamp', a.x, a.y)).toBe(true);
+    // the lamp's head drawn over the next tile: the lamp is taken up, the cat is never bulldozed
+    expect(dozeTarget(s, c.x, c.y, -1, () => idx(a.x, a.y))).toEqual({ kind: 'piece', i: idx(a.x, a.y) });
+    expect(dozeTarget(s, c.x, c.y, -2, none)).toEqual({ kind: 'nothing', i: idx(c.x, c.y) });
+    // a building's own tile, even where none of its pixels is drawn
+    expect(dozeTarget(s, b.x, b.y, -1, none)).toEqual({ kind: 'building', id: b.id });
+    expect(placePiece(s, 'floor', c.x, c.y)).toBe(true);
+    expect(dozeTarget(s, c.x, c.y, -1, none)).toEqual({ kind: 'piece', i: idx(c.x, c.y) });
+    // a floor covered by junk cannot be taken up: nothing to do there
+    s.tiles[idx(c.x, c.y)] = T.JUNK;
+    expect(dozeTarget(s, c.x, c.y, -1, none)).toEqual({ kind: 'nothing', i: idx(c.x, c.y) });
+    expect(dozeTarget(s, -3, 4, -1, none)).toEqual({ kind: 'nothing', i: -1 });
   });
 });

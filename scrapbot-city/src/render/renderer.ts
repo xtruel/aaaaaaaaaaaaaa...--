@@ -52,6 +52,9 @@ export interface ViewState {
   bulldoze: boolean;
   selectedId: number;
   hoverId?: number;
+  // with the bulldozer: the tile its click acts on when that is not a building (rubble, a fence, gate, lamp or floor,
+  // bare ground; -1 or left out = none): outlined, and a fence, gate or lamp there lights up instead of a building
+  dozeTile?: number;
   reducedMotion: boolean;
   // modular building: the catalog tool, the selected fence/gate/lamp/floor (tile index, -1 none), the tiles of a row
   // being dragged, and the text the interface wants next to the ghost (a module's effect; shown while the piece or
@@ -1508,6 +1511,11 @@ export class Renderer {
     // a catalog tool shows its own preview (drawPiecePreview)
     if (!h || view.build || view.piece) return;
     if (view.hoverId !== undefined && view.hoverId >= 0) return; // the building itself gets highlighted
+    const doze = view.bulldoze ? (view.dozeTile ?? -1) : -1;
+    if (doze >= 0) {
+      this.outlineFootprint(doze % MAP_W, Math.floor(doze / MAP_W), 1, 1, PAL.red, camX, camY);
+      return;
+    }
     if (!inBounds(h.x, h.y)) return;
     this.outlineFootprint(h.x, h.y, 1, 1, view.bulldoze ? PAL.red : 'rgba(236,232,246,0.6)', camX, camY);
   }
@@ -1542,6 +1550,14 @@ export class Renderer {
         if (!f) continue;
         ctx.drawImage(img, f.x, f.y, f.w, f.h, it.sx0 - camX, it.sy0 - camY, f.w, f.h);
         this.pushDrawn(K_PIECE, it.ref, it.ref, f, it.sx0, it.sy0, f.w, f.h);
+        // the bulldozer's click would take this one up: it lights up as a building under the pointer does
+        if (view.bulldoze && view.dozeTile === it.ref) {
+          ctx.globalAlpha = 0.35;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.drawImage(img, f.x, f.y, f.w, f.h, it.sx0 - camX, it.sy0 - camY, f.w, f.h);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
+        }
       } else if (it.kind === K_BOT) this.drawBot(s.bots[it.ref], it.ref, camX, camY, img, view.reducedMotion);
       else if (it.kind === K_CAT) {
         const cat = s.cat;
