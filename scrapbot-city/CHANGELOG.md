@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.7.0 — incremento 2, gruppo G1: sei moduli ed economia leggibile (non ancora pubblicato)
+
+- **Sei moduli nuovi**, nella sezione «Moduli macchina» del catalogo (con la loro icona) e nel pannello dell'edificio.
+  Ogni edificio ha **un solo slot**: i due moduli del Riciclatore sono alternativi («Slot occupato da Separatore
+  magnetico: rimuovilo prima», anche sulla mappa con lo strumento del catalogo). Si installano solo su un edificio
+  completato; rimborso a metà alla rimozione e alla demolizione, mostrato prima. Nessun numero degli edifici cambia.
+  - **Separatore magnetico** (Riciclatore, 40 cr + 15 pz): ciclo 2 → 1,5 s, pezzi 60 → 80 al minuto; rottami 90 → 120
+    al minuto, energia −2 → −4.
+  - **Selezionatore di precisione** (Riciclatore, 40 cr + 15 pz): 3 rottami → 3 pezzi invece di 2, ciclo 2 → 3 s: gli
+    stessi 60 pezzi al minuto con 60 rottami invece di 90.
+  - **Braccio doppio** (Fabbrica 2PM, 90 cr + 30 pz): ciclo 3 → 2 s, crediti 600 → 900 al minuto; pezzi 40 → 60 al
+    minuto, smog 0,06 → 0,09 al secondo, energia −4 → −6.
+  - **Capsula abitativa** (Capsule Bot, 35 cr + 15 pz): alloggi 6 → 9, energia −1 → −2.
+  - **Pannelli orientabili** (Campo Solare, 60 cr + 40 pz): energia +5 → +7.
+  - **Ugello esteso** (Purificatore, 50 cr + 30 pz): raggio di bonifica 5 → 8 caselle (anche l'anello sulla mappa),
+    energia −3 → −4; stessa velocità (una casella ogni 6 s) e stessa pulizia dell'aria.
+- **Il pannello di ogni edificio legge la simulazione**: per ogni valore la colonna «A piena energia» (con il modulo) e
+  la colonna «Ora» (con l'energia disponibile, gli straordinari, la pausa): energia, smog, ingressi e uscite di un
+  ciclo, durata del ciclo, quanto produce e consuma al minuto, alloggi, deposito, raggio e ritmo della bonifica. Un
+  edificio fermo per i materiali o per la riserva di pezzi segna «in attesa» e 0 al minuto. Durante gli straordinari
+  una nota dice quanti secondi restano (si sommano ai moduli solo finché durano).
+- **La causa dello stato, a parole e con un'icona** (non solo col colore): funziona normalmente; in pausa (l'hai
+  fermato tu); fermo: energia insufficiente; rallentato: poca energia (al N%); mancano materiali (quali); in attesa:
+  pezzi tenuti da parte per costruire (quanti); in costruzione (secondi rimasti); senza carburante.
+- **Lo slot nel pannello**: per ogni modulo lo stato (installato · slot occupato · installabile · non ora, col motivo),
+  costo e rimborso, prima → dopo a piena energia e, se installato, il valore di ora. «Installa» avvisa se lascerebbe la
+  città senza energia sufficiente; «Rimuovi» e «Demolisci» dicono cosa si perde: rottami oltre il deposito che resta,
+  cittadini oltre gli alloggi che restano, energia che non basta più.
+- **«+N in attesa»** accanto al contatore dei rottami quando i bot ne hanno portati più di quanti ne stanno nel
+  deposito; il suggerimento al passaggio del mouse spiega che entrano da soli appena c'è posto.
+- **Consigli di USA-9** sul collo di bottiglia reale: con il deposito pieno e pochi crediti propone un convertitore
+  (Lab Riparatutto o Fonderia, secondo il percorso) e non più un Bot Dock; un nuovo Riciclatore solo se c'è energia e
+  ci sono rottami da lavorare, altrimenti «prima l'energia» o «niente rottami da riciclare».
+- **Fumo, vapore e animazioni seguono lo stato reale**: il fumo segue lo smog che l'edificio emette davvero (meno con
+  poca energia, ×1,5 con gli straordinari, niente da fermo); il camino della Fabbrica tiene il suo fumo e lo scarico del
+  braccio doppio aggiunge il fumo in più del modulo; l'ugello spruzza una nebbiolina mentre il Purificatore lavora; le
+  gocce del Purificatore non salgono più quando è in pausa. Con il movimento ridotto niente particelle.
+- **Edifici nascosti selezionabili** (studio della mappa §9): con la ruspa il clic va all'edificio che la ruspa mostra
+  attraverso quello trasparente (il Giardino Pixel dietro la Guglia); senza ruspa un secondo clic nello stesso punto sul
+  sopra-selezionato passa a ciò che nasconde (l'edificio o la recinzione, il cancello, il lampione su quella casella) e
+  un terzo torna indietro; un doppio clic non conta. L'edificio davanti diventa trasparente finché la selezione dura.
+- Il pannello di un altro edificio si apre dall'inizio, non più dove era scorso quello di prima.
+- `npm run waits` ha una riga per modulo e tre configurazioni confrontabili (verde rigoroso, industriale, ibrida);
+  `npm run balance` con seme fisso e le righe già esistenti di `npm run waits` sono identiche a prima.
+- Salvataggi compatibili: i moduli nuovi stanno in `buildings[i].modules`; un salvataggio danneggiato con due moduli
+  sullo stesso edificio tiene solo il primo che ci sta.
+
 ## 0.7.0-alpha.1 — costruzione modulare, incremento 1
 
 - **Sei elementi nuovi nel pannello «Oggetti e moduli»** (pulsante nella barra degli strumenti accanto alla ruspa, tasto

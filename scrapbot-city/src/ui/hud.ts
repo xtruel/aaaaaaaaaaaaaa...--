@@ -666,13 +666,14 @@ export class Hud {
     this.markCatalog(s);
     const list = panel.querySelector<HTMLElement>('.cat-scroll')!;
     list.scrollTop = scrolled;
-    // the item in hand stays in sight when the tool box above the list takes its room
+    // the item in hand stays in sight when the tool box above the list takes its room: all of it, or from its top
+    // (name and price) when the list is shorter than the item (a short window: a module's effect takes lines)
     const chosen = panel.querySelector<HTMLElement>('.cat-item.active');
     if (chosen) {
       const r = chosen.getBoundingClientRect();
       const l = list.getBoundingClientRect();
-      if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
-      else if (r.top < l.top) list.scrollTop -= l.top - r.top;
+      if (r.top < l.top || r.height > l.height) list.scrollTop -= l.top - r.top;
+      else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
     }
     panel.querySelector('[data-close]')!.addEventListener('click', () => {
       audio.play('click');
