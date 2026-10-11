@@ -161,41 +161,65 @@ export interface SceneryItem {
   glows: string[];
 }
 
-// Deterministic per city: the same seed always gives the same surroundings.
-export function placeScenery(seed: number, ring: number, meta: Record<string, DecorMeta>): { items: SceneryItem[]; taken: Set<number> } {
-  const names = Object.keys(meta).sort();
+// A city theme's border scenery (atlas.ts ThemeArtMeta): its own signature pieces, frames sc/<id>/<name>/<f>, and
+// the plain decor pieces (d/<name>) that suit it.
+export interface SceneryTheme {
+  id: string;
+  scenery: Record<string, DecorMeta>;
+  decor: string[];
+}
+
+const SIGNATURE_COPIES = 2;
+
+// Deterministic per city: the same seed always gives the same surroundings. Without a theme (Scrapbot City, free
+// play) every decor piece can stand anywhere in the ring. A themed city first puts its signature pieces in the ring
+// behind the map (biggest first, SIGNATURE_COPIES of each, at spots shuffled by the seed), then fills the ring the
+// same way from its signature pieces and its own share of the decor.
+export function placeScenery(seed: number, ring: number, meta: Record<string, DecorMeta>, theme?: SceneryTheme | null): { items: SceneryItem[]; taken: Set<number> } {
+  type Piece = DecorMeta & { name: string; prefix: string };
+  const plain = (name: string): Piece => ({ ...meta[name], name, prefix: `d/${name}` });
+  const signature: Piece[] = theme ? Object.keys(theme.scenery).map((name) => ({ ...theme.scenery[name], name, prefix: `sc/${theme.id}/${name}` })) : [];
+  const pool = theme ? [...signature, ...theme.decor.filter((n) => meta[n]).map(plain)] : Object.keys(meta).sort().map(plain);
   const items: SceneryItem[] = [];
   const taken = new Set<number>();
-  if (!names.length) return { items, taken };
+  if (!pool.length) return { items, taken };
   const key = (x: number, y: number) => (y + ring) * (MAP_W + 2 * ring) + (x + ring);
-  const low = names.filter((n) => !meta[n].tall);
+  const low = pool.filter((p) => !p.tall);
   const salt = (seed % 9973) + 101;
   const inRing = (x: number, y: number) => x >= -ring && y >= -ring && x < MAP_W + ring && y < MAP_H + ring && !(x >= 0 && y >= 0 && x < MAP_W && y < MAP_H);
+  // puts a piece there if it fits
+  const place = (m: Piece, tx: number, ty: number): boolean => {
+    for (let y = ty; y < ty + m.d; y++)
+      for (let x = tx; x < tx + m.w; x++) {
+        if (!inRing(x, y) || taken.has(key(x, y)) || isRoadRow(y) || isRoadCol(x) || isCanal(x, y)) return false;
+        // keep the first row in front of the map clear, so nothing hides the city's edge
+        if (x >= MAP_W && x === MAP_W && y >= 0) return false;
+        if (y >= MAP_H && y === MAP_H && x >= 0) return false;
+      }
+    // tall scenery only where it is behind the whole map on an axis
+    const isBack = tx + m.w <= 0 || ty + m.d <= 0;
+    if (m.tall && !isBack) return false;
+    for (let y = ty; y < ty + m.d; y++) for (let x = tx; x < tx + m.w; x++) taken.add(key(x, y));
+    const frameNames = Array.from({ length: Math.max(1, m.frames) }, (_, k) => `${m.prefix}/${k}`);
+    items.push({ name: m.name, tx, ty, w: m.w, d: m.d, frames: m.frames, fps: m.fps, back: isBack, names: frameNames, glows: frameNames.map((n) => `${n}/g`) });
+    return true;
+  };
+  if (signature.length) {
+    const spots: [number, number, number][] = [];
+    for (let ty = -ring; ty < MAP_H + ring; ty++) for (let tx = -ring; tx < MAP_W + ring; tx++) if (inRing(tx, ty) && (tx < 0 || ty < 0)) spots.push([hash2(tx, ty, salt + 2), tx, ty]);
+    spots.sort((a, b) => a[0] - b[0]);
+    const big = [...signature].sort((a, b) => b.w * b.d - a.w * a.d || (a.name < b.name ? -1 : 1));
+    for (let c = 0; c < SIGNATURE_COPIES; c++) for (const m of big) for (const [, tx, ty] of spots) if (place(m, tx, ty)) break;
+  }
   for (let ty = -ring; ty < MAP_H + ring; ty++)
     for (let tx = -ring; tx < MAP_W + ring; tx++) {
       if (!inRing(tx, ty)) continue;
       const h = hash2(tx, ty, salt);
       const back = tx < 0 || ty < 0;
       if (h > (back ? 0.2 : 0.11)) continue;
-      const pool = back ? names : low;
-      if (!pool.length) continue;
-      const name = pool[Math.floor(hash2(tx, ty, salt + 1) * pool.length)];
-      const m = meta[name];
-      let fits = true;
-      for (let y = ty; y < ty + m.d && fits; y++)
-        for (let x = tx; x < tx + m.w && fits; x++) {
-          if (!inRing(x, y) || taken.has(key(x, y)) || isRoadRow(y) || isRoadCol(x) || isCanal(x, y)) fits = false;
-          // keep the first row in front of the map clear, so nothing hides the city's edge
-          if (x >= MAP_W && x === MAP_W && y >= 0) fits = false;
-          if (y >= MAP_H && y === MAP_H && x >= 0) fits = false;
-        }
-      if (!fits) continue;
-      // tall scenery only where it is behind the whole map on an axis
-      const isBack = tx + m.w <= 0 || ty + m.d <= 0;
-      if (m.tall && !isBack) continue;
-      for (let y = ty; y < ty + m.d; y++) for (let x = tx; x < tx + m.w; x++) taken.add(key(x, y));
-      const frameNames = Array.from({ length: Math.max(1, m.frames) }, (_, k) => `d/${name}/${k}`);
-      items.push({ name, tx, ty, w: m.w, d: m.d, frames: m.frames, fps: m.fps, back: isBack, names: frameNames, glows: frameNames.map((n) => `${n}/g`) });
+      const list = back ? pool : low;
+      if (!list.length) continue;
+      place(list[Math.floor(hash2(tx, ty, salt + 1) * list.length)], tx, ty);
     }
   items.sort((a, b) => a.tx + a.w + a.ty + a.d - (b.tx + b.w + b.ty + b.d));
   return { items, taken };

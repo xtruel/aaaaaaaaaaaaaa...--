@@ -17,7 +17,7 @@ import { hash2 } from '../game/world';
 import { t } from '../i18n';
 import { drawPixelText, pixelTextWidth } from './pixelfont';
 import { PAL } from './sprites';
-import { atlasImage, buildingArt, citizenVariants, decorArt, frame, opaqueAt, variantArt, variantKey, whenAtlasReady } from './iso/atlas';
+import { atlasImage, buildingArt, citizenVariants, cityTheme, decorArt, frame, opaqueAt, themeArt, themedFrame, variantArt, variantKey, whenAtlasReady } from './iso/atlas';
 import type { BuildingArtMeta, Frame } from './iso/atlas';
 import { DepthSorter } from './iso/depth';
 import type { DepthItem } from './iso/depth';
@@ -96,6 +96,9 @@ const K_DECOR = 5;
 const K_LAMP = 6;
 const K_PIECE = 7;
 const POOL = [5, 10, 14, 16, 14, 10, 5]; // half-widths of a lamp's light pool, row by row
+// The light of a city without a theme (atlas.ts ThemeArtMeta.light): no daylight multiply ('' or 'r,g,b'), the night
+// veil's colour, a factor on its opacity.
+const GAME_LIGHT = { day: '', veil: '16,12,52', dark: 1 };
 
 // Player-built pieces (0.7): how tall the solid ones stand (voxels; draw order, bots fly over them), and their
 // frames: a fence by the mask of its fence/gate neighbours (alone: along x or y by its rotation), a gate by its
@@ -292,6 +295,9 @@ export class Renderer {
   private toy: number;
   private terrainState: GameState | null = null;
   private terrainPainted = false;
+  // the city's theme (atlas.ts cityTheme), set with the terrain: its ground, its border scenery and its light
+  private theme: string | null = null;
+  private light = GAME_LIGHT;
 
   // shadows are drawn opaque into their own layer, then blended once
   private shadow: HTMLCanvasElement;
@@ -510,7 +516,10 @@ export class Renderer {
       this.terrainPainted = false;
       return;
     }
-    const sc = placeScenery(s.seed, RING, decorArt);
+    const theme = (this.theme = cityTheme(s.cityId));
+    const look = theme ? themeArt[theme] : null;
+    this.light = look ? { day: look.light.day.some((c) => c < 255) ? look.light.day.join(',') : '', veil: look.light.night.join(','), dark: look.light.dark } : GAME_LIGHT;
+    const sc = placeScenery(s.seed, RING, decorArt, theme && look ? { id: theme, scenery: look.scenery, decor: look.decor } : null);
     this.scenery = sc.items;
     this.sceneryTaken = sc.taken;
     // street lamps every fifth tile on the curbs of the old streets (not on crossings, not on the canal):
@@ -543,8 +552,9 @@ export class Renderer {
     this.terrainPainted = true;
   }
 
+  // Terrain cache only: a themed city paints its twin of every t/ frame it has one of.
   private blitT(name: string, tx: number, ty: number): void {
-    const f = frame(name);
+    const f = frame(themedFrame(name, this.theme));
     const img = atlasImage();
     if (!f || !img) return;
     const top = tileTop(tx, ty);
@@ -2037,9 +2047,20 @@ export class Renderer {
 
   private drawLighting(s: GameState, camX: number, camY: number, img: HTMLImageElement): void {
     const ctx = this.ctx;
-    const dark = darkness(dayPhase(s));
+    const light = this.light;
+    const night = darkness(dayPhase(s));
+    // a themed city's daylight fades out as its night veil comes in (gone at midnight, darkness 0.55; under 2% it
+    // changes no colour by a whole level)
+    const daylight = 1 - night / 0.55;
+    if (light.day && daylight > 0.02) {
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = `rgba(${light.day},${daylight})`;
+      ctx.fillRect(0, 0, this.viewW, this.viewH);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    const dark = Math.min(0.9, night * light.dark);
     if (dark <= 0.01) return;
-    ctx.fillStyle = `rgba(16,12,52,${dark})`;
+    ctx.fillStyle = `rgba(${light.veil},${dark})`;
     ctx.fillRect(0, 0, this.viewW, this.viewH);
     if (dark < 0.2) return;
     ctx.globalCompositeOperation = 'lighter';
