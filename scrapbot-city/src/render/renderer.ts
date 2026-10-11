@@ -1758,8 +1758,12 @@ export class Renderer {
       seen.add(key);
       const inside = inBounds(p.x, p.y);
       const i = inside ? idx(p.x, p.y) : -1;
-      // a dragged row passing over the same piece already there just carries on: no ghost on it
-      if (dragged && inside && (kind === 'floor' ? s.floor[i] !== 0 : solidKind(s.solid[i]) === kind)) continue;
+      // a dragged row passing over the same piece already there (a fence row: over a gate too) just carries on: no
+      // ghost on it
+      if (dragged && inside) {
+        const there = solidKind(s.solid[i]);
+        if (kind === 'floor' ? s.floor[i] !== 0 : there === kind || (kind === 'fence' && there === 'gate')) continue;
+      }
       let check = pieceCheck(s, kind, p.x, p.y, tool.rot);
       // each tile of a row is paid when it is laid: past what the money covers, the ghosts say so
       if (check.ok && !affords(s.res, def.cost, laid + 1)) check = { ok: false, reason: t('place.costs', { cost: costText(def.cost) }), costOnly: true };
