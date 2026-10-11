@@ -54,7 +54,8 @@ export interface ViewState {
   hoverId?: number;
   reducedMotion: boolean;
   // modular building: the catalog tool, the selected fence/gate/lamp/floor (tile index, -1 none), the tiles of a row
-  // being dragged, and the text the interface wants next to the ghost (a module's effect); left out = none
+  // being dragged, and the text the interface wants next to the ghost (a module's effect; shown while the piece or
+  // module can go there, else the core's reason is shown); left out = none
   piece?: { kind: CatalogKind; rot: number } | null;
   selectedPiece?: number;
   pieceRow?: { x: number; y: number }[] | null;
@@ -1805,7 +1806,9 @@ export class Renderer {
       // only a building the module fits is outlined; on any other one the reason says where it goes
       const def = BUILDINGS[mp.b.type];
       if (mp.fits) this.outlineFootprint(mp.b.x, mp.b.y, def.w, def.h, mp.check.ok ? PAL.lime : mp.check.costOnly ? PAL.yellow : PAL.red, camX, camY);
-      const text = mp.fits ? view.pieceLabel || (mp.check.ok ? null : mp.check.reason) : mp.check.reason;
+      // the interface's label (the module's effect) while the module can go on; otherwise why not ("Already
+      // installed", "Only on a finished Bot Dock", the price), even when the interface passed its effect
+      const text = mp.check.ok ? view.pieceLabel || null : mp.check.reason;
       const f = frame(namesOf(mp.b.type, buildingArt[mp.b.type]?.frames ?? 1).off);
       const top = tileTop(mp.b.x, mp.b.y);
       if (text) this.drawLabel(text, top.X + ((def.w - def.h) * TILE) / 2 - camX, top.Y - (f ? f.ay : 40) - 12 - camY, mp.fits && mp.check.ok ? PAL.lime : PAL.red);
@@ -1828,11 +1831,12 @@ export class Renderer {
         ctx.globalAlpha = 1;
       }
     }
-    // one label: on the pointer's tile (the end of a dragged row), or on the first tile that will be skipped
+    // one label: on the pointer's tile (the end of a dragged row), or on the first tile that will be skipped; the
+    // interface's text only over a ghost that will be laid (a refused one says why)
     const h = view.hover;
     const at = (h && this.ghosts.find((g) => g.x === h.x && g.y === h.y)) || this.ghosts[this.ghosts.length - 1];
     const bad = at.ok ? this.ghosts.find((g) => !g.ok) : at;
-    const label = view.pieceLabel ? { g: at, text: view.pieceLabel } : bad?.reason ? { g: bad, text: bad.reason } : null;
+    const label = at.ok && view.pieceLabel ? { g: at, text: view.pieceLabel } : bad?.reason ? { g: bad, text: bad.reason } : null;
     if (!label) return;
     const f = kind === 'floor' ? undefined : frame(this.ghostFrameName(s, kind, tool.rot, label.g));
     const top = tileTop(label.g.x, label.g.y);
