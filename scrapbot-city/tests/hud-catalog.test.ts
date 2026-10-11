@@ -303,7 +303,7 @@ describe('selected piece panel', () => {
     if (placePiece(s, 'floor', f.x, f.y)) {
       update({ selectedPiece: idx(f.x, f.y) });
       expect(q(insp, '[data-rotate]')).toBeNull();
-      expect(q(insp, '[data-remove-piece]')!.textContent).toBe('Remove (+1 credits)');
+      expect(q(insp, '[data-remove-piece]')!.textContent).toBe('Remove (+1 credit)');
     }
   });
 });

@@ -34,9 +34,11 @@ export function gain(s: GameState, cost: Cost): void {
   }
 }
 
+// "12 credits + 1 part": an amount of exactly 1 takes the singular (cost.<resource>.one). Every other amount keeps
+// the plural key; in Polish 2–4 and 5+ take the same word for all three (części, złomu, kr).
 export function costText(cost: Cost): string {
   const parts = (Object.keys(cost) as Resource[]).filter((r) => (cost[r] ?? 0) > 0);
-  return parts.map((r) => tk(`cost.${r}`, { n: cost[r] ?? 0 })).join(' + ') || t('common.free');
+  return parts.map((r) => tk(cost[r] === 1 ? `cost.${r}.one` : `cost.${r}`, { n: cost[r] ?? 0 })).join(' + ') || t('common.free');
 }
 
 export function shiftAlignment(s: GameState, delta: number): void {
