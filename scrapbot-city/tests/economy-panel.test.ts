@@ -18,6 +18,7 @@ import type { Building, GameState } from '../src/game/state';
 import { OBJECTIVES } from '../src/game/story';
 import { LANGS, setLang, t } from '../src/i18n';
 import {
+  buildingDesc,
   buildingRows,
   catalogEffect,
   homesLost,
@@ -128,7 +129,8 @@ function expectRowsFromSim(s: GameState): number {
       }
     }
     if (st.housing) expect([at('homes').nominal, at('homes').now]).toEqual([`${st.housing}`, `${eff.housing}`]);
-    if (st.storage) expect([at('storage').nominal, at('storage').now]).toEqual([`${st.storage}`, `${eff.storage}`]);
+    // storage with its unit, as the panel always wrote it ("180 scrap")
+    if (st.storage) expect([at('storage').nominal, at('storage').now]).toEqual([t('cost.scrap', { n: st.storage }), t('cost.scrap', { n: eff.storage })]);
     if (st.cleanRadius) {
       expect(at('radius').nominal).toBe(`${st.cleanRadius}`);
       expect(at('clean').now).toBe(Number.isFinite(eff.cleanEvery) ? tenth(eff.cleanEvery) : t('insp.stopped'));
@@ -494,5 +496,57 @@ describe('the declared building numbers stay as they were', () => {
         expect(rows.get('clean')).toBe(tenth(CLEAN_EVERY));
       }
     }
+  });
+});
+
+describe('a building\'s description says its own numbers', () => {
+  // the plain buildings' words, exactly as before (the toolbar's tooltip, a building without a module)
+  const PLAIN: Partial<Record<BuildingType, string>> = {
+    recycler: 'Turns 3 scrap into 2 parts. Every city needs one: parts build everything.',
+    dock: '+2 scrap bots and +80 scrap storage. Bots drop their loot at the nearest dock.',
+    pods: 'Homes for 6 robot citizens. Citizens pay taxes and throw away junk.',
+    solar: '+5 energy, zero emissions. Pricey to set up.',
+    purifier: 'Scrubs the air and slowly cleans toxic sludge within 5 tiles.',
+  };
+
+  it('without a module: the plain words, in every language with no placeholder left', () => {
+    setLang('en');
+    for (const [type, text] of Object.entries(PLAIN)) expect(buildingDesc({ type: type as BuildingType })).toBe(text);
+    try {
+      for (const { id } of LANGS) {
+        setLang(id);
+        for (const type of Object.keys(BUILDINGS) as BuildingType[]) {
+          const text = buildingDesc({ type });
+          expect(text, `${id} ${type}`).not.toMatch(/[{}]/);
+          if (type === 'purifier') expect(text, id).toContain('5');
+        }
+        const pods = buildingDesc({ type: 'pods', modules: ['podsCapsule'] });
+        expect(pods, id).toContain('9');
+        expect(pods, id).not.toContain('6');
+      }
+    } finally {
+      setLang('en');
+    }
+  });
+
+  it('with a module: the nozzle\'s 8 tiles, the capsule\'s 9 homes, the trackers\' +7, the sorter\'s 3 parts, +180 storage', () => {
+    setLang('en');
+    const s = lab();
+    const on = (type: BuildingType, kind: ModuleKind) => {
+      const b = build(s, type);
+      expect(installModule(s, kind, b)).toBe(true);
+      return buildingDesc(b);
+    };
+    expect(on('purifier', 'purifierNozzle')).toBe('Scrubs the air and slowly cleans toxic sludge within 8 tiles.');
+    expect(on('pods', 'podsCapsule')).toBe('Homes for 9 robot citizens. Citizens pay taxes and throw away junk.');
+    expect(on('solar', 'solarTracker')).toBe('+7 energy, zero emissions. Pricey to set up.');
+    expect(on('recycler', 'recyclerSorter')).toBe('Turns 3 scrap into 3 parts. Every city needs one: parts build everything.');
+    expect(on('recycler', 'recyclerMagnet')).toBe(PLAIN.recycler);
+    expect(on('dock', 'dockStorage')).toBe('+2 scrap bots and +180 scrap storage. Bots drop their loot at the nearest dock.');
+    // and the panel shows it
+    const pur = s.buildings.find((b) => b.type === 'purifier')!;
+    const { root, update } = hud(s);
+    update({ selectedId: pur.id });
+    expect(root.querySelector('[data-inspector] .insp-desc')!.textContent).toBe('Scrubs the air and slowly cleans toxic sludge within 8 tiles.');
   });
 });

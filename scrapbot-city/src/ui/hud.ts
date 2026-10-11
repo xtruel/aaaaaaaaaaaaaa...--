@@ -13,7 +13,7 @@ import { day } from '../game/state';
 import type { Building, GameState, Message } from '../game/state';
 import { OBJECTIVES, objectiveHint, objectiveText, objectiveTools } from '../game/story';
 import { padMode } from '../gamepad';
-import { bDesc, bName, pathLabel, t, tk } from '../i18n';
+import { bName, pathLabel, t, tk } from '../i18n';
 import { keyLabel, localizeKeys } from '../keys';
 import { iconUrl, pathColor, portraitUrl, toolThumb } from '../render/icons';
 import type { IconName } from '../render/icons';
@@ -22,6 +22,7 @@ import { PAL, makeCanvas } from '../render/sprites';
 import {
   CONSTRUCTION,
   MACHINE_MODULES,
+  buildingDesc,
   buildingRows,
   catalogCost,
   catalogEffect,
@@ -452,7 +453,7 @@ export class Hud {
     const tip = this.el.tooltip;
     tip.innerHTML = `
       <p class="tip-title">${bName(type)} <span class="tag" style="--path:${pathColor(type)}">${pathLabel(def.path)}</span></p>
-      <p class="tip-desc">${esc(bDesc(type))}</p>
+      <p class="tip-desc">${esc(buildingDesc({ type }))}</p>
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
       <p class="tip-cost">${costChips(buildCost(this.s, type))}</p>`;
     tip.hidden = false;
@@ -976,7 +977,7 @@ export class Hud {
       <div class="progress"><span data-progress></span></div>
       <dl class="insp-rows${withNow ? '' : ' no-now'}">${lines}${head}${body}</dl>
       <p class="insp-note" data-overtime hidden></p>
-      <p class="insp-desc">${esc(bDesc(b.type))}</p>
+      <p class="insp-desc">${esc(buildingDesc(b))}</p>
       ${slots.length ? this.moduleSection(s, b, slots) : ''}
       ${pausable ? `<div class="insp-actions"><button type="button" class="btn" data-pause>${b.paused ? t('insp.resume') : t('insp.pause')}</button></div>` : ''}
       ${

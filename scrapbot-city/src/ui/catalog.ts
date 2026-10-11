@@ -103,6 +103,8 @@ function perMin(perSecond: number): string {
   const n = perSecond * 60;
   return `${n >= 10 ? Math.round(n) : Math.round(n * 10) / 10}`;
 }
+// "180 scrap", "1 scrap" (costText would write 0 as "free")
+const scrapAmount = (n: number) => tk(n === 1 ? 'cost.scrap.one' : 'cost.scrap', { n });
 const resources = (cost: Readonly<Cost>) => (Object.keys(cost) as Resource[]).filter((r) => (cost[r] ?? 0) > 0);
 
 // A building's numbers at full power, as the rows show them. made / used: per minute at the nominal cycle (the
@@ -252,6 +254,22 @@ export function moduleLabel(b: Building, kind: ModuleKind): string {
 
 // ---------- the building panel: nominal and now, and why ----------
 
+// A building's description with its own numbers (buildingStats): a module changes what the words say, the nozzle's 8
+// tiles, the capsule's 9 homes, the trackers' +7, the sorter's 3 parts, the extra storage's +180. Without a building
+// (the toolbar's tooltip), the plain building's numbers.
+export function buildingDesc(b: Pick<Building, 'type'> & Partial<Pick<Building, 'modules'>>): string {
+  const st = buildingStats(b);
+  return tk(`b.${b.type}.desc`, {
+    scrap: st.input.scrap ?? 0,
+    parts: st.output.parts ?? 0,
+    storage: st.storage,
+    homes: st.housing,
+    energy: st.energy,
+    radius: st.cleanRadius,
+  });
+}
+
+
 export interface PanelRow {
   key: string; // what the row shows ('energy', 'made.parts'...): the panel writes "now" into it in place
   label: string;
@@ -278,7 +296,8 @@ export function buildingRows(s: GameState, b: Building): PanelRow[] {
   }
   if (def.fuel) out.push({ key: 'fuel', label: t('insp.fuel'), nominal: t('insp.fuelValue', { n: def.fuel.scrap, s: def.fuel.seconds }), now: null });
   if (st.housing) add('homes');
-  if (st.storage) add('storage');
+  // storage in scrap, with its unit ("180 scrap"), as the panel always wrote it
+  if (st.storage) out.push({ key: 'storage', label: rowLabel({ stat: 'storage' }), nominal: scrapAmount(st.storage), now: scrapAmount(eff.storage) });
   if (def.bots) out.push({ key: 'bots', label: t('insp.bots'), nominal: `+${def.bots}`, now: null });
   if (def.happiness) out.push({ key: 'happiness', label: t('insp.happiness'), nominal: `+${def.happiness}`, now: null });
   if (st.cleanRadius) {

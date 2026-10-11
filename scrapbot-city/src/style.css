@@ -1698,6 +1698,8 @@ select {
   width: 280px;
   max-height: calc(100% - var(--top-r, 64px) - var(--dock, 186px) - 28px);
   overflow-y: auto;
+  /* thin, as in the other panels: a full-width scrollbar takes the room of the labels in the module cards */
+  scrollbar-width: thin;
   padding: 0 0 12px;
 }
 
@@ -2031,9 +2033,14 @@ select {
 }
 
 /* the module slots of a Dock or a Smelter */
+/* (a little wider than the panel's text: its own border and padding already set its content in) */
+.inspector > .insp-mod {
+  margin-inline: 8px;
+}
+
 .insp-mod {
   margin-bottom: 8px;
-  padding: 8px;
+  padding: 8px 6px 8px 8px;
   background: rgba(18, 11, 41, 0.45);
   border: 2px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--r-s);
@@ -2080,6 +2087,16 @@ select {
 .inspector .mod-fx {
   margin-block: 8px;
   font-size: 13px;
+}
+
+/* a module card's numbers sit closer together than the building's (the card is narrower): "Parts used / min" and
+   "Scrap used / min" keep one line next to "600 → 900" and the value now */
+.inspector .mod-fx.with-now {
+  column-gap: 6px;
+}
+
+.inspector .mod-fx dd.now {
+  min-width: 2em;
 }
 
 .mod-fx dd b {

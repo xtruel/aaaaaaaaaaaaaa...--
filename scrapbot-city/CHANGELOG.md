@@ -7,6 +7,13 @@
   prima, e non ricompra un modulo appena tolto (prima la soglia era 350 ms: una rimozione seguita da «Installa» dopo
   352–450 ms ricomprava il modulo a prezzo pieno contro metà rimborso). Una pressione a sé sulla conferma, dopo, funziona
   come prima. La stessa soglia vale per il secondo clic che raggiunge l'edificio nascosto dietro un altro.
+- **Pannello dell'edificio**: la riga del deposito ha di nuovo la sua unità («180 rottami», non «180»); nelle schede
+  dei moduli «Pezzi usati / min» e «Rottami usati / min» restano su una riga anche con la barra di scorrimento (colonne
+  un po' più strette, barra sottile come negli altri pannelli; nelle lingue più lunghe le etichette vanno a capo tra
+  le parole, mai dentro una parola). La descrizione di un edificio dice i suoi numeri veri: il Purificatore con
+  l'ugello «nel raggio di 8 caselle», la Capsule Bot con la capsula 9 alloggi, il Campo Solare coi pannelli +7, il
+  Riciclatore col selezionatore 3 pezzi, il Bot Dock col deposito aggiuntivo +180; senza modulo, e nella barra degli
+  strumenti, le parole di sempre.
 
 ## In lavorazione — incremento 2: le città della campagna nei loro temi
 

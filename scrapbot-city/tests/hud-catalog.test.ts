@@ -260,7 +260,7 @@ describe('building panel modules', () => {
     const on = q(insp, '[data-mod="dockStorage"]')!;
     expect(on.querySelector('.mod-count')!.textContent).toBe('1/1');
     // the building rows now show the storage with the module
-    expect(row(insp, 'Storage')).toEqual(['180', '180']);
+    expect(row(insp, 'Storage')).toEqual(['180 scrap', '180 scrap']);
     const clock = vi.spyOn(performance, 'now').mockReturnValue(10_000);
     try {
       q(on, '[data-remove]')!.click();
