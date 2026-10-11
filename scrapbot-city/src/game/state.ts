@@ -1,5 +1,7 @@
 import { BUILDINGS, DAY_LENGTH, DEFAULT_MODS, MAP_H, MAP_W, SMOG_DANGER, T, TILE } from './defs';
 import type { BuildingType, CityMods, Resource } from './defs';
+import { modulesFor, normRot, solidKind } from './piecedefs';
+import type { ModuleKind } from './piecedefs';
 import { generateMap } from './world';
 
 export type BuildingStatus = 'building' | 'ok' | 'idle' | 'noPower' | 'noInput' | 'noFuel' | 'reserve';
@@ -19,6 +21,8 @@ export interface Building {
   // path meter change this building really made when placed (after the ±100 clamp); demolishing undoes
   // exactly this. Missing in older saves: then the standard shift is used.
   align?: number;
+  // machine modules installed (absent = none; never two of the same kind; catalog order)
+  modules?: ModuleKind[];
 }
 
 export type BotState = 'idle' | 'toJunk' | 'collect' | 'toDrop';
@@ -90,6 +94,8 @@ export interface Stats {
   industrialBuilt: number;
   catPets: number;
   partsMade: number;
+  piecesPlaced: number; // floors, fences, gates and lamps bought
+  modulesInstalled: number;
 }
 
 export interface Hints {
@@ -117,6 +123,9 @@ export interface GameState {
   amount: Uint16Array; // junk per tile
   occ: Int32Array; // building id per tile or -1 (derived, not saved)
   claims: Uint8Array; // bots heading to each junk tile (derived, not saved)
+  floor: Uint8Array; // industrial floor per tile: 0 none, 1 floor (stays under buildings, solids and junk)
+  solid: Uint8Array; // solid piece per tile: 0 none, 1 fence, 2 gate, 3 lamp (never on a building's tiles)
+  rot: Uint8Array; // rotation of the solid piece on each tile (0..3)
   buildings: Building[];
   nextId: number;
   bots: Bot[];
@@ -210,6 +219,9 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     amount: map.amount,
     occ: new Int32Array(MAP_W * MAP_H).fill(-1),
     claims: new Uint8Array(MAP_W * MAP_H),
+    floor: new Uint8Array(MAP_W * MAP_H),
+    solid: new Uint8Array(MAP_W * MAP_H),
+    rot: new Uint8Array(MAP_W * MAP_H),
     buildings: [],
     nextId: 1,
     bots: [],
@@ -237,7 +249,7 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     eventsSeen: [],
     eventLast: {},
     objective: 0,
-    stats: { scrapCollected: 0, built: 0, cleaned: 0, creditsEarned: 0, maxPollution: mods.startPollution, industrialBuilt: 0, catPets: 0, partsMade: 0 },
+    stats: { scrapCollected: 0, built: 0, cleaned: 0, creditsEarned: 0, maxPollution: mods.startPollution, industrialBuilt: 0, catPets: 0, partsMade: 0, piecesPlaced: 0, modulesInstalled: 0 },
     outcome: null,
     derived: emptyDerived(),
     dirtyTiles: [],
@@ -274,7 +286,9 @@ export function addBuilding(s: GameState, type: BuildingType, x: number, y: numb
   s.buildings.push(b);
   for (let dy = 0; dy < def.h; dy++) {
     for (let dx = 0; dx < def.w; dx++) {
-      s.occ[idx(x + dx, y + dy)] = b.id;
+      const i = idx(x + dx, y + dy);
+      s.occ[i] = b.id;
+      if (s.floor[i]) s.dirtyTiles.push(i); // the floor under it is covered now
     }
   }
   return b;
@@ -285,7 +299,9 @@ export function removeBuilding(s: GameState, b: Building): void {
   s.buildings = s.buildings.filter((o) => o.id !== b.id);
   for (let dy = 0; dy < def.h; dy++) {
     for (let dx = 0; dx < def.w; dx++) {
-      s.occ[idx(b.x + dx, b.y + dy)] = -1;
+      const i = idx(b.x + dx, b.y + dy);
+      s.occ[i] = -1;
+      if (s.floor[i]) s.dirtyTiles.push(i); // the floor under it shows again
     }
   }
 }
@@ -305,18 +321,28 @@ export function pushMessage(s: GameState, text: string, tone: MessageTone = 'inf
 // ---------- save / load ----------
 
 // Everything except the map arrays (stored compactly) and runtime-only data.
-type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages'> & {
+// Pieces (0.7) are stored sparsely: `floors` lists the floored tile indexes, `solids` the [index, kind, rot]
+// of every fence/gate/lamp (kind as in GameState.solid). Both are optional: 0.6 saves have neither.
+type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' | 'solid' | 'rot' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages'> & {
   tiles: string;
   amount: number[];
+  floors?: number[];
+  solids?: [number, number, number][];
 };
 
 export function serialize(s: GameState): string {
-  const { tiles, amount, occ: _occ, claims: _claims, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
+  const { tiles, amount, occ: _occ, claims: _claims, floor, solid, rot, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
   // bots are not saved: the scrap they carry goes into storage (as far as it fits) instead of vanishing
   const carried = s.bots.reduce((n, b) => n + b.carry, 0);
   const room = Math.max(0, (s.derived.storage || 0) - s.res.scrap);
   const res = { ...rest.res, scrap: rest.res.scrap + Math.min(carried, room) };
-  const data: SaveData = { ...rest, res, tiles: Array.from(tiles).join(''), amount: Array.from(amount) };
+  const floors: number[] = [];
+  const solids: [number, number, number][] = [];
+  for (let i = 0; i < floor.length; i++) {
+    if (floor[i]) floors.push(i);
+    if (solid[i]) solids.push([i, solid[i], rot[i]]);
+  }
+  const data: SaveData = { ...rest, res, tiles: Array.from(tiles).join(''), amount: Array.from(amount), floors, solids };
   return JSON.stringify(data);
 }
 
@@ -330,9 +356,10 @@ export function deserialize(json: string): GameState {
   // Start from a fresh city so fields added in newer versions get sane defaults.
   const base = createGame({ seed: 1 });
   const spireDone = d.spireDone ?? d.buildings.some((b) => b.type === 'spire' && b.built >= 1);
+  const { floors, solids, ...saved } = d;
   const s: GameState = {
     ...base,
-    ...(d as Omit<SaveData, 'tiles' | 'amount'>),
+    ...(saved as Omit<SaveData, 'tiles' | 'amount' | 'floors' | 'solids'>),
     version: SAVE_VERSION,
     mods: { ...DEFAULT_MODS, ...(d.mods ?? {}) },
     stats: { ...base.stats, maxPollution: d.pollution ?? 0, ...(d.stats ?? {}) },
@@ -344,6 +371,9 @@ export function deserialize(json: string): GameState {
     amount: Uint16Array.from(d.amount),
     occ: new Int32Array(size).fill(-1),
     claims: new Uint8Array(size),
+    floor: new Uint8Array(size),
+    solid: new Uint8Array(size),
+    rot: new Uint8Array(size),
     buildings: [],
     bots: [],
     derived: emptyDerived(),
@@ -356,7 +386,24 @@ export function deserialize(json: string): GameState {
   for (const b of d.buildings) {
     const placed = addBuilding(s, b.type, b.x, b.y, b.id);
     Object.assign(placed, { paused: false }, b);
+    // only modules that fit this building, each once (a hand-edited save cannot stack two filters)
+    const modules = modulesFor(placed.type, placed.modules);
+    if (modules.length) placed.modules = modules;
+    else delete placed.modules;
   }
   s.nextId = Math.max(d.nextId, ...s.buildings.map((b) => b.id + 1));
+  const valid = (i: unknown): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < size;
+  if (Array.isArray(floors)) for (const i of floors) if (valid(i)) s.floor[i] = 1;
+  if (Array.isArray(solids)) {
+    for (const entry of solids) {
+      if (!Array.isArray(entry)) continue;
+      const [i, code, r] = entry;
+      const kind = solidKind(Number(code));
+      // a solid piece never shares a tile with a building
+      if (!valid(i) || !kind || s.occ[i] !== -1) continue;
+      s.solid[i] = Number(code);
+      s.rot[i] = normRot(kind, Number(r));
+    }
+  }
   return s;
 }

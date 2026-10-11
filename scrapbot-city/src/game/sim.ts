@@ -16,6 +16,7 @@ import {
 import { addWaste, canAfford, costText, gain, partsReserve, pay, setTile, spawnJunk } from './actions';
 import { bName, t, tk } from '../i18n';
 import { cityById, goalText, updateStars } from './cities';
+import { buildingStats } from './piecedefs';
 import { FREE_HINTS, buildingCenter, day, findBuilding, idx, inBounds, pushMessage } from './state';
 import type { Bot, Building, GameState } from './state';
 import { OBJECTIVES, endingFor, endingTitle, objectiveText, pickEvent } from './story';
@@ -124,10 +125,11 @@ export function computeDerived(s: GameState): void {
   for (const b of s.buildings) {
     if (b.built < 1) continue;
     const def = BUILDINGS[b.type];
-    if (def.energy > 0 && (!def.fuel || b.fuel > 0)) d.energyProd += def.energy;
-    if (def.energy < 0 && !b.paused) d.energyUse -= def.energy;
+    const st = buildingStats(b); // energy and storage with the modules installed
+    if (st.energy > 0 && (!def.fuel || b.fuel > 0)) d.energyProd += st.energy;
+    if (st.energy < 0 && !b.paused) d.energyUse -= st.energy;
     d.housing += def.housing ?? 0;
-    d.storage += def.storage ?? 0;
+    d.storage += st.storage;
     d.botTarget += def.bots ?? 0;
     happy += def.happiness ?? 0;
   }
@@ -149,7 +151,7 @@ function tickBuilding(s: GameState, b: Building, dt: number, overtime: number): 
     runProcess(s, b, dt * d.efficiency * overtime);
   } else if (def.fuel) {
     b.status = b.fuel > 0 ? 'ok' : 'noFuel';
-  } else if (def.energy < 0 && d.efficiency <= 0) {
+  } else if (buildingStats(b).energy < 0 && d.efficiency <= 0) {
     b.status = 'noPower';
   } else {
     b.status = 'ok';
@@ -213,15 +215,16 @@ function updatePollution(s: GameState, dt: number, overtime: number): void {
   for (const b of s.buildings) {
     if (b.built < 1) continue;
     const def = BUILDINGS[b.type];
-    if (def.pollution > 0) {
+    const st = buildingStats(b); // a Smelter filter lowers the Smelter's pollution
+    if (st.pollution > 0) {
       if (def.fuel) {
-        if (b.fuel > 0) rate += def.pollution * overtime;
+        if (b.fuel > 0) rate += st.pollution * overtime;
       } else if (b.status === 'ok') {
-        rate += def.pollution * overtime * s.derived.efficiency;
+        rate += st.pollution * overtime * s.derived.efficiency;
       }
-    } else if (def.pollution < 0 && !b.paused) {
-      const power = def.energy < 0 ? s.derived.efficiency : 1;
-      rate += def.pollution * power;
+    } else if (st.pollution < 0 && !b.paused) {
+      const power = st.energy < 0 ? s.derived.efficiency : 1;
+      rate += st.pollution * power;
     }
   }
   let sludge = 0;
@@ -339,7 +342,7 @@ function checkObjectives(s: GameState): void {
 // ---------- bots ----------
 
 function dropoffs(s: GameState): Building[] {
-  return s.buildings.filter((b) => b.built >= 1 && (BUILDINGS[b.type].storage ?? 0) > 0);
+  return s.buildings.filter((b) => b.built >= 1 && buildingStats(b).storage > 0);
 }
 
 function syncBots(s: GameState): void {
