@@ -1007,7 +1007,8 @@ export class Hud {
   }
 
   // A selected piece (floor, fence, gate, lamp or decoration): what it is, that it is only for looks, Rotate and
-  // Remove with what it really gives back (markPieceRefund keeps that up to date).
+  // Remove with what it really gives back (markPieceRefund keeps that up to date), then what it is like. The buttons
+  // come before the description, so on a short window (1024x640) they are in sight without scrolling the panel.
   private renderPiece(info: PieceInfo, i: number): void {
     const panel = this.el.inspector;
     panel.style.setProperty('--path', 'var(--muted)');
@@ -1021,12 +1022,12 @@ export class Hud {
         <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
       </div>
       <p class="insp-status piece-note">${t('insp.decoration')}</p>
-      <p class="insp-desc">${esc(catalogEffect(info.kind))}</p>
-      <p class="insp-warn" data-scrap-room hidden></p>
       <div class="insp-actions">
         ${info.rotatable ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
         ${info.removable ? `<button type="button" class="btn" data-remove-piece></button>` : ''}
-      </div>`;
+      </div>
+      <p class="insp-warn" data-scrap-room hidden></p>
+      <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;
     this.markPieceRefund(info);
     panel.querySelector('[data-close]')!.addEventListener('click', () => this.handlers.onCloseInspector());
     panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotatePiece(i));
