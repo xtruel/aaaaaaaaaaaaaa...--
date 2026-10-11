@@ -1570,6 +1570,285 @@ select {
   padding: 7px 12px;
 }
 
+/* Objects & modules: a side panel in the building panel's place; its head and the tool in hand stay put while
+   the list scrolls on short windows */
+.catalog {
+  --path: var(--pink);
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  overflow: hidden;
+}
+
+.catalog .insp-head {
+  flex: none;
+  padding-block: 8px;
+}
+
+.cat-head .tool-plate {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.cat-head .tool-plate img {
+  width: 32px;
+  height: 32px;
+}
+
+.cat-tool {
+  flex: none;
+  margin-top: 10px;
+  padding: 8px 10px 10px;
+  background: rgba(18, 11, 41, 0.55);
+  border: 2px solid var(--lime);
+  border-radius: var(--r-s);
+}
+
+.cat-help {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.cat-help b {
+  font-family: var(--f-display);
+  font-weight: 400;
+  font-size: 15px;
+  color: var(--lime);
+}
+
+.cat-help kbd {
+  font-size: 10px;
+  padding: 0 4px;
+}
+
+.cat-tool-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.cat-tool-btns .btn {
+  flex: 1;
+  justify-content: center;
+  padding: 6px 10px;
+  font-size: 15px;
+}
+
+/* Rotate: the turning arrow next to the word, in the middle of the button */
+.btn.btn-turn {
+  justify-content: center;
+  gap: 8px;
+}
+
+.cat-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.cat-section {
+  margin: 8px 0 4px;
+  font-family: var(--f-display);
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cat-note {
+  margin: -2px 0 5px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 8px 3px 4px;
+  text-align: left;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(26, 16, 51, 0.7);
+  border-radius: var(--r-s);
+}
+
+.cat-item:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.cat-item.active {
+  background: rgba(198, 244, 50, 0.16);
+  border-color: var(--lime);
+}
+
+.cat-item.cant .cat-pic,
+.cat-item.cant .cat-name {
+  opacity: 0.6;
+}
+
+.cat-item.cant .cost {
+  color: var(--red);
+}
+
+.cat-pic {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 44px;
+  flex: none;
+}
+
+.cat-pic img,
+.insp-head .cat-plate img {
+  width: 64px;
+  height: 44px;
+}
+
+.cat-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.cat-top .tool-cost {
+  flex: none;
+  margin-top: 0;
+}
+
+.cat-name {
+  font-family: var(--f-display);
+  font-size: 16px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+.cat-effect {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.cat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.cat-limit {
+  color: var(--muted);
+}
+
+.cat-reason {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--red);
+}
+
+.cat-meta .cat-reason {
+  font-size: inherit;
+}
+
+/* the module slots of a Dock or a Smelter */
+.insp-mod {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: rgba(18, 11, 41, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-s);
+}
+
+.insp-mod.on {
+  border-color: rgba(198, 244, 50, 0.55);
+}
+
+.mod-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mod-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mod-title b {
+  font-family: var(--f-display);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.mod-title small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mod-count {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.insp-mod.on .mod-count {
+  color: var(--lime);
+}
+
+.inspector .mod-fx {
+  margin-block: 8px;
+  font-size: 13px;
+}
+
+.mod-fx dd b {
+  color: var(--lime);
+}
+
+.insp-mod .btn .tool-cost {
+  margin-top: 0;
+}
+
+.insp-mod .cat-reason {
+  margin-top: 6px;
+}
+
+.insp-warn {
+  margin-block: 8px 6px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--yellow);
+}
+
+.piece-note {
+  font-family: var(--f-body);
+  font-size: 14px;
+  color: var(--muted);
+}
+
 /* build dock */
 
 .toolbar {
@@ -1771,6 +2050,53 @@ select {
 
 .tool.cant .cost {
   color: var(--red);
+}
+
+/* The Tools column: the bulldozer and the Objects & modules catalog as two half-height cards, one above the
+   other, with the picture beside the name, so the build bar does not get any wider */
+.group-tools-misc .group-tools {
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tool.tool-mini {
+  flex: 1 1 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  width: 116px;
+  padding: 3px 4px 3px 3px;
+}
+
+.tool.tool-mini .tool-plate {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.tool.tool-mini .tool-plate img {
+  width: 24px;
+  height: 24px;
+}
+
+.tool-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tool-mini .tool-name {
+  font-size: 12px;
+  line-height: 1.05;
+  text-align: left;
+}
+
+.tool-mini .tool-cost {
+  justify-content: flex-start;
+  margin-top: 0;
 }
 
 .tooltip {
@@ -3268,14 +3594,27 @@ body.crt-on .crt {
     min-width: 30px;
     padding: 0 6px;
   }
+
+  /* the build bar exactly fits 1280 px: slightly closer groups leave the Tools column its room */
+  .toolbar {
+    gap: 8px;
+  }
 }
 
 /* Below 1280 px the twelve full cards no longer fit: compact cards with the exact half-size picture (the plain
    1x sprite, still crisp) and tighter gaps keep the whole build bar on screen down to 1024 px. */
 @media (max-width: 1279px) {
   .toolbar {
-    gap: 8px;
+    gap: 6px;
     padding-inline: 8px;
+  }
+
+  .tool.tool-mini {
+    width: 110px;
+  }
+
+  .tool-mini .tool-name {
+    font-size: 11px;
   }
 
   .group-tools {
