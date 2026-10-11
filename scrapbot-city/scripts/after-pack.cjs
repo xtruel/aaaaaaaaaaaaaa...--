@@ -68,6 +68,48 @@ async function editWindowsExe(context) {
   console.log(`  • after-pack: ${exeName} icon (${ico.icons.length} sizes) and version info ${info.productName} ${info.version} set`);
 }
 
+// Both platforms: the licences of what the game ships that is not ours, in <install folder>/licenses/. The six fonts
+// are inside dist/index.html; SIL OFL 1.1 and Apache 2.0 ask for their copyright notice and licence text to travel
+// with them. Electron's and Chromium's licences are already in the root (LICENSE.electron.txt, LICENSES.chromium.html).
+const FONTS = [
+  ['bungee', 'Bungee'],
+  ['dotgothic16', 'DotGothic16'],
+  ['lilita-one', 'Lilita One'],
+  ['nunito', 'Nunito'],
+  ['permanent-marker', 'Permanent Marker'],
+  ['silkscreen', 'Silkscreen'],
+];
+function writeNotices(context) {
+  const root = context.packager.projectDir;
+  const dir = path.join(context.appOutDir, 'licenses');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(path.join(dir, 'fonts'), { recursive: true });
+  const lines = [
+    'Scrapbot City - third-party components',
+    '',
+    'Fonts (embedded in the game, from the @fontsource npm packages):',
+  ];
+  for (const [pkg, family] of FONTS) {
+    const base = path.join(root, 'node_modules', '@fontsource', pkg);
+    const meta = JSON.parse(fs.readFileSync(path.join(base, 'package.json'), 'utf8'));
+    const text = fs.readFileSync(path.join(base, 'LICENSE'), 'utf8');
+    const copyright = (text.match(/^Copyright[^\n]*/m) ?? [''])[0].trim();
+    fs.writeFileSync(path.join(dir, 'fonts', `${pkg}-LICENSE.txt`), text);
+    lines.push(`  ${family} - ${meta.license}${copyright ? ` - ${copyright}` : ''} - fonts/${pkg}-LICENSE.txt`);
+  }
+  const sw = path.join(root, 'node_modules', 'steamworks.js');
+  if (fs.existsSync(sw)) {
+    fs.copyFileSync(path.join(sw, 'LICENSE'), path.join(dir, 'steamworks.js-LICENSE.txt'));
+    const v = JSON.parse(fs.readFileSync(path.join(sw, 'package.json'), 'utf8')).version;
+    lines.push('', `steamworks.js ${v} - MIT - steamworks.js-LICENSE.txt`);
+    lines.push('Steamworks API (steam_api64.dll / libsteam_api.so) - (c) Valve Corporation, redistributed under the Steamworks SDK Access Agreement');
+  }
+  lines.push('', 'Electron - MIT - ../LICENSE.electron.txt', 'Chromium and its components - ../LICENSES.chromium.html', '');
+  fs.writeFileSync(path.join(dir, 'THIRD-PARTY-NOTICES.txt'), lines.join('\n'));
+  console.log(`  • after-pack: licenses/ written (${FONTS.length} fonts${fs.existsSync(sw) ? ', steamworks.js' : ''})`);
+}
+
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName === 'win32') await editWindowsExe(context);
+  writeNotices(context);
 };

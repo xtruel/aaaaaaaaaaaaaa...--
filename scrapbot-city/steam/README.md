@@ -15,6 +15,9 @@ La guida completa (account, pagina del negozio, achievement, Steam Cloud, uscita
 | `achievements.csv` | i 18 achievement da creare in Steamworks (API name, nome, descrizione, nascosto) |
 | `achievements_i18n.csv` | gli stessi nomi e descrizioni nelle 8 lingue del gioco |
 | `store-assets/` | grafica per la pagina del negozio: vedi [store-assets/README.md](store-assets/README.md) |
+| `STORE-COPY.md` | testi della pagina (inglese e italiano), requisiti di sistema da confermare, tag |
+| `ASSETS-PROVENANCE.md` | da dove viene ogni immagine, licenze di font e componenti, che cosa deve confermare il titolare |
+| `CONTENT-SURVEY-DRAFT.md` | bozza del questionario sui contenuti, con la dichiarazione sull'IA |
 | `content/` | la build da caricare, creata da `npm run dist:steam` (non è in git) |
 | `output/` | log e cache di steamcmd (non è in git) |
 | `steamcmd/` | posto consigliato per steamcmd (non è in git) |
@@ -90,6 +93,8 @@ npm run dist:steam
 
 Crea `steam/content/windows` e `steam/content/linux` (la build Windows si fa anche da Linux, senza wine).
 `steam_appid.txt` (che serve solo per i test locali) non viene mai copiato, e comunque i depot lo escludono.
+Ogni build contiene anche `licenses/` (licenze dei font e di steamworks.js). Poi controlla i moduli nativi:
+`npm run steam:check` (e su Linux `xvfb-run -a npm run steam:launch-check`), vedi docs/STEAM.md sezione 5.
 
 ## Passo 5 — Prova a vuoto, poi caricamento sul ramo beta
 

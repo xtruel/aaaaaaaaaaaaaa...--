@@ -2,141 +2,189 @@
 
 Il gioco è una pagina HTML impacchettata con **Electron**: stesso codice per browser e desktop, una build per
 Windows e una per Linux (che usa anche lo Steam Deck). Questa guida va dall'account Steamworks al pulsante
-"Release". Non serve esperienza con Steamworks: segui i passi **in ordine**; ognuno dice dove cliccare e quale
-file del progetto usare. I nomi dei menu di Steamworks sono in inglese, come li vedrai sul sito.
+"Release". Segui i passi **in ordine**; ognuno dice dove cliccare e quale file del progetto usare. I nomi dei menu di
+Steamworks sono in inglese, come li vedrai sul sito.
 
-Per la sola parte "caricare i file" c'è **[steam/README.md](../steam/README.md)**; per la grafica del negozio
-**[steam/store-assets/README.md](../steam/store-assets/README.md)**.
+| Per… | Leggi |
+|---|---|
+| caricare i file (SteamPipe, steamcmd, errori) | [steam/README.md](../steam/README.md) |
+| la grafica del negozio | [steam/store-assets/README.md](../steam/store-assets/README.md) |
+| provenienza e licenze della grafica, dei font e dell'audio | [steam/ASSETS-PROVENANCE.md](../steam/ASSETS-PROVENANCE.md) |
+| i testi della pagina (inglese e italiano), requisiti, tag | [steam/STORE-COPY.md](../steam/STORE-COPY.md) |
+| il questionario sui contenuti e la dichiarazione sull'IA | [steam/CONTENT-SURVEY-DRAFT.md](../steam/CONTENT-SURVEY-DRAFT.md) |
+| il trailer (registrazione dal gioco, riproducibile) | [scripts/trailer/README.md](../scripts/trailer/README.md) |
+
+**Le regole di questo ramo.** Il lavoro per Steam vive sul ramo `steam-package`, **separato** dal ramo del gioco
+finché l'integrazione non è verificata: non contiene ancora la 0.7 (le build di oggi sono costruite dalla **0.6.0**).
+Qui nessuno ha un App ID, un account Steamworks, il client Steam, un PC Windows o uno Steam Deck: **niente è stato
+caricato, pubblicato, pagato o configurato su Steam**, e nessuna funzione di Steam è dichiarata funzionante senza una
+prova vera. Pubblicare, cambiare prezzi, spendere soldi o mettere una build sul ramo pubblico richiedono la **tua**
+approvazione esplicita.
 
 ## La lista in breve
 
 - [ ] 1. Account Steamworks, quota Steam Direct, dati fiscali e bancari — *avviala subito: è la parte più lenta*
-- [ ] 2. Creare l'app e scrivere App ID e depot nel progetto
-- [ ] 3. Pagina del negozio (testi, grafica, lingue, requisiti) e questionario sui contenuti
+- [ ] 2. Creare l'app, i depot e il ramo `beta`; scrivere App ID e depot nel progetto (SteamPipe, sezione 2)
+- [ ] 3. Pagina del negozio: testi, grafica, trailer, lingue, requisiti, questionario sui contenuti
 - [ ] 4. Depot, opzioni di avvio, runtime Linux, componenti da installare
-- [ ] 5. Build con `npm run dist:steam`
-- [ ] 6. Caricamento con `steam/upload.sh`
-- [ ] 7. Prova sul ramo `beta` (Windows, Linux, Steam Deck)
-- [ ] 8. Achievement
-- [ ] 9. Steam Cloud
-- [ ] 10. Controller e revisione Steam Deck
-- [ ] 11. Dichiarazione dei contenuti fatti con l'IA
-- [ ] 12. Prezzo
-- [ ] 13. Pagina "Coming Soon" e Steam Next Fest
-- [ ] 14. Uscita
+- [ ] 5. Ricostruire le build Steam dalla **0.7.0-beta.1 verificata** e rifare i controlli nativi (sezione 5)
+- [ ] 6. Caricare sul ramo `beta` e provare su Windows, Linux e Steam Deck (sezione 6)
+- [ ] 7. Achievement · 8. Steam Cloud · 9. Controller e revisione Steam Deck
+- [ ] 10. Dichiarazione sull'IA (nel questionario) · 11. Prezzo (lo decidi tu)
+- [ ] 12. Pagina "Coming Soon" e Steam Next Fest · 13. Uscita (lista di controllo finale)
 
-## 0. Dove siamo (build 0.6.0, ottobre 2026)
+## 0. Dove siamo — stato onesto (11 ottobre 2026)
 
-### Cosa c'è già nel progetto
+Quattro parole, sempre con lo stesso significato:
+- **Fatto**: è nel repository (codice, script, file).
+- **Generato**: i file sono stati prodotti (build, immagini, video) ma **non** sono stati avviati o provati sul sistema
+  a cui sono destinati.
+- **Verificato qui**: provato davvero su questa macchina — **Linux x64 (Ubuntu 24.04, glibc 2.39), senza client
+  Steam, senza GPU (Xvfb, rendering software)**.
+- **Da verificare (titolare)**: si può provare solo con Windows, uno Steam Deck o il client Steam con l'App ID vero.
 
-| Cosa | Dove |
-|---|---|
-| App desktop (finestra 1280×800, F11 schermo intero, uscita, link esterni nel browser) | `electron/main.cjs` |
-| Ponte sicuro gioco ↔ desktop (`window.scrapbotDesktop`) | `electron/preload.cjs` |
-| **Salvataggi su file** (uno per chiave, scrittura atomica + copia `.bak`), pronti per Steam Cloud | `electron/main.cjs`, `src/storage.ts` |
-| **Controller** (Steam Deck, Xbox, PlayStation): menu col D-pad, cursore virtuale in città | `src/gamepad.ts`, `src/session.ts` |
-| **8 lingue**: inglese, italiano, tedesco, francese, spagnolo, portoghese, polacco, olandese | `src/i18n/` |
-| 18 achievement nel gioco, inviati a Steam tramite `steamworks.js` 0.4.0 (installato) | `src/achievements.ts`, `steam/achievements.csv` |
-| Build per Steam (cartelle, non installer), Windows + Linux anche da Linux, senza wine | `npm run dist:steam` → `steam/content/windows`, `steam/content/linux` |
-| Icona e dati della versione dentro `Scrapbot City.exe` | `scripts/after-pack.cjs`, icone in `build/` |
-| Script SteamPipe (App ID e depot da compilare) e caricamento senza password nei file | `steam/sdk/*.vdf`, `steam/upload.sh`, `steam/upload.bat` |
-| Grafica del negozio: 4 capsule, 6 screenshot, 4 immagini della libreria, eventi, icone | `steam/store-assets/` |
-| Prova locale dell'app desktop | `npm run desktop` |
+I test fatti qui usano il **vero** modulo steamworks.js (non un sostituto): dimostrano che si carica e che il gioco
+regge l'assenza di Steam. **Non** dimostrano che achievement, overlay, Cloud o tastiera del Deck funzionino con Steam:
+quello si vede solo sul ramo beta.
 
-### Stato dell'integrazione Steam — onesto
-
-| Funzione | Stato | Note |
+| Cosa | Stato | Dettagli |
 |---|---|---|
-| Achievement nel gioco (18, salvati sul PC) | ✔ funzionano | verificati nelle partite di prova |
-| Achievement **su Steam** | ⏳ **manca solo l'App ID** | `steamworks.js` 0.4.0 è installato e incluso nelle build (moduli nativi Windows x64 e Linux x64, `steam_api64.dll`, `libsteam_api.so`). Senza client Steam il gioco scrive `Steam not available` nel log e gira normalmente. Due condizioni, vedi sezioni 4 e 8: su Windows serve il **Visual C++ 2015-2022 (x64)** (da spuntare in Steamworks); su Linux serve glibc 2.34 o più nuova (c'è sullo Steam Deck e sulle distribuzioni recenti) |
-| Salvataggi su file (scrittura atomica + `.bak`, ripresa dalla copia se il file è rovinato) | ✔ fatto e testato | `tests/storage.test.ts`, `tests/saves.test.ts` |
-| **Steam Cloud** | ⏳ **da configurare in Steamworks** | il gioco scrive già i file nella cartella giusta; resta da attivare Auto-Cloud (sezione 9). Si prova solo con l'app su Steam |
-| Overlay di Steam e tastiera a schermo del Deck | ⏳ da provare col client Steam | il codice c'è; si verifica solo col gioco avviato da Steam (sezione 7) |
-| Controller / Steam Deck (1280×800) | ✔ testato | D-pad, cursore virtuale, menu, pausa; con `SteamDeck=1` parte a schermo intero |
-| Build Linux nel **Steam Linux Runtime 3.0 (sniper)** | ✔ provata, senza client Steam | avviata con i file del runtime di Valve (versione 3.0.20260805) in un contenitore preparato a mano, non dal client Steam: tutte le librerie trovate, menu a 1280×800, sandbox di Chromium attiva come utente normale, salvataggi in `~/.config/Scrapbot City/saves`. Al runtime **4.0** mancano librerie che Electron richiede (vedi sezione 4) |
-| Build Windows | ⚠ **mai avviata su Windows** | costruita da Linux e controllata leggendone le risorse (icona, versione, DLL). Va provata sul ramo beta (sezione 7) |
-| Script di caricamento | ✔ scritti e provati a vuoto | controlli e comandi provati su Linux con uno steamcmd finto; il vero caricamento richiede App ID e account |
-| Grafica del negozio | ✔ pronta | `steam/store-assets/README.md`. Mancano il **trailer** e le **icone degli achievement** |
+| Build Linux per Steam (`steam/content/linux`, 90 file, 271,0 MiB) | **Generato** e **verificato qui** | costruita l'11/10 dalla 0.6.0 (`npm run dist:steam`); avviata senza client Steam: menu in <1 s, una città gira, salvataggi in `~/.config/Scrapbot City/saves`, "Quit" chiude con codice 0, nessun errore nella pagina (`npm run steam:launch-check`) |
+| Build Windows per Steam (`steam/content/windows`, 90 file, 277,6 MiB) | **Generato** | costruita da Linux; l'exe è Electron 33.4.11 con icona e dati di versione; **mai avviata su Windows** |
+| steamworks.js 0.4.0 contro Electron 33.4.11 | **Verificato qui** (Linux) · **controllo statico** (Windows) | sezione 5 |
+| Comportamento senza Steam | **Verificato qui** (Linux) | `Steam not available: Failed to load module '…/steamclient.so'` nel log, il gioco continua; tastiera del Deck: il gioco riceve "no" e usa i suoi campi; achievement: chiamata ignorata |
+| Achievement su Steam | **Da verificare** | servono App ID, i 18 achievement creati in Steamworks (sezione 7) e il client Steam |
+| Overlay di Steam (Shift+Tab) | **Da verificare** | il codice c'è (`electronEnableSteamOverlay`); si vede solo avviando da Steam |
+| Steam Cloud | **Da configurare** e **da verificare** | il gioco scrive i file nella cartella giusta (verificato qui su Linux; su Windows solo dal codice); configurazione in sezione 8 |
+| Steam Deck | **Da verificare** | nessun Deck qui; `SteamDeck=1` (schermo intero) provato in passato solo impostando la variabile a mano |
+| Controller | **Verificato solo con Gamepad API simulata** in Chromium (sessioni precedenti) | da provare con un controller vero e con Steam Input |
+| Build nel runtime Linux "sniper" | **Verificato** in passato **senza** client Steam (contenitore preparato a mano) | la prova vera è dal client Steam |
+| Script SteamPipe (`steam/sdk/*.vdf`, `upload.sh`, `upload.bat`) | **Fatto** | `node steam/prepare-upload.cjs --check` oggi rifiuta di partire per i segnaposto (verificato l'11/10); provati in passato con uno steamcmd finto; `upload.bat` mai provato su Windows |
+| Grafica del negozio | **Generato** | dimensioni tutte conformi alle regole attuali; screenshot del menu tolto dal set; screenshot da rifare sulla build finale; tre dubbi sul logo da decidere (ASSETS-PROVENANCE §5) |
+| Testi del negozio, requisiti, tag | **Bozza** | STORE-COPY.md (righe **[pending final build]** da controllare) |
+| Questionario sui contenuti | **Bozza** | CONTENT-SURVEY-DRAFT.md |
+| Trailer | **Fatto** (pipeline) · **Generato** (video di prova) | provato da capo a fondo l'11/10 sulla build del ramo principale (`04d782e`, 0.7.0-alpha.1): video di prova di 54 s, 1920×1080, 30 fps, H.264 9,8 Mbit/s, audio muto, più 11 schermate; fuori da git. Va rifatto sulla build finale |
+| Licenze di terzi nelle build | **Fatto** | cartella `licenses/` nelle due build (font OFL/Apache, steamworks.js MIT) |
 
-**Cosa devi fare tu** (nessuno può farlo al posto tuo): account e pagamenti (sezione 1), creare l'app e i depot (2),
-compilare la pagina e il questionario (3, 11), le impostazioni di Steamworks (4, 8, 9, 10), caricare e provare
-la build (6, 7), prezzo e date (12, 13), premere "Release" (14).
+**Cosa devi fare tu** (nessuno può farlo al posto tuo): account e pagamenti (1), creare app, depot e ramo beta (2),
+pagina, grafica, trailer e questionario (3, 10), impostazioni di Steamworks (4, 7, 8, 9), caricare e provare (6),
+prezzo e date (11, 12), premere "Release" (13).
 
 ## 1. Account Steamworks e quota
 
 1. Vai su <https://partner.steamgames.com>, crea l'account come **Qwerty3D Games** (azienda o persona fisica)
    e firma l'accordo di distribuzione.
-2. Completa **identità**, **questionario fiscale** (la verifica richiede 10–15 giorni lavorativi e può chiedere
-   documenti) e **conto bancario** (l'intestatario deve coincidere con il nome dato nella registrazione).
-3. Paga la quota **Steam Direct**: 100 USD per gioco, restituiti nel pagamento successivo al superamento di
-   1.000 USD di ricavi del gioco.
-4. Tra il pagamento della quota e l'uscita del gioco devono passare almeno **21 giorni** (vale per i primi titoli,
-   secondo la guida di Steamworks; la pagina pubblicitaria di Steam Direct dice ancora 30: conta 30 per sicurezza).
+2. Completa **identità**, **questionario fiscale** (la verifica può richiedere settimane e documenti) e **conto
+   bancario** (l'intestatario deve coincidere con il nome dato nella registrazione).
+3. Paga la quota **Steam Direct**: 100 USD per gioco, non rimborsabili ma recuperati nel pagamento successivo a quando
+   il gioco supera 1.000 USD di ricavi lordi rettificati. **È una spesa: la fai tu.**
+4. Tra il pagamento della quota e l'uscita devono passare **30 giorni** (vale per i primi titoli).
+   (Letto l'11/10/2026 su [Steam Direct](https://partner.steamgames.com/steamdirect).)
 
-Fallo subito: verifiche e attese sono la parte più lunga di tutto il percorso.
+## 2. SteamPipe passo per passo: App ID, depot, rami, caricamento
 
-## 2. Creare l'app e scrivere App ID e depot
+### 2.1 Cosa creare in Steamworks
 
-1. Dopo il pagamento Steamworks ti dà un "credito app": usalo per creare l'app **Scrapbot City**.
-   Steam le assegna un numero, l'**App ID**.
-2. Segui **[steam/README.md](../steam/README.md), passi 1 e 2**: scrivi l'App ID in `steam/sdk/app_build.vdf`
-   (al posto di `0000000`), crea i due depot (Windows e Linux + SteamOS) e scrivi i loro numeri al posto di
-   `0000001` e `0000002`. Aggiungi i depot al pacchetto **Developer Comp** e a quello in vendita.
-3. Crea un account Steam dedicato ai caricamenti con i soli permessi *Edit App Metadata* e
-   *Publish App Changes To Steam* (consiglio di Valve per la sicurezza).
-4. Per provare una build locale fuori dal client Steam (con Steam aperto e il tuo account):
-   `npm run steam:appid -- <AppID>` scrive `steam_appid.txt` accanto all'eseguibile in `release/`;
-   `npm run steam:appid -- --remove` lo toglie. Senza numero usa 480 (Spacewar, l'app di prova di Valve).
-   In alternativa la variabile d'ambiente `STEAM_APP_ID`. Quando è Steam ad avviare il gioco l'App ID arriva da solo,
-   e `steam_appid.txt` non finisce mai nei depot.
+| Cosa | Dove | Note |
+|---|---|---|
+| **L'app** "Scrapbot City" | dopo il pagamento, con il credito app | Steam le assegna un numero: l'**App ID** (lo vedi anche nell'indirizzo, `…/apps/landing/<AppID>`) |
+| **Depot Windows** | la tua app → **SteamPipe → Depots** | di solito App ID + 1; *Operating System*: **Windows**; *Architecture*: 64-bit; lingue: tutte (le 8 lingue sono dentro il gioco) |
+| **Depot Linux** | stessa pagina, *Add new depot* | di solito App ID + 2; *Operating System*: **Linux + SteamOS** (lo usa anche lo Steam Deck) |
+| Depot nei **pacchetti** | la tua app → *All Associated Packages, DLC, Demos and Tools* | aggiungi i due depot al pacchetto **Developer Comp** (senza, neanche tu scarichi i file) e a quello in vendita |
+| **Ramo `beta`** con password | **SteamPipe → Builds** → crea un ramo | va creato **prima** del caricamento; chi conosce la password lo sceglie in Steam → Proprietà → Beta |
+| **Account per i caricamenti** | il tuo gruppo Steamworks | consiglio di Valve: un account dedicato con i soli permessi *Edit App Metadata* e *Publish App Changes To Steam*; per mettere live una build di un gioco **già uscito** l'account deve avere un telefono o l'app Steam Mobile, e dopo un cambio di email/telefono Valve blocca la messa live per 3 giorni |
+
+Dopo ogni modifica alle impostazioni: **Publish** (*Prepare for Publishing* → *Publish to Steam*).
+(Regole lette l'11/10/2026 su [Uploading to Steam](https://partner.steamgames.com/doc/sdk/uploading).)
+
+### 2.2 Dove scrivere i numeri nel progetto
+
+| Segnaposto | Cosa è | File da modificare |
+|---|---|---|
+| `0000000` | App ID | `steam/sdk/app_build.vdf`, riga `"AppID"` |
+| `0000001` | depot Windows | `steam/sdk/app_build.vdf` (blocco `"Depots"`) **e** `steam/sdk/depot_build_windows.vdf` (riga `"DepotID"`) |
+| `0000002` | depot Linux | `steam/sdk/app_build.vdf` (blocco `"Depots"`) **e** `steam/sdk/depot_build_linux.vdf` (riga `"DepotID"`) |
+
+Esempio con App ID 1234560 (numeri **inventati**, solo per mostrare la forma: usa i tuoi):
+
+```
+"AppID" "1234560"
+"Depots"
+{
+	"1234561" "depot_build_windows.vdf"
+	"1234562" "depot_build_linux.vdf"
+}
+```
+
+Controllo senza caricare niente: `node steam/prepare-upload.cjs --check`. Si rifiuta di partire finché resta un
+segnaposto o se i numeri dei due file non coincidono (verificato l'11/10/2026: oggi elenca i 5 segnaposto).
+
+### 2.3 steamcmd (una volta sola)
+
+Istruzioni in [steam/README.md](../steam/README.md), passo 3 (`steam/steamcmd/`, escluso da git). La prima volta
+chiede password e codice **Steam Guard**, poi ricorda il login: nessuna password è scritta nei file.
+
+### 2.4 Costruire le build da caricare
+
+```bash
+npm run dist:steam
+```
+
+Dal **commit verificato** della 0.7.0-beta.1 (sezione 5: prima unisci il ramo del gioco in `steam-package`, solo
+quando la build finale è verificata). Crea `release/win-unpacked/` e `release/linux-unpacked/` (anche da Linux, senza
+wine) e li copia in `steam/content/windows` e `steam/content/linux`. `steam_appid.txt` non viene mai copiato. Fai la
+build su **Linux o macOS**: Windows non conserva il permesso "eseguibile" dei file Linux.
+
+### 2.5 Prova a vuoto, poi il ramo beta
+
+```bash
+steam/upload.sh <account_build> --preview      # legge tutto e scrive i log in steam/output, non carica niente
+steam/upload.sh <account_build> --beta beta    # carica i due depot e mette la build live SOLO sul ramo "beta"
+```
+
+Su Windows c'è `steam\upload.bat` con le stesse opzioni (mai provato su Windows; per il depot Linux carica da Linux,
+macOS o WSL). Alla fine deve comparire `Successfully finished AppID … build (BuildID …)`.
+
+### 2.6 Il ramo `default` (quello dei giocatori): mai da script
+
+- Gli script **non possono** mettere una build sul ramo `default`: Valve non lo permette (`SetLive` non accetta
+  `default`) e `upload.sh` si rifiuta anche se glielo chiedi.
+- Si fa **a mano** in **SteamPipe → Builds**, scegliendo il ramo `default` nella riga della build, **solo** dopo le
+  prove della sezione 6 e **solo con la tua decisione esplicita**. Prima dell'uscita la build sul `default` è quella
+  che Valve controlla in revisione; dopo l'uscita è quella che ricevono i giocatori.
+
+### 2.7 Provare una build fuori dal client Steam
+
+Con Steam aperto e il tuo account: `npm run steam:appid -- <AppID>` scrive `steam_appid.txt` accanto agli eseguibili
+in `release/`; `npm run steam:appid -- --remove` lo toglie (senza numero usa 480, l'app di prova di Valve). In
+alternativa la variabile `STEAM_APP_ID`. Quando è Steam ad avviare il gioco l'App ID arriva da solo.
 
 ## 3. Pagina del negozio
 
-Steamworks → la tua app → **Edit Store Page**. Va compilata e inviata in revisione **prima** della build.
-La revisione richiede di solito 3–5 giorni lavorativi: inviala almeno 7 giorni prima di quando vuoi la pagina online.
+Steamworks → la tua app → **Edit Store Page**. Va compilata e inviata in revisione **prima** della build; la revisione
+richiede alcuni giorni lavorativi.
 
-**Grafica** — tutti i file sono pronti in `steam/store-assets/`; la tabella completa (file → campo di Steamworks,
-dimensioni, origine) è in **[steam/store-assets/README.md](../steam/store-assets/README.md)**. In breve:
-
-| Sezione di Steamworks | File |
-|---|---|
-| Store Assets → Header / Small / Main / Vertical Capsule | `header_capsule_920x430.png`, `small_capsule_462x174.png`, `main_capsule_1232x706.png`, `vertical_capsule_748x896.png` |
-| Store Assets → Page Background (facoltativo) | `page_background_1438x810.png` |
-| Screenshots (almeno 1920×1080, 16:9) | `screenshots/` (6 immagini: menu, mappa della regione, città di giorno e di notte, pannello di un edificio, evento) |
-| Library Assets → Capsule / Header / Hero / Logo | `library_capsule_600x900.png`, `library_header_920x430.png`, `library_hero_3840x1240.png`, `library_logo_1280x720.png` |
-| Community Assets → App Icon (.jpg) e Shortcut Icon | `community_icon_184x184.jpg`, `shortcut_icon_256x256.png` (o `shortcut_icon.ico`) |
-| Event Cover / Event Header (per gli annunci) | `event_cover_800x450.png`, `event_header_1920x622.png` |
-
-Sulle capsule Steam ammette solo artwork, nome del gioco e sottotitolo: per questo gli slogan delle immagini
-originali sono stati tolti (spiegazione nel README della grafica). Dopo il caricamento controlla l'anteprima di
-Steamworks, soprattutto la posizione del logo sopra l'immagine *Hero*.
-
-**Trailer** (consigliato, oggi manca): 30–60 secondi. Apri con il bot che raccoglie spazzatura, poi la scelta
-"pianeta pulito o profitto?", poi le 5 città.
-
-**Testi**
-- Breve: *"Small robots, big choices. Turn the junk of the Scrap Coast into five living cities — and decide if they grow green or rich."*
-- La descrizione va tradotta a parte in Steamworks per ogni lingua: i testi del gioco in `src/i18n/` possono fare da base.
-- Tag consigliati: City Builder, Pixel Graphics, Cozy, Management, Choices Matter, Casual, Strategy, Cute.
-- Sviluppatore ed editore: Qwerty3D Games. Data di uscita: "Coming soon" finché non è decisa.
-
-**Lingue da spuntare** (colonna *Interface*; *Full Audio* e *Subtitles* no, non ci sono voci): English, Italian,
-German, French, Spanish - Spain, Portuguese - Portugal, Polish, Dutch. Il gioco sceglie da solo la lingua del sistema
-al primo avvio; si cambia dal pulsante col globo nel menu o dalle impostazioni.
-
-**Sistemi operativi e requisiti**: spunta **Windows** e **SteamOS + Linux** (non macOS: non c'è una build Mac).
-Minimo: Windows 10 64 bit (Electron non supporta più Windows 7 e 8) oppure SteamOS / Linux 64 bit recente;
-spazio su disco **350 MB** (le build occupano 278 MB su Windows e 272 MB su Linux). Processore, memoria e scheda video
-indicali dopo averlo provato su un PC modesto (è un gioco 2D in pixel art).
-
-**Questionario sui contenuti** (*Content Survey*): obbligatorio prima della revisione. Comprende i contenuti per adulti
-(qui nessuno), le classificazioni per età generate dalle risposte e la parte sull'IA (sezione 11).
+- **Testi** (breve e lungo, inglese e italiano), requisiti di sistema da confermare, tag proposti:
+  [steam/STORE-COPY.md](../steam/STORE-COPY.md). Le righe **[pending final build]** si tolgono o si confermano sulla
+  build finale: la pagina non deve promettere niente che il gioco non abbia.
+- **Grafica**: [steam/store-assets/README.md](../steam/store-assets/README.md) (file → campo di Steamworks). Regole
+  ricontrollate l'11/10/2026 sulle pagine attuali di Steamworks: tutte le dimensioni sono quelle in vigore; sulle
+  capsule solo artwork, nome del gioco ed eventuale sottotitolo ufficiale (slogan tolti); hero senza testo; logo
+  separato su sfondo trasparente. Restano **tre decisioni tue** (targa "2PM" e katakana nel logo, insegne nelle
+  illustrazioni) e gli **screenshot da rifare sulla build finale**: dettagli in
+  [steam/ASSETS-PROVENANCE.md](../steam/ASSETS-PROVENANCE.md), sezione 5.
+- **Trailer**: [scripts/trailer/README.md](../scripts/trailer/README.md). Steam lo vuole fino a 1920×1080, 30 o 60 fps,
+  H.264 + AAC in .mp4, 5.000+ kbit/s; consiglia che il primo trailer sia soprattutto gameplay con l'interfaccia
+  visibile. La pipeline produce esattamente questo dalla build di rilascio, senza testi né immagini aggiunte; manca
+  l'audio (sezione 4 del README del trailer).
+- **Lingue** (solo colonna *Interface*: niente *Full Audio* né *Subtitles*, il gioco non ha voci): English, Italian,
+  German, French, Spanish - Spain, Portuguese - Portugal, Polish, Dutch.
+- **Sistemi operativi**: **Windows** e **SteamOS + Linux**; non macOS (nessuna build Mac).
+- **Questionario sui contenuti** (obbligatorio): [steam/CONTENT-SURVEY-DRAFT.md](../steam/CONTENT-SURVEY-DRAFT.md).
 
 ## 4. Depot, opzioni di avvio, runtime Linux, componenti
 
-Tutto in Steamworks → la tua app → **Installation** (alla fine premi *Publish* per rendere effettive le modifiche).
-
-**Depot**: vedi passo 2 (uno Windows, uno *Linux + SteamOS*, entrambi nel pacchetto Developer Comp e in quello in vendita).
+Tutto in Steamworks → la tua app → **Installation** (alla fine *Publish*).
 
 **Cartella di installazione**: `Scrapbot City`.
 
@@ -147,68 +195,65 @@ Tutto in Steamworks → la tua app → **Installation** (alla fine premi *Publis
 | 1 | `Scrapbot City.exe` | (vuoto) | Windows | 64-bit | Launch (Default) |
 | 2 | `scrapbot-city` | (vuoto) | Linux + SteamOS | 64-bit | Launch (Default) |
 
-L'eseguibile si scrive così, senza `./` né cartelle: i file sono nella radice del depot.
-**Steam Deck** usa l'opzione 2 (la build Linux nativa): non serve un'opzione a parte.
+L'eseguibile si scrive così, senza `./` né cartelle: i file sono nella radice del depot. Lo Steam Deck usa l'opzione 2.
 
-**Runtime Linux** (*Installation → Linux Runtime*, compare dopo aver creato l'opzione di avvio Linux):
-scegli **Steam Linux Runtime 3.0 (sniper)**.
-- Provato con i file di sniper, senza client Steam: il gioco parte (menu, schermo intero a 1280×800, salvataggi).
-  La prova definitiva è quella sul ramo beta (sezione 7).
-- **Non** scegliere *Steam Linux Runtime 4.0*, anche se Valve lo consiglia per i giochi nuovi: non contiene le
-  librerie GTK 3 e di accessibilità (`libgtk-3`, `libatk-bridge`, `libatspi`) che Electron 33 richiede per partire
-  (controllato sull'elenco dei pacchetti pubblicato da Valve).
-- L'impostazione predefinita (1.0 "scout") non è stata provata: meglio non lasciarla.
+**Runtime Linux** (*Installation → Linux Runtime*): **Steam Linux Runtime 3.0 (sniper)**. Provato in passato con i
+file di sniper senza client Steam (il gioco parte); **non** scegliere il 4.0: mancano le librerie GTK 3 e di
+accessibilità che Electron 33 richiede. La prova definitiva è quella sul ramo beta.
 
 **Componenti da installare** (*Installation → Redistributables*): spunta **Visual C++ Redistributable 2015-2022
-(x64)** (il nome esatto in lista può variare di poco). Il modulo Windows di `steamworks.js` lo richiede
-(`VCRUNTIME140.dll`): sui PC che non lo hanno il gioco parte lo stesso, ma gli achievement non arrivano a Steam.
+(x64)** (il nome in lista può variare di poco). Il modulo Windows di steamworks.js importa `VCRUNTIME140.dll`, che
+Electron non contiene (controllato l'11/10 con `npm run steam:check`): senza, su un PC che non lo ha già, il gioco
+parte lo stesso ma senza funzioni di Steam.
 
-**Sandbox su Linux**: Electron usa la sandbox di Chromium. Nel runtime sniper funziona (provato come utente normale).
-Se su qualche sistema il gioco non parte con l'errore *"The SUID sandbox helper binary was found, but is not
-configured correctly"* o *"No usable sandbox"*, aggiungi `--no-sandbox` agli *Arguments* dell'opzione Linux.
+**Sandbox su Linux**: Electron usa la sandbox di Chromium (provata in passato nel runtime sniper come utente normale).
+Se su qualche sistema il gioco non parte con *"The SUID sandbox helper binary was found, but is not configured
+correctly"* o *"No usable sandbox"*, aggiungi `--no-sandbox` agli *Arguments* dell'opzione 2. (I controlli automatici
+di questo progetto usano `--no-sandbox` solo perché girano come root, cosa che Chromium non permette con la sandbox.)
 
-**Mac**: nessuna build per ora (servirebbero un account Apple Developer, firma e notarizzazione). `npm run dist:mac` esiste
-ma non è stato provato.
+## 5. Moduli nativi: steamworks.js ed Electron
 
-## 5. Build
+Controllo dell'11/10/2026, rifacibile in ogni momento:
 
 ```bash
-npm run dist:steam
+npm run steam:check                                   # controlli statici + carica il modulo dentro Electron
+xvfb-run -a npm run steam:launch-check -- --out /tmp/launch-check   # avvia la build Linux senza Steam (serve Playwright)
 ```
 
-Funziona anche su Linux, senza wine: compila il gioco, crea `release/win-unpacked/` e `release/linux-unpacked/`
-e li copia in `steam/content/windows` e `steam/content/linux` (la cartella che SteamPipe carica, un depot per sistema).
-Ogni cartella viene sostituita per intero, così non resta nessun file vecchio; `steam_appid.txt` non viene mai copiato.
-Fai la build su **Linux o macOS** se puoi: Windows non conserva il permesso "eseguibile" dei file Linux.
+| Voce | Risultato |
+|---|---|
+| Electron installato | 33.4.11 = Node 20.18.3, **N-API 9**, NODE_MODULE_VERSION 130, Chromium 130 |
+| steamworks.js | 0.4.0 (licenza MIT), l'ultima pubblicata su npm; binari precompilati con napi-rs per Windows x64, Linux x64, macOS |
+| Compatibilità ABI | i moduli usano **N-API** (ABI stabile tra versioni di Node): non dipendono da NODE_MODULE_VERSION. La funzione più recente che usano è di **N-API 6**; Electron 33 offre N-API 9 → compatibili. Per questo `npmRebuild: false` è corretto |
+| Linux: `steamworksjs.linux-x64-gnu.node` (sha256 `3d242b59…`) | x86-64; trova `libsteam_api.so` accanto a sé (RUNPATH `$ORIGIN`); richiede **glibc 2.34** o più nuova (`libsteam_api.so` solo 2.14). Su sistemi più vecchi il modulo non si carica e il gioco gira senza Steam |
+| Linux: caricamento dentro Electron 33.4.11 | **verificato qui**, sia da `node_modules` sia dalla build impacchettata: il modulo si carica; `init()` senza App ID e con 480 lancia `Failed to load module '…/steamclient.so'` (nessun client Steam) e il processo continua |
+| Linux: build impacchettata avviata | **verificato qui**: modulo e `libsteam_api.so` mappati nel processo principale (`/proc/<pid>/maps`), log `Steam not available: …`, menu, città, salvataggi, Quit con codice 0; memoria con una città aperta circa 730 MB in 6 processi (rendering software: indicativo) |
+| Windows: `steamworksjs.win32-x64-msvc.node` (sha256 `1042713f…`) | x86-64; importa `steam_api64.dll` e `VCRUNTIME140.dll` (+ CRT universale di Windows 10); cerca le funzioni N-API nell'eseguibile a runtime. **Controllo statico**: `Scrapbot City.exe` (Electron 33.4.11) esporta 145 funzioni `napi_*`, comprese tutte le 57 che il modulo chiama |
+| Windows: caricamento | **da verificare (titolare)**: qui non c'è Windows |
+| Build impacchettate | contengono gli stessi binari di `node_modules` (hash identici); la `.lib` (serve solo per compilare) non è inclusa |
 
-## 6. Caricamento
+**Se aggiorni Electron o steamworks.js**: rifai `npm run steam:check` (deve restare senza FAIL) e la prova sul ramo
+beta. steamworks.js non pubblica una tabella di versioni di Electron supportate; i suoi autori lo provano con una loro
+app Electron (nel `package.json` di steamworks.js 0.4.0: electron 24). La compatibilità qui è dedotta da N-API, non
+garantita da loro.
 
-Dettagli e risoluzione dei problemi in **[steam/README.md](../steam/README.md)** (passi 3–5). In breve:
+## 6. Prova sul ramo beta (con Steam vero)
 
-1. Installa `steamcmd` una volta (passo 3 del README).
-2. Prova a vuoto: `steam/upload.sh <account_build> --preview` — controlla App ID, depot, file e versione, non carica niente.
-3. Carica: `steam/upload.sh <account_build> --beta beta` — carica i due depot e mette la build sul ramo `beta`.
-
-La prima volta `steamcmd` chiede password e codice Steam Guard, poi ricorda il login: nessuna password è scritta
-nei file. Su Windows c'è `steam\upload.bat` con le stesse opzioni, ma per il depot Linux è meglio caricare da
-Linux, macOS o WSL (motivo nel README).
-
-## 7. Prova sul ramo beta
-
-1. Steamworks → **SteamPipe → Builds**: crea il ramo `beta` con una password (prima del caricamento del passo 6).
-2. Nel client Steam: tasto destro sul gioco → **Proprietà → Beta**, inserisci la password e scegli `beta`.
-3. Prova **su Windows, su Linux e sullo Steam Deck**:
+1. Ramo `beta` creato (2.1) e build caricata con `--beta beta` (2.5).
+2. Nel client Steam: tasto destro sul gioco → **Proprietà → Beta** → password → `beta`.
+3. Prova **su Windows, su Linux e sullo Steam Deck**, e annota il risultato di ogni riga:
    - il gioco parte dal pulsante "Gioca" (su Windows è la **prima volta in assoluto**: l'exe è costruito da Linux);
-   - Steam Deck: parte a schermo intero, tutto si usa col controller, il campo del nome città apre la tastiera di Steam;
+   - `Scrapbot City.exe` → Proprietà → Dettagli: versione e nome giusti;
    - **Shift+Tab** apre l'overlay di Steam;
-   - finisci il tutorial: deve comparire la notifica di Steam di *Bootcamp Graduate* (achievement collegati);
-   - salva su PC, apri sul Deck: la città deve esserci (Steam Cloud, sezione 9);
-   - "Quit" chiude il gioco e Steam lo vede chiuso.
-4. Per tester esterni e stampa: chiavi Steam (Steamworks → *Request Steam Product Keys*) oppure la password del ramo beta.
-5. Quando tutto va: **SteamPipe → Builds** → metti la build sul ramo **default** a mano (nessuno script può farlo:
-   è una regola di Valve). La build sul ramo default è quella che Valve controlla nella revisione (sezione 14).
+   - finisci il tutorial: compare la notifica di Steam di *Bootcamp Graduate* (achievement collegati);
+   - salva su PC, apri sul Deck: la città c'è (Steam Cloud, sezione 8), e viceversa;
+   - Steam Deck: parte a schermo intero, tutto si usa col controller, il campo del nome città apre la tastiera di Steam;
+   - "Quit" chiude il gioco e Steam lo vede chiuso;
+   - `npm run steam:check` dice di provare il caricamento su Windows: è questa prova.
+4. Per tester esterni: chiavi Steam o la password del ramo beta.
+5. Solo quando tutto va, e se lo decidi tu: build sul ramo **default** a mano (2.6).
 
-## 8. Achievement
+## 7. Achievement
 
 Steamworks → la tua app → **Stats & Achievements → Achievements**. Crea i 18 achievement copiando
 **[steam/achievements.csv](../steam/achievements.csv)**:
@@ -241,163 +286,183 @@ Steamworks → la tua app → **Stats & Achievements → Achievements**. Crea i 
 | ACH_COAST | Coast to Coast | Spire in tutte e 5 le città |
 | ACH_SUPERSTAR | Superstar | Tutte le 15 stelle |
 
-- **Traduzioni**: nomi e descrizioni nelle altre 7 lingue sono in
-  **[steam/achievements_i18n.csv](../steam/achievements_i18n.csv)** (presi da `src/i18n/`): copiali nei campi di ogni lingua.
-- **Icone** (oggi mancano): per ogni achievement un'icona a colori (sbloccato) e una in grigio (bloccato), quadrate;
-  Steam le mostra a 64×64. Si possono ricavare dalle icone pixel del gioco ingrandite senza sfumature. Usa la dimensione
-  e il formato che chiede il modulo di Steamworks.
-- Dopo le modifiche premi **Publish**: gli achievement non pubblicati non arrivano ai giocatori.
-- **Nuovi achievement**: l'aggiornamento dei contenuti (0.7, in lavorazione) ne aggiungerà altri. Si creano in più,
-  con nuovi API name; non cambiare mai l'API name di uno già pubblicato (chi l'ha sbloccato lo perderebbe).
-- Il gioco reinvia a Steam tutti gli achievement sbloccati a ogni avvio: chi li ha sbloccati offline o prima
-  dell'uscita su Steam li ritrova.
-- **Linux**: il modulo Linux di `steamworks.js` richiede glibc 2.34 o più nuova. Il runtime sniper ha la 2.31, ma Steam
-  usa quella del sistema quando è più nuova: provato con glibc 2.39 il modulo si carica. Sullo Steam Deck e sulle
-  distribuzioni recenti va; su sistemi più vecchi (es. Ubuntu 20.04, Debian 11) il gioco funziona ma senza
-  achievement di Steam. Da confermare nel test del passo 7 sul Deck.
+- **Traduzioni**: [steam/achievements_i18n.csv](../steam/achievements_i18n.csv) (8 lingue, prese da `src/i18n/`).
+- **Icone** (mancano): per ogni achievement un'icona a colori e una in grigio, nel formato che chiede il modulo.
+- Dopo le modifiche **Publish**. Non cambiare mai l'API name di un achievement già pubblicato.
+- La 0.7 non aggiunge achievement nel ramo principale di oggi; se la build finale ne avrà di nuovi, rigenera i CSV.
+- Il gioco reinvia a Steam gli achievement sbloccati a ogni avvio. Su Linux servono glibc ≥ 2.34 (sezione 5).
 
-## 9. Steam Cloud (salvataggi sincronizzati)
+## 8. Steam Cloud (salvataggi sincronizzati)
 
-La versione desktop salva tutto in file `.sav` nella cartella dell'utente (percorso fissato in `electron/main.cjs`:
-cartella dei dati delle app + `Scrapbot City/saves`):
+### 8.1 Dove e come salva il gioco
 
-| Sistema | Cartella | Verificato |
+La versione desktop salva ogni dato in un file `.sav` nella cartella `saves` dei dati dell'app (percorso fissato in
+`electron/main.cjs`: `app.getPath('appData')` + `Scrapbot City/saves`). Il nome del file è la chiave del dato con i
+caratteri diversi da lettere, cifre e `-` sostituiti da `_`, più `.sav`. Ogni scrittura è atomica (file temporaneo
+`.tmp`, poi rinomina) e la versione precedente buona resta come `.sav.bak`.
+
+| Sistema | Cartella | Come lo sappiamo |
 |---|---|---|
-| Windows | `%APPDATA%\Scrapbot City\saves` (`C:\Users\<nome>\AppData\Roaming\...`) | dal codice (`app.getPath('appData')`) |
-| Linux / Steam Deck | `~/.config/Scrapbot City/saves` | sì, avviando la build Linux (anche con i file del runtime sniper) |
-| macOS (nessuna build) | `~/Library/Application Support/Scrapbot City/saves` | — |
+| Windows | `%APPDATA%\Scrapbot City\saves` (`C:\Users\<nome>\AppData\Roaming\Scrapbot City\saves`) | dal codice (`appData` = Roaming su Windows); **da verificare** |
+| Linux / Steam Deck | `~/.config/Scrapbot City/saves` (o `$XDG_CONFIG_HOME/Scrapbot City/saves`) | **verificato qui** l'11/10 con la build Linux |
 
-I file sono circa 25 al massimo (impostazioni, campagna, achievement, finali, 4 slot di gioco libero e 5 città della
-campagna, ognuno con un file di dati e uno di descrizione), di pochi KB ciascuno (una città grande ~11 KB).
+### 8.2 Che cosa si sincronizza (build 0.7.0-beta.1)
 
-Steamworks → la tua app → **Application → Steam Cloud**:
+| File | Contenuto |
+|---|---|
+| `settings.sav` | impostazioni: lingua, volumi, filtro CRT, movimento ridotto, scorrimento ai bordi, schermo intero |
+| `campaign.sav` | profilo della campagna: stelle, banca regionale, Guglie e finali delle 5 città |
+| `achievements.sav`, `endings.sav` | achievement e finali visti |
+| `tutorial-done.sav`, `last.sav`, `migrated.sav` | tutorial visto, ultima partita per "Continua", migrazione dalla 0.4 |
+| `projects.sav` | **[pending final build]** progetti sbloccati del catalogo (`docs/MODULAR-INC2.md` §4) |
+| `save_auto.sav`, `save_1.sav` … `save_3.sav` + `meta_*.sav` | gioco libero: salvataggio automatico e 3 slot manuali (città + riepilogo) |
+| `save_city-home.sav` … `save_city-company.sav` + `meta_city-*.sav` | le 5 città della campagna |
+| `backup_save_<slot>_v<N>.sav`, `backup_meta_<slot>_v<N>.sav` | copia di sicurezza di un salvataggio scritto da una versione precedente (formato v2 della 0.6/0.7.0-alpha.1, o v0 se rovinato), fatta **una volta** prima di sovrascriverlo con il formato v3; mai cancellata (`src/storage.ts` del ramo principale) |
+| `campaign-damaged.sav` | solo se un profilo della campagna rovinato è stato messo da parte |
 
-1. **Byte quota per user**: `10000000` (10 MB); **Number of files allowed per user**: `100`.
-2. Attiva **Auto-Cloud** e aggiungi una **Root Path**:
-   - Root: **WinAppDataRoaming**
-   - Subdirectory: `Scrapbot City/saves`
-   - Pattern: `*.sav`
-   - OS: **[All OSes]** (obbligatorio quando si usano i Root Override)
-   - Recursive: **no**
-3. Aggiungi un **Root Override** per Linux (Steam Deck compreso):
-   - Original Root: WinAppDataRoaming — OS: **Linux** — New Root: **LinuxHome**
-   - Add/Replace Path: `.config/Scrapbot City/saves` — **Replace Path**: sì
-4. Premi *Save* e poi *Publish*.
+**Non** si sincronizzano: `*.sav.bak` e `*.sav.tmp` (il pattern `*.sav` non li prende: restano sul PC per riparare un
+file rovinato) e `steam-deck.json` (fuori da `saves/`: la scelta "finestra o schermo intero" del Deck resta sul Deck).
 
-Così un salvataggio fatto su Windows si ritrova sul Deck e viceversa. Le copie `.sav.bak` e i file temporanei restano
-solo sul computer (il pattern `*.sav` non li prende): servono se un file si rovina. La scelta "finestra o schermo intero"
-del Deck sta in `steam-deck.json`, fuori da `saves/`, quindi non passa al PC.
+**Quanti file e quanto spazio.** Chiavi fisse: 9. Slot: 9 (4 gioco libero + 5 campagna) × 2 file = 18. Copie di
+sicurezza: di solito una per slot (v2) × 2 = 18; al massimo 3 versioni vecchie × 18 = 54. Totale: circa 45 file di
+solito, **81 al massimo**. Dimensioni misurate l'11/10 sulla build del ramo principale: una città della campagna a
+metà partita 10–13 KB (+ 80 byte di riepilogo), profilo della campagna 0,5 KB, impostazioni 0,1 KB. Anche con città
+grandi (stimate fino a 50 KB) e tutte le copie si resta sotto **2 MB**.
 
-**Prova prima dell'uscita**: spunta *"Enable cloud support for developers only"* (solo gli account con la licenza
-Developer Comp usano il Cloud), poi nel client Steam apri la console (`steam://open/console` nel browser) e scrivi
-`testappcloudpaths <AppID>` per vedere quali file Steam trova. Prima dell'uscita togli la spunta e pubblica.
-Il pulsante **"Open the saves folder"** nelle impostazioni del gioco apre la cartella (utile anche per l'assistenza).
-Nota: su Linux, se un giocatore ha cambiato `XDG_CONFIG_HOME`, i salvataggi finiscono lì e il Cloud non li vede (raro).
+### 8.3 Configurazione in Steamworks
 
-## 10. Controller e revisione Steam Deck
+Steamworks → la tua app → **Application → Steam Cloud** (regole lette l'11/10/2026 su
+[Steam Cloud](https://partner.steamgames.com/doc/features/cloud)):
 
-**Steam Input** (Steamworks → la tua app → **Application → Steam Input**): supporto controller **completo**
-(*Full*) e configurazione predefinita **Gamepad** per tutti i tipi di controller. Il gioco legge il controller
-come un pad standard (non usa le API di Steam Input). Sulla pagina del negozio comparirà "Supporto completo del controller".
+1. **Byte quota per user**: `10000000` (10 MB, cinque volte il massimo stimato). **Number of files allowed per user**:
+   `200` (più del doppio degli 81 possibili). *Save*, poi *Publish*: solo dopo si sbloccano le opzioni Auto-Cloud.
+2. **Auto-Cloud → Root Paths**, una riga:
+
+   | Root | Subdirectory | Pattern | OS | Recursive |
+   |---|---|---|---|---|
+   | `WinAppDataRoaming` | `Scrapbot City/saves` | `*.sav` | **[All OSes]** (obbligatorio con i Root Override) | No |
+
+3. **Root Overrides**, una riga per Linux (Steam Deck compreso):
+
+   | Original Root | OS | New Root | Add/Replace Path | Replace Path |
+   |---|---|---|---|---|
+   | `WinAppDataRoaming` | Linux | `LinuxHome` | `.config/Scrapbot City/saves` | **sì** |
+
+   Niente override per macOS (nessuna build Mac).
+4. *Save* e *Publish*. Le modifiche arrivano ai client entro una decina di minuti (o riavviando Steam).
+
+Così un salvataggio fatto su Windows si ritrova sul Deck o su Linux e viceversa (stessi nomi di file).
+
+**Da sapere**:
+- Valve sconsiglia di sincronizzare impostazioni legate alla macchina: in `settings.sav` c'è anche "schermo intero"
+  (sul Deck la scelta è separata, `steam-deck.json`). Se dà fastidio passando tra PC diversi, si può spostare quella
+  voce fuori da `saves/` in un aggiornamento.
+- Su Linux, chi ha cambiato `XDG_CONFIG_HOME` salva altrove e il Cloud non vede i file (raro).
+- Sul Deck Steam sincronizza anche quando la console va in sospensione (*Dynamic Cloud Sync*): il gioco salva a ogni
+  nuovo giorno, alla chiusura e quando la finestra viene nascosta; se la sospensione non nasconde la finestra, l'ultimo
+  giorno di gioco potrebbe non essere nel Cloud. **Da provare sul Deck.**
+
+### 8.4 Prova prima dell'uscita (con il client Steam)
+
+1. Spunta *"Enable cloud support for developers only"* (vale per i giochi già usciti; prima dell'uscita il Cloud lo
+   usano comunque solo gli account con la licenza).
+2. Nel client Steam apri `steam://open/console`, scrivi `testappcloudpaths <AppID>` e `set_spew_level 4 4`.
+3. Avvia il gioco da Steam, salva, chiudi: nella console devono comparire i caricamenti dei `.sav` (non dei `.bak`).
+4. Su un altro PC (o sul Deck): avvia, controlla che la città ci sia. Prova Windows → Linux/Deck e il contrario.
+5. Problemi: `%Steam%\logs\cloud_log.txt`. Fine prova: `testappcloudpaths 0`, `set_spew_level 0 0`.
+6. Prima dell'uscita togli la spunta del punto 1 e pubblica.
+
+Il pulsante **"Open the saves folder"** nelle impostazioni del gioco apre la cartella (utile per l'assistenza).
+
+## 9. Controller e revisione Steam Deck
+
+**Steam Input** (Steamworks → **Application → Steam Input**): supporto controller **completo** e configurazione
+predefinita **Gamepad** — da dichiarare solo dopo averlo provato con un controller vero dal client Steam. Il gioco
+legge il controller come un pad standard (non usa le API di Steam Input).
 
 Comandi in città: stick sinistro = cursore, stick destro = mappa, A = costruisci/seleziona, B = annulla,
-LB/RB = edificio precedente/successivo, LT/RT = zoom, X = ruspa, Y = suggerimento, Start = menu,
-D-pad = una casella alla volta, View = pausa, L3 = velocità, R3 = torna all'HQ.
+LB/RB = edificio precedente/successivo, LT/RT = zoom, X = ruspa, Y = suggerimento (con un oggetto ruotabile in mano lo
+ruota), Start = menu, D-pad = una casella alla volta, View = pausa, L3 = velocità, R3 = torna all'HQ.
 
-**Revisione Steam Deck**: si può chiedere anche prima dell'uscita, dalla pagina dell'app → *Technical Tools* →
-**Steam Hardware Compatibility Review** (il link non è ancora disponibile per tutti; Valve può anche testare il gioco
-da sola). Puoi indicare il ramo da provare (es. `beta`); se non lo indichi Valve prova il ramo default. Serve prima
-aver superato la normale revisione della build. Valve prova prima la build Linux; se va male prova quella Windows con Proton e tiene il risultato migliore.
-I risultati arrivano di solito entro una settimana; hai poi circa una settimana per guardarli prima che vengano pubblicati.
+**Revisione Steam Deck**: dalla pagina dell'app → *Technical Tools* → **Steam Hardware Compatibility Review** (dopo la
+normale revisione della build). Valve prova la build Linux; se va male prova quella Windows con Proton. Requisiti e
+stato: tutto usabile col controller (fatto, provato solo con Gamepad API simulata), glifi dei pulsanti nei testi
+(fatto), 1280×800 (finestra di partenza 1280×800), testi leggibili a 800p (da ricontrollare in tedesco e polacco),
+tastiera a schermo per i campi di testo (codice fatto, **da provare** con Steam), 30 fps a 800p (**da misurare sul
+Deck**), nessun launcher (fatto), schermo intero sul Deck (fatto, provato solo con la variabile `SteamDeck=1`).
+**Non scrivere "Steam Deck Verified" da nessuna parte**: il badge lo assegna Valve.
 
-Cosa controlla Valve per **"Verified"** e lo stato attuale:
+## 10. Dichiarazione dei contenuti fatti con l'IA
 
-| Requisito | Stato |
-|---|---|
-| Tutto il gioco usabile col controller, senza mouse, con la configurazione predefinita | ✔ menu, dialoghi, regione e città (cursore virtuale) |
-| Glifi dei pulsanti del controller nei testi | ✔ A, B, X, Y, LB/RB, LT/RT, Start, View, L3, R3 |
-| Risoluzione 1280×800 (o 1280×720) | ✔ finestra di partenza 1280×800 |
-| Testi leggibili: minimo 9 px di altezza a 1280×800 (12 consigliati) | ✔ verificato sugli screenshot, da ricontrollare nelle lingue lunghe (DE, PL) |
-| Tastiera a schermo per i campi di testo | ✔ con steamworks.js (`showFloatingGamepadTextInput`), altrimenti Steam + X — da provare (sezione 7) |
-| Almeno 30 fps a 800p | da misurare sul Deck (gioco 2D, atteso senza problemi) |
-| Nessun launcher, nessun avviso "hardware non supportato" | ✔ |
-| Schermo intero sul Deck | ✔ con `SteamDeck=1` (lo imposta Steam) parte a schermo intero; se il giocatore lo toglie (F11 o impostazioni) la scelta resta su quel dispositivo |
+Fa parte del questionario sui contenuti: bozza completa, con le domande a cui devi rispondere, in
+**[steam/CONTENT-SURVEY-DRAFT.md](../steam/CONTENT-SURVEY-DRAFT.md)**. In breve: contenuti **pre-generati** con l'aiuto
+dell'IA sì (codice, grafica generata da codice, testi, traduzioni, musica ed effetti sintetizzati); **generati dal
+vivo** no. L'origine delle immagini del negozio la dichiari tu.
 
-## 11. Dichiarazione dei contenuti fatti con l'IA
+## 11. Prezzo
 
-Nel **Content Survey** (sezione 3) c'è una parte sull'IA generativa. Valve chiede di dichiarare i contenuti che i
-giocatori vedono o sentono creati con l'aiuto dell'IA, distinguendo:
+**Lo decidi tu**; nessuno script o documento di questo progetto lo imposta. Il candidato di cui si è parlato è
+**7,99 €** come prezzo base. Fatti utili alla decisione: Steam rimborsa su richiesta entro 14 giorni dall'acquisto e
+con meno di 2 ore di gioco; la durata della campagna 0.7 **non è ancora stata misurata con persone** (serve il playtest:
+[PLAYTEST.md](PLAYTEST.md)); i prezzi degli altri Paesi Steamworks li propone dal prezzo base; anche il prezzo passa
+dalla revisione di Valve.
 
-- **Pre-generati** (fatti durante lo sviluppo): qui sì. Testi, traduzioni, grafica e musica del gioco sono stati creati
-  con l'aiuto dell'IA, e così il mockup del menu; gli sprite sono modelli voxel generati da codice scritto con l'aiuto
-  dell'IA. Se anche le 5 immagini usate per la grafica del negozio sono generate con l'IA, dichiaralo.
-- **Generati dal vivo** (mentre si gioca): nessuno; il gioco non usa IA quando gira.
+## 12. Pagina "Coming Soon" e Steam Next Fest
 
-Descrivi con onestà cosa e come: Valve valuta questi contenuti con le stesse regole degli altri, e la descrizione
-compare sulla pagina del negozio. Alcune risposte, dopo l'approvazione, si cambiano solo scrivendo al supporto.
+**Apri la pagina "Coming Soon" il prima possibile**: le wishlist raccolte prima dell'uscita sono ciò che pesa di più
+sulle vendite. Serve solo la pagina approvata (sezione 3), non la build; deve restare "Coming Soon" per un periodo
+minimo prima dell'uscita (controllalo in Steamworks).
 
-## 12. Prezzo (consiglio)
+**Steam Next Fest** (una settimana di demo gratuite, tre volte l'anno): si partecipa una volta sola per gioco, con una
+demo giocabile da tutti; la demo è un'app separata collegata al gioco (gratuita); oggi non c'è una build demo (idea:
+tutorial + prima città). Date e scadenze delle prossime edizioni: Steamworks → *Upcoming Events* (le date annotate in
+passato per febbraio 2027 vanno **ricontrollate** lì).
 
-- Con i contenuti di oggi (campagna di 1,5–3 ore, 10 eventi) il prezzo onesto è **4,99–6,99 €**: sotto le 2 ore
-  di gioco molti chiedono il rimborso, e Steam lo concede entro 14 giorni.
-- Un city builder pixel indie di 6–10 ore regge **9,99–12,99 €**: è il traguardo dopo i contenuti della 0.7 (sezione 15).
-- Per gli altri Paesi usa i prezzi regionali che Steamworks propone partendo dal prezzo in dollari.
-- Sconto di lancio del 10–15%. Anche il prezzo passa dalla revisione di Valve.
+## 13. Uscita — lista di controllo finale
 
-## 13. Pagina "Coming Soon" e Steam Next Fest
+Prima di premere "Release", ogni riga deve essere vera:
 
-**Apri la pagina "Coming Soon" il prima possibile**: le wishlist raccolte nei mesi prima dell'uscita sono ciò che pesa
-di più sulle vendite. Serve solo la pagina approvata (sezione 3), non la build. La pagina deve restare "Coming Soon"
-almeno **2 settimane** prima dell'uscita.
+- [ ] La 0.7.0-beta.1 (o la versione da vendere) è **verificata** sul ramo del gioco, e `steam-package` è stato
+      aggiornato da quel commit (solo allora si uniscono i rami).
+- [ ] `npm run build`, `npm test` verdi sul commit; `npm run dist:steam` rifatto da quel commit.
+- [ ] `npm run steam:check` senza FAIL; `npm run steam:launch-check` senza FAIL sulla build Linux.
+- [ ] App ID e depot scritti in `steam/sdk/*.vdf`; `node steam/prepare-upload.cjs --check` senza problemi.
+- [ ] Caricata con `--preview`, poi con `--beta beta`.
+- [ ] Prove della sezione 6 fatte **su Windows, Linux e Steam Deck**, con esito annotato.
+- [ ] Achievement creati e pubblicati; uno sbloccato dal client Steam.
+- [ ] Steam Cloud configurato e provato nei due sensi (8.4); "developers only" tolto.
+- [ ] Visual C++ 2015-2022 (x64) spuntato nei Redistributables; runtime Linux "sniper".
+- [ ] Pagina del negozio: testi senza righe **[pending final build]** non verificate; requisiti confermati; tag.
+- [ ] Grafica: decisioni sul logo prese; screenshot rifatti sulla build finale (almeno 5, solo gameplay); trailer
+      rifatto sulla build finale, con l'audio deciso da te.
+- [ ] ASSETS-PROVENANCE.md §6 confermato per iscritto; questionario sui contenuti compilato, con la sezione IA.
+- [ ] Verifica legale dei nomi ("Scrapbot City", "2PM", personaggi).
+- [ ] Prezzo deciso e approvato da te; data decisa da te.
+- [ ] Pagina "Coming Soon" pubblicata da almeno il periodo minimo; revisione di pagina e build superata; 30 giorni
+      passati dal pagamento della quota.
+- [ ] **Tu** metti la build sul ramo `default` (a mano) e **tu** premi **Release App** → *Publish Now* → *Release Now*.
 
-**Steam Next Fest** (una settimana di demo gratuite, tre volte l'anno: febbraio, giugno, ottobre):
-- si partecipa **una volta sola** per gioco, con una **demo giocabile da tutti** e la pagina del gioco pubblica;
-  il gioco non deve uscire prima della fine del Fest;
-- la demo è un'app separata collegata al gioco (gratuita, senza un'altra quota); va preparata una build demo
-  (oggi non c'è): l'idea è **tutorial + la prima città**, un pezzo già chiuso del gioco;
-- **prossime edizioni**: **febbraio 2027** (22 febbraio – 1 marzo; iscrizione entro il **10 gennaio 2027**; demo e
-  pagina in revisione entro il 25 gennaio per essere nell'anteprima stampa dell'11 febbraio, tutto entro l'8 febbraio)
-  e **giugno 2027** (date su Steamworks → *Upcoming Events*). Quella di ottobre 2026 è troppo vicina.
-- **Consiglio**: febbraio 2027 solo se a fine gennaio la 0.7 e la demo sono pronte e provate; altrimenti giugno 2027.
-  Esci con il gioco completo poche settimane dopo il Fest, quando le wishlist sono fresche.
+## 14. Cosa manca (onestamente)
 
-## 14. Uscita
+1. **La build finale 0.7.0-beta.1** (catalogo da 24 elementi, sblocchi, temi delle città: oggi in lavorazione) e la sua
+   verifica; poi le build Steam rifatte da quella.
+2. **Prove con Steam vero**: Windows, Steam Deck, achievement, overlay, Cloud, tastiera del Deck, controller.
+3. **Screenshot e trailer della build finale** (le pipeline sono pronte); **audio del trailer**; **icone degli
+   achievement**.
+4. **Playtest** con 10–20 persone che non conoscono il gioco ([PLAYTEST.md](PLAYTEST.md)): serve anche per qualsiasi
+   frase sulla durata.
+5. **Revisione madrelingua** delle traduzioni.
+6. **Verifica legale** di nomi e marchi.
+7. **Decisioni del titolare** su logo (targa "2PM", katakana), origine delle immagini del negozio, prezzo, date.
+8. Da correggere nel ramo del gioco: i Crediti attribuiscono la licenza OFL anche a Permanent Marker, che è Apache 2.0
+   (ASSETS-PROVENANCE §4).
 
-Prima di poter uscire servono:
-- pagina del negozio approvata e "Coming Soon" da almeno 2 settimane;
-- build sul ramo **default** approvata da Valve (*Game Build checklist*: deve contenere ciò che la pagina promette;
-  si può continuare ad aggiornarla durante la revisione);
-- almeno 21 giorni dal pagamento della quota;
-- prezzo approvato; questionario sui contenuti completo.
+Lingue da valutare dopo: portoghese brasiliano, giapponese, cinese semplificato e coreano (servono font CJK; oggi c'è
+solo il katakana del logo).
 
-Il gioco **non esce da solo**: quando tutto è approvato, nella pagina dell'app compare il pulsante verde
-**Release App**. Si apre un riepilogo; poi *Publish Now*, conferma e *Release Now*.
-
-## 15. Cosa manca prima di vendere (onestamente)
-
-Fatto nella 0.5–0.6: salvataggi su file con Steam Cloud, controller e Steam Deck, 8 lingue, 4 brani di musica,
-città isometrica, build Windows e Linux, grafica del negozio, script di caricamento.
-
-1. **Più contenuti** (è il punto più importante; la 0.7 è in lavorazione): oggi ci sono solo 10 eventi narrativi,
-   che si ripetono in tutte e 5 le città, e una città si completa in 12–20 minuti. Per un gioco a pagamento servono
-   almeno 30–40 eventi, edifici o miglioramenti per la seconda metà della partita e una modalità "infinita" con obiettivi.
-2. **Trailer** e **icone degli achievement** (sezioni 3 e 8).
-3. **Musica di un compositore**: i 4 brani sono chiptune scritti come note in `src/music.ts` e suonati dal codice.
-   Vanno bene per demo e playtest; per il lancio conviene un compositore (anche solo per riscriverli meglio).
-4. **Passata grafica**: dalla 0.6 la città è isometrica e gli sprite sono modelli voxel generati dal codice
-   (`scripts/art/`, `npm run art`). Un artista pixel può sostituire qualsiasi fotogramma mettendo un PNG con lo stesso
-   nome in `art/overrides/` (vedi README).
-5. **Playtest** con 10–20 persone che non conoscono il gioco: vedi **[PLAYTEST.md](PLAYTEST.md)**.
-6. **Revisione delle traduzioni** da madrelingua (soprattutto eventi e finali) durante il playtest.
-7. **Verifica legale** di nomi e marchi ("2PM", "Scrapbot City") prima di registrare la pagina.
-8. **Prima prova su Windows** e sul Deck (sezione 7): oggi nessuna delle due è stata fatta con il client Steam.
-
-Lingue da valutare dopo: portoghese brasiliano, giapponese, cinese semplificato e coreano (i city builder vendono
-molto in Asia; servono font CJK, oggi c'è solo il katakana del logo).
-
-## 16. Idee per allungare la vita del gioco (aggiornamenti dopo l'uscita)
+## 15. Idee per dopo l'uscita
 
 - Albero tecnologico dei bot (velocità, capacità, droni da pulizia).
-- Sesta e settima città come aggiornamento gratuito: fa tornare i giocatori e Steam lo mostra a chi ha il gioco in wishlist.
+- Sesta e settima città come aggiornamento gratuito.
 - Modalità infinita con classifica (Steam Leaderboards) e sfide settimanali con seed fisso.
 - Editor di mappe e Steam Workshop.
