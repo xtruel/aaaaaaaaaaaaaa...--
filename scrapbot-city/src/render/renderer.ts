@@ -118,6 +118,8 @@ const PLANTER_FRAMES = ['pc/planter/0', 'pc/planter/1'];
 const SIGN_FRAMES = [0, 1, 2].map((motif) => DIR_FRAMES(`sign/${motif}`));
 const PERGOLA_FRAMES = ['pc/pergola/x', 'pc/pergola/y'];
 const FLOOR_FRAMES = [0, 1, 2, 3].map((k) => `t/floor/${k}`);
+// the placed pieces' lights that a building in front of them cuts (drawPieceLights), made when first needed
+let lightLayer: HTMLCanvasElement | null = null;
 const GHOST_OK = 'rgba(198,244,50,0.35)';
 const GHOST_BAD = 'rgba(226,54,75,0.5)';
 
@@ -2075,6 +2077,82 @@ export class Renderer {
     this.addLabel(label.text, top.X - camX, top.Y - (f ? f.ay : 0) - 12 - camY, label.g.ok ? PAL.lime : PAL.red);
   }
 
+  private lightBuildings: number[] = []; // drawPieceLights: the buildings drawn this frame, in draw order
+
+  // The placed pieces' lights at night (the gate's lamp, the lamp's lens and pool, a sign's neon, the sculpture's eyes),
+  // cut where a building drawn in front of them covers them, as the pieces themselves are: a sign or a lamp behind a
+  // building does not shine through the building. A light no building in front reaches is drawn as it always was; the
+  // others go on a layer in draw order, where each building erases the lights behind it (a see-through one only in
+  // part), and the layer goes over the city as the lights did one by one (the context is already additive, at the
+  // night's strength). Other pieces do not cut a light: they are small, and a yard full of lamps costs what it did.
+  private drawPieceLights(s: GameState, camX: number, camY: number, img: HTMLImageElement): void {
+    const ctx = this.ctx;
+    // the buildings drawn, in draw order (few next to the pieces and bots)
+    const blds = this.lightBuildings;
+    blds.length = 0;
+    for (let k = 0; k < this.drawnCount; k++) if (this.drawn[k].kind === K_BUILDING && this.drawn[k].f) blds.push(k);
+    const cut: number[] = [];
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let k = 0; k < this.drawnCount; k++) {
+      const d = this.drawn[k];
+      if (d.kind !== K_PIECE) continue;
+      const g = frame(glowOf(this.pieceNames[d.ref]));
+      if (!g) continue;
+      const tx = d.ref % MAP_W;
+      const top = tileTop(tx, (d.ref - tx) / MAP_W);
+      const gx = top.X - g.ax;
+      const gy = top.Y - g.ay;
+      let behind = false;
+      for (let n = blds.length - 1; n >= 0 && blds[n] > k && !behind; n--) {
+        const o = this.drawn[blds[n]];
+        behind = o.sx < gx + g.w && o.sy < gy + g.h && o.sx + o.w > gx && o.sy + o.h > gy;
+      }
+      if (!behind) {
+        ctx.drawImage(img, g.x, g.y, g.w, g.h, gx - camX, gy - camY, g.w, g.h);
+        continue;
+      }
+      cut.push(k);
+      x0 = Math.min(x0, gx);
+      y0 = Math.min(y0, gy);
+      x1 = Math.max(x1, gx + g.w);
+      y1 = Math.max(y1, gy + g.h);
+    }
+    if (!cut.length) return;
+    const w = Math.ceil(x1 - x0);
+    const h = Math.ceil(y1 - y0);
+    lightLayer ??= document.createElement('canvas');
+    if (lightLayer.width < w || lightLayer.height < h) {
+      lightLayer.width = Math.max(lightLayer.width, w);
+      lightLayer.height = Math.max(lightLayer.height, h);
+    }
+    const m = lightLayer.getContext('2d')!;
+    m.globalAlpha = 1;
+    m.globalCompositeOperation = 'source-over';
+    m.clearRect(0, 0, w, h);
+    let next = 0;
+    for (let k = cut[0]; k < this.drawnCount; k++) {
+      const o = this.drawn[k];
+      if (o.kind === K_BUILDING && o.f && o.sx < x1 && o.sy < y1 && o.sx + o.w > x0 && o.sy + o.h > y0) {
+        const b = s.buildings[o.index];
+        m.globalCompositeOperation = 'destination-out';
+        m.globalAlpha = b && b.id === o.ref && this.coversFocus(b, o.sx, o.sy, o.w, o.h) ? 0.35 : 1;
+        m.drawImage(img, o.f.x, o.f.y, o.f.w, o.f.h, o.sx - x0, o.sy - y0, o.f.w, o.f.h);
+      } else if (k === cut[next]) {
+        next++;
+        const g = frame(glowOf(this.pieceNames[o.ref]))!;
+        const tx = o.ref % MAP_W;
+        const top = tileTop(tx, (o.ref - tx) / MAP_W);
+        m.globalCompositeOperation = 'lighter';
+        m.globalAlpha = 1;
+        m.drawImage(img, g.x, g.y, g.w, g.h, top.X - g.ax - x0, top.Y - g.ay - y0, g.w, g.h);
+      }
+    }
+    ctx.drawImage(lightLayer, 0, 0, w, h, x0 - camX, y0 - camY, w, h);
+  }
+
   // The frame of a ghost: a fence joins the real fences and gates around it and the ghosts of its row that will be
   // laid, exactly as it will look (a refused one joins the whole row, so the row still reads as one); alone, it lies
   // along its rotation. The other pieces follow the tool's rotation; a planter or a sign shows its tile's look.
@@ -2250,15 +2328,7 @@ export class Renderer {
     // placed gates, lamps and decorations: the gate's amber light; the lamp's lens and the pool of light it throws on
     // the ground, both in its glow frame (so no street-lamp pool here: it would light the ground twice); a neon sign's
     // tubes; the sculpture's eyes when it faces the camera (its frames 0 and 1 have a glow)
-    for (let k = 0; k < this.drawnCount; k++) {
-      const d = this.drawn[k];
-      if (d.kind !== K_PIECE) continue;
-      const g = frame(glowOf(this.pieceNames[d.ref]));
-      if (!g) continue;
-      const tx = d.ref % MAP_W;
-      const top = tileTop(tx, (d.ref - tx) / MAP_W);
-      ctx.drawImage(img, g.x, g.y, g.w, g.h, top.X - g.ax - camX, top.Y - g.ay - camY, g.w, g.h);
-    }
+    this.drawPieceLights(s, camX, camY, img);
     for (let k = 0; k < this.drawnCount; k++) {
       const d = this.drawn[k];
       if (d.kind !== K_BOT || !d.f) continue;

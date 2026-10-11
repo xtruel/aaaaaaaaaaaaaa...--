@@ -24,6 +24,10 @@
 - **Si clicca quello che si vede**: un lampione o una decorazione davanti a un edificio prende il clic sui propri pixel
   (selezione, ruspa, evidenziazione); prima metà di un'insegna davanti al Quartier Generale selezionava l'edificio.
   Recinzioni e cancelli restano «trasparenti» al clic come nell'incremento 1.
+- **Le luci notturne restano dietro gli edifici**: un'insegna, un lampione, un cancello o una scultura nascosti dietro
+  un edificio non brillano più attraverso di esso (prima, di notte, un cuore al neon dietro il Quartier Generale
+  compariva sul suo tetto); le luci in vista e quelle davanti agli edifici restano come prima, e un cortile pieno di
+  lampioni costa da disegnare quanto prima.
 - **Nessun effetto su economia, felicità, smog, allineamento, stelle o achievement**: una città con decine di
   decorazioni gioca byte per byte come la stessa città senza (test con il pilota automatico). Salvataggi: codici 4
   panchina … 9 scultura, in coda a recinzione 1, cancello 2, lampione 3; i salvataggi vecchi si caricano come prima.
