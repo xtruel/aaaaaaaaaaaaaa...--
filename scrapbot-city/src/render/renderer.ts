@@ -6,6 +6,7 @@
 import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
 import type { BuildingType } from '../game/defs';
 import { placeCheck } from '../game/actions';
+import type { CatalogKind } from '../game/pieces';
 import { dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
 import type { Bot, Building, FxEvent, GameState } from '../game/state';
@@ -49,6 +50,12 @@ export interface ViewState {
   selectedId: number;
   hoverId?: number;
   reducedMotion: boolean;
+  // modular building: the catalog tool, the selected fence/gate/lamp/floor (tile index, -1 none), the tiles of a row
+  // being dragged, and the text the interface wants next to the ghost (a module's effect); left out = none
+  piece?: { kind: CatalogKind; rot: number } | null;
+  selectedPiece?: number;
+  pieceRow?: { x: number; y: number }[] | null;
+  pieceLabel?: string | null;
 }
 
 interface BotVis {
@@ -316,6 +323,19 @@ export class Renderer {
       // bots, citizens and scenery never take a click: what is behind them stays clickable
     }
     return -1;
+  }
+
+  // The fence, gate or lamp drawn under a screen point, else the floor tile under it: its tile index, or -1.
+  // A building drawn in front of it wins (pickBuilding is asked first).
+  pickPiece(_sx: number, _sy: number): number {
+    return -1;
+  }
+
+  // Screen box (CSS px) covering the piece on a tile.
+  pieceScreenBox(i: number): { left: number; top: number; right: number; bottom: number } {
+    const top = tileTop(i % MAP_W, Math.floor(i / MAP_W));
+    const z = this.pxZoom;
+    return { left: (top.X - TILE - this.cam.x) * z, top: (top.Y - this.cam.y) * z, right: (top.X + TILE - this.cam.x) * z, bottom: (top.Y + TILE - this.cam.y) * z };
   }
 
   pickCat(sx: number, sy: number): boolean {
