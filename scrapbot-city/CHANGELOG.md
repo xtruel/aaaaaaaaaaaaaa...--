@@ -31,9 +31,11 @@
   vista prima di comprare, annullare è gratis, una posa paga una volta, dopo la posa lo strumento resta in mano.
   Corretto: il secondo tocco o clic di un doppio tocco/clic (o `A` `A`) non compra più niente sulla mappa, né a cavallo
   tra due caselle (prima comprava due pezzi), né dietro una finestra o il pannello dello smog appena chiusi con quel
-  doppio tocco (prima comprava un pezzo); un tocco sulla mappa che chiude il pannello dello smog lo chiude e basta; un
-  doppio tocco su una voce del catalogo o su «Fatto» non prende più un'altra voce quando la lista si sposta sotto il
-  dito. Un tocco su un'altra casella, o dopo un attimo, funziona come prima.
+  doppio tocco (prima comprava un pezzo); con la ruspa un doppio clic su una recinzione non toglie anche il pavimento
+  sotto; sulla stessa casella il secondo tocco viene rifiutato con il motivo, come prima; un tocco sulla mappa che
+  chiude il pannello dello smog lo chiude e basta; un doppio tocco su una voce del catalogo o su «Fatto» non prende
+  più un'altra voce quando la lista si sposta sotto il dito. Un tocco su un'altra casella, o dopo un attimo, funziona
+  come prima.
 - Nessun numero degli edifici originali è cambiato: `npm run balance` (con la stessa sequenza casuale) e `npm run
   waits` danno le stesse uscite byte per byte.
 
