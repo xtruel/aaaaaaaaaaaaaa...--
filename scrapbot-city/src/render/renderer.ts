@@ -8,7 +8,7 @@ import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { costText, placeCheck } from '../game/actions';
 import type { PlaceCheck } from '../game/actions';
-import { MODULES, PIECES, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
+import { MODULES, PIECES, buildingStats, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
 import type { CatalogKind, ModuleKind, PieceKind, SolidKind } from '../game/pieces';
 import { dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
@@ -1380,7 +1380,8 @@ export class Renderer {
 
   private drawGroundMarks(s: GameState, view: ViewState, camX: number, camY: number): void {
     const selected = view.selectedId >= 0 ? s.buildings.find((b) => b.id === view.selectedId) : undefined;
-    if (selected && BUILDINGS[selected.type].cleanRadius) this.drawRadius(selected.x, selected.y, selected.type, camX, camY);
+    // the radius the sim cleans: 8 tiles with the Purifier's nozzle
+    if (selected && BUILDINGS[selected.type].cleanRadius) this.drawRadius(selected.x, selected.y, selected.type, camX, camY, buildingStats(selected).cleanRadius);
     if (view.piece?.kind === 'floor') this.drawFloorGhosts(camX, camY);
     const h = view.hover;
     // a catalog tool shows its own preview (drawPiecePreview)
@@ -1682,9 +1683,9 @@ export class Renderer {
     }
   }
 
-  private drawRadius(tx: number, ty: number, type: BuildingType, camX: number, camY: number): void {
+  private drawRadius(tx: number, ty: number, type: BuildingType, camX: number, camY: number, radius = BUILDINGS[type].cleanRadius ?? 0): void {
     const def = BUILDINGS[type];
-    const r = (def.cleanRadius ?? 0) * TILE;
+    const r = radius * TILE;
     const cx = (tx + def.w / 2) * TILE;
     const cy = (ty + def.h / 2) * TILE;
     const ctx = this.ctx;

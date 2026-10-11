@@ -110,7 +110,20 @@ describe('catalog panel', () => {
     expect(q(root, '[data-inspector]')!.hidden).toBe(true);
     expect(q(root, '[data-catalog]')!.classList.contains('active')).toBe(true);
     const items = [...panel.querySelectorAll<HTMLElement>('[data-item]')];
-    expect(items.map((b) => b.dataset.item)).toEqual(['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter']);
+    expect(items.map((b) => b.dataset.item)).toEqual([
+      'floor',
+      'fence',
+      'gate',
+      'lamp',
+      'dockStorage',
+      'smelterFilter',
+      'recyclerMagnet',
+      'recyclerSorter',
+      'factoryArm',
+      'podsCapsule',
+      'solarTracker',
+      'purifierNozzle',
+    ]);
     expect(panel.textContent).toContain('Construction');
     expect(panel.textContent).toContain('Machine modules');
     // no Dock yet: the module says why it cannot be had
@@ -189,6 +202,34 @@ describe('catalog panel', () => {
 });
 
 describe('building panel modules', () => {
+  it('the building rows read the numbers the sim uses with the module: cycle output, homes, sludge radius; one slot', () => {
+    const { s, root, update } = setup();
+    const rec = build(s, 'recycler');
+    const pods = build(s, 'pods');
+    const pur = build(s, 'purifier');
+    const insp = q(root, '[data-inspector]')!;
+    const rows = () => insp.querySelector('dl')!.textContent!;
+    update({ selectedId: rec.id });
+    expect(rows()).toContain('3 scrap → 2 parts');
+    expect(installModule(s, 'recyclerSorter', rec)).toBe(true);
+    update({ selectedId: rec.id });
+    expect(rows()).toContain('3 scrap → 3 parts');
+    // the magnet shares the slot: greyed out, with the reason in words
+    const magnet = q(insp, '[data-mod="recyclerMagnet"]')!;
+    expect(q(magnet, '[data-install]')!.hasAttribute('disabled')).toBe(true);
+    expect(magnet.querySelector('.cat-reason')!.textContent).toBe('Slot taken by Precision sorter: remove it first');
+    update({ selectedId: pods.id });
+    expect(rows()).toContain('Citizens: 6');
+    installModule(s, 'podsCapsule', pods);
+    update({ selectedId: pods.id });
+    expect(rows()).toContain('Citizens: 9');
+    update({ selectedId: pur.id });
+    expect(rows()).toContain('Radius: 5 tiles');
+    installModule(s, 'purifierNozzle', pur);
+    update({ selectedId: pur.id });
+    expect(rows()).toContain('Radius: 8 tiles');
+  });
+
   it('shows the slot, before -> after, 0/1 and Install; then 1/1 and Remove with a second click', () => {
     const { s, root, calls, update } = setup();
     const dock = build(s, 'dock');

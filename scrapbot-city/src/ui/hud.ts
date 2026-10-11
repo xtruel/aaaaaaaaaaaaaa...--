@@ -732,7 +732,8 @@ export class Hud {
     }
     const bar = panel.querySelector<HTMLElement>('[data-progress]');
     if (bar) {
-      const p = b.built < 1 ? b.built : def.process ? b.timer / def.process.time : def.fuel ? Math.min(1, b.fuel / def.fuel.seconds) : 1;
+      // (the cycle with the module installed: the magnet's 1.5 s, the sorter's 3 s)
+      const p = b.built < 1 ? b.built : def.process ? b.timer / buildingStats(b).cycle : def.fuel ? Math.min(1, b.fuel / def.fuel.seconds) : 1;
       bar.style.width = `${Math.round(p * 100)}%`;
     }
     // a confirmation that would leave less storage than the scrap in it says how much goes (bots keep
@@ -749,18 +750,18 @@ export class Hud {
 
   private renderInspector(s: GameState, b: Building): void {
     const def = BUILDINGS[b.type];
-    // energy, smog and storage with the installed modules
+    // energy, smog, storage, cycle, homes and sludge radius with the installed module (what the sim uses)
     const stats = buildingStats(b);
     const rows: [string, string][] = [];
     if (stats.energy) rows.push([t('insp.energy'), `${stats.energy > 0 ? '+' : ''}${stats.energy}`]);
     if (stats.pollution) rows.push([t('insp.smog'), `${stats.pollution > 0 ? '+' : ''}${(stats.pollution * 60).toFixed(1)}`]);
-    if (def.process) rows.push([t('insp.cycle'), `${costText(def.process.input)} → ${costText(def.process.output)}`]);
+    if (def.process) rows.push([t('insp.cycle'), `${costText(stats.input)} → ${costText(stats.output)}`]);
     if (def.fuel) rows.push([t('insp.fuel'), t('insp.fuelValue', { n: def.fuel.scrap, s: def.fuel.seconds })]);
-    if (def.housing) rows.push([t('insp.homes'), t('insp.homesValue', { n: def.housing })]);
+    if (stats.housing) rows.push([t('insp.homes'), t('insp.homesValue', { n: stats.housing })]);
     if (stats.storage) rows.push([t('insp.storage'), costText({ scrap: stats.storage })]);
     if (def.bots) rows.push([t('insp.bots'), `+${def.bots}`]);
     if (def.happiness) rows.push([t('insp.happiness'), `+${def.happiness}`]);
-    if (def.cleanRadius) rows.push([t('insp.cleans'), t('insp.cleansValue', { n: def.cleanRadius })]);
+    if (stats.cleanRadius) rows.push([t('insp.cleans'), t('insp.cleansValue', { n: stats.cleanRadius })]);
     // the modules go with the building: their refunds are part of it
     const refund = costText(demolishRefund(s, b));
     const pausable = b.built >= 1 && (def.process || def.fuel || def.cleanRadius);

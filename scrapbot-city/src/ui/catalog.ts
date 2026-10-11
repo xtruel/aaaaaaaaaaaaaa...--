@@ -4,7 +4,7 @@
 import { canAfford, costText } from '../game/actions';
 import { MAP_W, T } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
-import { CATALOG_ORDER, MODULES, PIECES, buildingStats, buildingStatsWith, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, solidKind } from '../game/pieces';
+import { CATALOG_ORDER, MODULES, PIECES, buildingStats, buildingStatsWith, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, moduleNeeds, solidKind } from '../game/pieces';
 import type { BuildingStats, CatalogKind, ModuleKind, PieceKind } from '../game/pieces';
 import type { Building, GameState } from '../game/state';
 import { t, tk } from '../i18n';
@@ -41,12 +41,8 @@ export function shortfall(s: GameState, cost: Cost): Cost {
   return out;
 }
 
-// Where a module can go, in the words of moduleCheck (which needs a building to say it).
-const NEEDS: Record<ModuleKind, Key> = { dockStorage: 'place.modDock', smelterFilter: 'place.modSmelter' };
-
-export function moduleNeeds(kind: ModuleKind): string {
-  return t(NEEDS[kind]);
-}
+// Where a module can go, in the words of moduleCheck (which needs a building to say it): core's moduleNeeds.
+export { moduleNeeds } from '../game/pieces';
 
 export interface CatalogState {
   ok: boolean;
@@ -67,7 +63,8 @@ export function catalogState(s: GameState, kind: CatalogKind): CatalogState {
   const checks = targets.map((b) => moduleCheck(s, kind, b));
   if (checks.some((c) => c.ok)) return { ok: true };
   if (checks.some((c) => c.costOnly)) return missing(s, cost);
-  return { ok: false, reason: t('place.modInstalled') };
+  // already installed, or the slot taken by the other module (moduleCheck's own words)
+  return { ok: false, reason: checks.find((c) => c.reason)?.reason ?? t('place.modInstalled') };
 }
 
 // Can `kind` go on this building now? moduleCheck's answer, with what is missing instead of the full price.

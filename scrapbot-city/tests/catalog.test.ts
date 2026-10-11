@@ -76,10 +76,13 @@ function row3(s: GameState): { x: number; y: number }[] {
 }
 
 describe('catalog wording', () => {
-  it('lists the four construction pieces, then the two machine modules, each with a name, effect and limit', () => {
+  it('lists the four construction pieces, then the machine modules, each with a name, effect and limit', () => {
     expect(CONSTRUCTION).toEqual(['floor', 'fence', 'gate', 'lamp']);
-    expect(MACHINE_MODULES).toEqual(['dockStorage', 'smelterFilter']);
-    for (const kind of [...CONSTRUCTION, ...MACHINE_MODULES]) {
+    expect(MACHINE_MODULES).toEqual(['dockStorage', 'smelterFilter', 'recyclerMagnet', 'recyclerSorter', 'factoryArm', 'podsCapsule', 'solarTracker', 'purifierNozzle']);
+    // every module has its name (the "slot taken by" reason uses it)
+    for (const kind of MACHINE_MODULES) expect(catalogName(kind), kind).not.toMatch(/^mod\./);
+    // effect and limit wording of the increment-2 modules comes with their panel rows (UI, increment 2 G1)
+    for (const kind of [...CONSTRUCTION, ...MACHINE_MODULES.slice(0, 2)]) {
       for (const text of [catalogName(kind), catalogEffect(kind), catalogLimit(kind)]) {
         expect(text, kind).not.toMatch(/^(pc|mod|cat)\./);
         expect(text, kind).not.toMatch(/\{\w+\}/);
@@ -140,6 +143,19 @@ describe('what can be bought now', () => {
     s.res.parts = 0;
     expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, reason: 'Missing 15 parts' });
     expect(catalogState(s, 'smelterFilter')).toEqual({ ok: false, reason: t('place.modSmelter') });
+  });
+
+  it('the Recycler slot: the sorter is not on offer where every Recycler has the magnet, and says why', () => {
+    const s = city();
+    const a = build(s, 'recycler');
+    const b = build(s, 'recycler');
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: true });
+    installModule(s, 'recyclerMagnet', a);
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: true }); // the second Recycler is free
+    installModule(s, 'recyclerMagnet', b);
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: false, reason: 'Slot taken by Magnetic separator: remove it first' });
+    expect(catalogState(s, 'recyclerMagnet')).toEqual({ ok: false, reason: t('place.modInstalled') });
+    expect(installState(s, 'recyclerSorter', a)).toEqual({ ok: false, reason: 'Slot taken by Magnetic separator: remove it first' });
   });
 
   it('on one building: moduleCheck, with what is missing instead of the whole price', () => {
