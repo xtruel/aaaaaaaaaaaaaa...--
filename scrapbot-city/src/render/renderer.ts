@@ -10,7 +10,7 @@ import { costText, placeCheck } from '../game/actions';
 import type { PlaceCheck } from '../game/actions';
 import { MODULES, PIECES, buildingStats, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
 import type { CatalogKind, ModuleKind, PieceKind, SolidKind } from '../game/pieces';
-import { dayPhase } from '../game/sim';
+import { airEffect, dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
 import type { Bot, Building, FxEvent, GameState } from '../game/state';
 import { hash2 } from '../game/world';
@@ -1960,26 +1960,53 @@ export class Renderer {
       if (!art) continue;
       const working = isWorking(s, b);
       const top = tileTop(b.x, b.y);
+      // Smoke and steam follow what the building puts into the air right now (the sim's airEffect: slower on a power
+      // shortage, x1.5 on overtime, none when it stops). The plain building's chimneys keep their 6 puffs a second at
+      // full power; a module's extra point (the double arm's exhaust) adds the module's extra smoke on top, so two
+      // points never halve the chimney's smoke.
       const smoke = art.points.smoke;
-      if (working && smoke && Math.random() < dt * 6) {
-        const p = smoke[Math.floor(Math.random() * smoke.length)];
+      if (working && smoke) {
+        const st = buildingStats(b);
+        const pace = st.pollution > 0 ? airEffect(s, b) / st.pollution : 1; // power share x overtime
+        const mul = BUILDINGS[b.type].pollution > 0 ? st.pollution / BUILDINGS[b.type].pollution : 1; // the module's
+        const own = Math.min(smoke.length, buildingArt[b.type]?.points.smoke?.length ?? smoke.length);
         const dirty = s.pollution > 60 ? '#4a3c32' : '#6d6878';
-        this.spawn(top.X + p[0], top.Y + p[1], 4 + Math.random() * 6, -8 - Math.random() * 6, 2.6, 2, dirty, 1.4);
+        for (let k = 0; k < smoke.length; k++) {
+          const rate = k < own ? (6 * pace * Math.min(1, mul)) / own : (6 * pace * Math.max(0, mul - 1)) / (smoke.length - own);
+          if (Math.random() >= dt * rate) continue;
+          const p = smoke[k];
+          this.spawn(top.X + p[0], top.Y + p[1], 4 + Math.random() * 6, -8 - Math.random() * 6, 2.6, 2, dirty, 1.4);
+        }
       }
-      // light, thin steam, much sparser than smoke
+      // light, thin steam, much sparser than smoke (as much as the filtered smoke it stands for)
       const steam = art.points.steam;
-      if (working && steam && Math.random() < dt * 2) {
-        const p = steam[0];
-        this.spawn(top.X + p[0] + (Math.random() - 0.5) * 3, top.Y + p[1], 2 + Math.random() * 4, -9 - Math.random() * 5, 1.6, 1, Math.random() < 0.5 ? '#e4e2ee' : '#c3c0d4', 1.2);
+      if (working && steam) {
+        const st = buildingStats(b);
+        const pace = st.pollution > 0 ? airEffect(s, b) / st.pollution : 1;
+        if (Math.random() < dt * 2 * pace) {
+          const p = steam[0];
+          this.spawn(top.X + p[0] + (Math.random() - 0.5) * 3, top.Y + p[1], 2 + Math.random() * 4, -9 - Math.random() * 5, 1.6, 1, Math.random() < 0.5 ? '#e4e2ee' : '#c3c0d4', 1.2);
+        }
       }
       const spark = art.points.spark;
       if (working && spark && Math.random() < dt * 3) {
         const p = spark[0];
         this.spawn(top.X + p[0] + (Math.random() - 0.5) * 6, top.Y + p[1], (Math.random() - 0.5) * 10, -12 - Math.random() * 8, 0.8, 1, PAL.lime, 0);
       }
-      if (b.type === 'purifier' && s.derived.efficiency > 0 && Math.random() < dt * 2) {
+      // a Purifier's droplets and its nozzle's mist only while it cleans (not paused, not without power), as fast as
+      // the power it gets lets it
+      if (b.type === 'purifier' && working && Math.random() < dt * 2 * s.derived.efficiency) {
         const def = BUILDINGS[b.type];
         this.spawn(top.X + ((def.w - def.h) * TILE) / 2, top.Y - (art.height - 4), (Math.random() - 0.5) * 6, -10, 1.2, 1, PAL.cyan, 0);
+      }
+      // the extended nozzle's spray: pale specks drifting down from its head
+      const mist = art.points.mist;
+      if (mist && working) {
+        const p = mist[0];
+        for (let n = 0; n < 2; n++) {
+          if (Math.random() >= dt * 4 * s.derived.efficiency) continue;
+          this.spawn(top.X + p[0] + (Math.random() - 0.5) * 4, top.Y + p[1] + 2, (Math.random() - 0.5) * 8, 6 + Math.random() * 6, 1.1, 1, Math.random() < 0.5 ? '#dff6f4' : '#a9e8ec', 0.5);
+        }
       }
       if (b.type === 'garden' && s.pollution < 50 && Math.random() < dt * 0.4) {
         this.spawn(top.X, top.Y + 2, 6, 4, 2, 1, PAL.greenL, 0);
