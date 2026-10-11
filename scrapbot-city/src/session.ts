@@ -778,9 +778,13 @@ export class GameSession implements PadTarget {
       else if (type === 'spire') this.build = null;
       return;
     }
-    // what you see is what you click: a building's roof or walls select it even over another tile
+    // what you see is what you click: a building's roof or walls select it even over another tile. The bulldozer
+    // works on the ground tile under the pointer (it draws the buildings in front of it see-through): rubble there,
+    // or a fence, gate or lamp, which a building in front can hide entirely, is cleared instead
     const picked = this.renderer.pickBuilding(sx, sy);
-    if (picked >= 0 && !(this.bulldoze && inBounds(tile.x, tile.y) && s.tiles[idx(tile.x, tile.y)] === T.RUBBLE && s.occ[idx(tile.x, tile.y)] === -1)) {
+    const ground = inBounds(tile.x, tile.y) ? idx(tile.x, tile.y) : -1;
+    const clears = this.bulldoze && ground >= 0 && s.occ[ground] === -1 && (s.tiles[ground] === T.RUBBLE || s.solid[ground] !== 0);
+    if (picked >= 0 && !clears) {
       this.selectBuilding(picked);
       audio.play('click');
       return;
