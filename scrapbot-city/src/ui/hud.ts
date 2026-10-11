@@ -802,8 +802,13 @@ export class Hud {
       this.confirmDemolish = false;
       this.handlers.onDemolish(b.id);
     });
-    for (const btn of panel.querySelectorAll<HTMLElement>('[data-install]')) {
-      btn.addEventListener('click', () => this.handlers.onInstall(b.id, btn.dataset.install as ModuleKind));
+    for (const btn of panel.querySelectorAll<HTMLButtonElement>('[data-install]')) {
+      btn.addEventListener('click', () => {
+        // one click, one module: the second click of a double click finds the button greyed out (it comes back
+        // with the next update if the module could not go on)
+        btn.disabled = true;
+        this.handlers.onInstall(b.id, btn.dataset.install as ModuleKind);
+      });
     }
     for (const btn of panel.querySelectorAll<HTMLElement>('[data-remove]')) {
       btn.addEventListener('click', () => {

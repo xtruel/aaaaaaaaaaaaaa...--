@@ -199,6 +199,8 @@ describe('building panel modules', () => {
     expect(slot.textContent).toContain('Roof slot');
     expect(slot.querySelector('.mod-count')!.textContent).toBe('0/1');
     expect(slot.querySelector('.mod-fx')!.textContent).toBe('Storage80 → 180');
+    // a double click installs once: the button greys out until the panel follows
+    q(slot, '[data-install]')!.click();
     q(slot, '[data-install]')!.click();
     expect(calls).toEqual([['onInstall', dock.id, 'dockStorage' satisfies ModuleKind]]);
 

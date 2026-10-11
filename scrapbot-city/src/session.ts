@@ -169,7 +169,9 @@ export class GameSession implements PadTarget {
         },
         onRotatePiece: (i) => this.rotatePiece(i, 1),
         onRemovePiece: (i) => {
-          if (removePieceAt(this.s, i % MAP_W, Math.floor(i / MAP_W))) this.selectedPiece = -1;
+          // only the piece still selected: the second click of a double click, on the button before the panel
+          // follows, must not take up the floor under a lamp just removed
+          if (i === this.selectedPiece && removePieceAt(this.s, i % MAP_W, Math.floor(i / MAP_W))) this.selectedPiece = -1;
         },
       },
       s,
