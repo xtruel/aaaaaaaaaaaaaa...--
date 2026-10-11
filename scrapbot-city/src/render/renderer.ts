@@ -8,7 +8,7 @@ import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { costText, placeCheck } from '../game/actions';
 import type { PlaceCheck } from '../game/actions';
-import { MODULES, PIECES, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
+import { MODULES, PIECES, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, pieceVariety, solidKind } from '../game/pieces';
 import type { CatalogKind, ModuleKind, PieceKind, SolidKind } from '../game/pieces';
 import { airEffect, dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
@@ -102,20 +102,47 @@ const POOL = [5, 10, 14, 16, 14, 10, 5]; // half-widths of a lamp's light pool, 
 
 // Player-built pieces (0.7): how tall the solid ones stand (voxels; draw order, bots fly over them), and their
 // frames: a fence by the mask of its fence/gate neighbours (alone: along x or y by its rotation), a gate by its
-// rotation (0 along x, 1 along y), a lamp by the direction of its arm (0 +x, 1 +y, 2 −x, 3 −y).
-const PIECE_H: Record<SolidKind, number> = { fence: 10, gate: 12, lamp: 22 };
+// rotation (0 along x, 1 along y), a lamp by the direction of its arm (0 +x, 1 +y, 2 −x, 3 −y). Increment 2's
+// decorations: bench, sign, Miso's house and sculpture by their direction (as the lamp), the pergola along x or y,
+// the planter's flowers and the sign's motif by the tile (pieceVariety).
+const PIECE_H: Record<SolidKind, number> = { fence: 10, gate: 12, lamp: 22, bench: 11, planter: 20, sign: 26, pergola: 22, cathouse: 15, sculpture: 27 };
 const PIECE_REACH = 64; // no piece's sprite or shadow reaches this far (px) from its tile: farther off-view ones are skipped early
 const FENCE_FRAMES = Array.from({ length: 16 }, (_, mask) => `pc/fence/${mask}`);
 const GATE_FRAMES = ['pc/gate/x', 'pc/gate/y'];
-const LAMP_FRAMES = [0, 1, 2, 3].map((dir) => `pc/lamp/${dir}`);
+const DIR_FRAMES = (kind: string) => [0, 1, 2, 3].map((dir) => `pc/${kind}/${dir}`);
+const LAMP_FRAMES = DIR_FRAMES('lamp');
+const BENCH_FRAMES = DIR_FRAMES('bench');
+const CATHOUSE_FRAMES = DIR_FRAMES('cathouse');
+const SCULPTURE_FRAMES = DIR_FRAMES('sculpture');
+const PLANTER_FRAMES = ['pc/planter/0', 'pc/planter/1'];
+const SIGN_FRAMES = [0, 1, 2].map((motif) => DIR_FRAMES(`sign/${motif}`));
+const PERGOLA_FRAMES = ['pc/pergola/x', 'pc/pergola/y'];
 const FLOOR_FRAMES = [0, 1, 2, 3].map((k) => `t/floor/${k}`);
 const GHOST_OK = 'rgba(198,244,50,0.35)';
 const GHOST_BAD = 'rgba(226,54,75,0.5)';
 
-function pieceFrameOf(kind: SolidKind, rot: number, mask: number): string {
-  if (kind === 'fence') return mask ? FENCE_FRAMES[mask] : rot & 1 ? 'pc/fence/y' : 'pc/fence/x';
-  if (kind === 'gate') return GATE_FRAMES[rot & 1];
-  return LAMP_FRAMES[rot & 3];
+// (variety: pieceVariety of the tile, for the planter and the sign)
+export function pieceFrameOf(kind: SolidKind, rot: number, mask: number, variety = 0): string {
+  switch (kind) {
+    case 'fence':
+      return mask ? FENCE_FRAMES[mask] : rot & 1 ? 'pc/fence/y' : 'pc/fence/x';
+    case 'gate':
+      return GATE_FRAMES[rot & 1];
+    case 'pergola':
+      return PERGOLA_FRAMES[rot & 1];
+    case 'bench':
+      return BENCH_FRAMES[rot & 3];
+    case 'cathouse':
+      return CATHOUSE_FRAMES[rot & 3];
+    case 'sculpture':
+      return SCULPTURE_FRAMES[rot & 3];
+    case 'planter':
+      return PLANTER_FRAMES[variety] ?? PLANTER_FRAMES[0];
+    case 'sign':
+      return (SIGN_FRAMES[variety] ?? SIGN_FRAMES[0])[rot & 3];
+    default:
+      return LAMP_FRAMES[rot & 3];
+  }
 }
 
 // Which of the four plates a floor tile shows: fixed per tile, so a laid floor looks like its preview.
@@ -592,11 +619,11 @@ export class Renderer {
     return { left: (top.X - TILE - this.cam.x) * z, top: (top.Y - this.cam.y) * z, right: (top.X + TILE - this.cam.x) * z, bottom: (top.Y + TILE - this.cam.y) * z };
   }
 
-  // The frame of the fence, gate or lamp on a tile. A fence joins its fence and gate neighbours, and the ghosts of
-  // the ones being laid next to it.
+  // The frame of the solid piece on a tile. A fence joins its fence and gate neighbours, and the ghosts of the ones
+  // being laid next to it; a planter or a sign shows the look its tile gives it.
   private pieceFrameName(s: GameState, tx: number, ty: number, i: number): string {
     const kind = solidKind(s.solid[i]) ?? 'fence';
-    if (kind !== 'fence') return pieceFrameOf(kind, s.rot[i], 0);
+    if (kind !== 'fence') return pieceFrameOf(kind, s.rot[i], 0, pieceVariety(kind, tx, ty));
     return pieceFrameOf(kind, s.rot[i], this.joinMask(s, tx, ty, this.ghostJoin));
   }
 
@@ -2042,9 +2069,9 @@ export class Renderer {
 
   // The frame of a ghost: a fence joins the real fences and gates around it and the ghosts of its row that will be
   // laid, exactly as it will look (a refused one joins the whole row, so the row still reads as one); alone, it lies
-  // along its rotation. A gate and a lamp follow the tool's rotation.
+  // along its rotation. The other pieces follow the tool's rotation; a planter or a sign shows its tile's look.
   private ghostFrameName(s: GameState, kind: Exclude<PieceKind, 'floor'>, rot: number, g: Ghost): string {
-    if (kind !== 'fence' || !inBounds(g.x, g.y)) return pieceFrameOf(kind, rot, 0);
+    if (kind !== 'fence' || !inBounds(g.x, g.y)) return pieceFrameOf(kind, rot, 0, pieceVariety(kind, g.x, g.y));
     return pieceFrameOf(kind, rot, this.joinMask(s, g.x, g.y, g.ok ? this.ghostJoin : this.ghostRow));
   }
 
@@ -2212,8 +2239,9 @@ export class Renderer {
         for (const p of art.points.light) ctx.fillRect(top.X + p[0] - 2 - camX, top.Y + p[1] - 2 - camY, 4, 4);
       }
     }
-    // placed gates and lamps: the gate's amber light; the lamp's lens and the pool of light it throws on the ground,
-    // both in its glow frame (so no street-lamp pool here: it would light the ground twice)
+    // placed gates, lamps and decorations: the gate's amber light; the lamp's lens and the pool of light it throws on
+    // the ground, both in its glow frame (so no street-lamp pool here: it would light the ground twice); a neon sign's
+    // tubes; the sculpture's eyes when it faces the camera (its frames 0 and 1 have a glow)
     for (let k = 0; k < this.drawnCount; k++) {
       const d = this.drawn[k];
       if (d.kind !== K_PIECE) continue;

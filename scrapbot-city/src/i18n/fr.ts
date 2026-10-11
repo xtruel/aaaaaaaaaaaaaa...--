@@ -692,7 +692,7 @@ export const fr: Dict = {
   'insp.decoration': "Décoration : aucun effet sur l'économie",
   'msg.rowPartial': "{n} sur {total} posés : les autres cases étaient prises ou l'argent manquait.",
   'extras.controls.5': "<kbd>O</kbd> : objets et modules · <kbd>R</kbd> : tourner (<kbd>Maj</kbd>+<kbd>R</kbd> : dans l'autre sens) · glisser avec le bouton gauche : une rangée de sol ou de clôture",
-  'extras.controls.pad3': "<kbd>Y</kbd> tourne aussi une clôture, un portail ou un lampadaire pendant la pose.",
+  'extras.controls.pad3': "<kbd>Y</kbd> tourne aussi l'objet en main pendant la pose (clôture, portail, lampadaire, banc…).",
 
   // ---------- added in 0.7, increment 2: readable smog ----------
   'hud.smog.more': "Clique ou touche pour voir d'où il vient et où il va.",
@@ -710,4 +710,26 @@ export const fr: Dict = {
   'smog.power': "Énergie à {n} % : l'industrie et les Purificateurs tournent moins vite.",
   'smog.limit': "Au-dessus de {limit} % pendant {seconds} secondes, la ville est perdue.",
   'smog.countdown': "Au-dessus de {limit} % : la ville est perdue dans {n} s !",
+
+  // ---------- added in 0.7, increment 2 (G2): decorations ----------
+  'cat.decorations': "Décorations",
+  'pc.bench': "Banc",
+  'pc.bench.effect': "Cadre en tuyaux de récup et lattes de bois ; tourne dans 4 directions",
+  'pc.planter': "Jardinière",
+  'pc.planter.effect': "Tulipes ou tournesols : la case décide",
+  'pc.sign': "Enseigne néon",
+  'pc.sign.effect': "Tête de bot, flèches du recyclage ou cœur (la case décide) ; allumée la nuit",
+  'pc.pergola': "Pergola",
+  'pc.pergola.effect': "Glycine grimpante sur un cadre en acier ; tourne dans 2 sens",
+  'pc.cathouse': "Maison de Miso",
+  'pc.cathouse.effect': "Niche avec coussin pour le chat ; Miso garde ses habitudes",
+  'pc.sculpture': "Sculpture de ferraille",
+  'pc.sculpture.effect': "Un robot soudé avec la ferraille en trop ; sa ferraille ne revient que si le stockage a de la place",
+  'place.bench': "Un banc gêne : retire-le d'abord",
+  'place.planter': "Une jardinière gêne : retire-la d'abord",
+  'place.sign': "Une enseigne néon gêne : retire-la d'abord",
+  'place.pergola': "Une pergola gêne : retire-la d'abord",
+  'place.cathouse': "La maison de Miso gêne : retire-la d'abord",
+  'place.sculpture': "Une sculpture de ferraille gêne : retire-la d'abord",
+  'insp.scrapRoom': "Le stockage a de la place pour {n} des {max} ferraille : le reste n'est pas rendu.",
 };

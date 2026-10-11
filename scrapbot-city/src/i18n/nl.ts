@@ -692,7 +692,7 @@ export const nl: Dict = {
   'insp.decoration': 'Decoratie: geen effect op de economie',
   'msg.rowPartial': '{n} van {total} neergezet: de andere vakjes waren bezet of het geld was op.',
   'extras.controls.5': '<kbd>O</kbd>: objecten & modules · <kbd>R</kbd>: draaien (<kbd>Shift</kbd>+<kbd>R</kbd>: de andere kant op) · slepen met de linkerknop: een rij vloer of hek',
-  'extras.controls.pad3': '<kbd>Y</kbd> draait ook een hek, poort of lantaarnpaal terwijl je die neerzet.',
+  'extras.controls.pad3': '<kbd>Y</kbd> draait ook het stuk in je hand terwijl je het neerzet (hek, poort, lantaarnpaal, bankje…).',
 
   // ---------- added in 0.7, increment 2: readable smog ----------
   'hud.smog.more': 'Klik of tik: waar de smog vandaan komt en heen gaat.',
@@ -710,4 +710,26 @@ export const nl: Dict = {
   'smog.power': 'Energie op {n}%: industrie en Zuiveraars werken trager.',
   'smog.limit': 'Staat de smog {seconds} seconden boven {limit}%, dan is de stad verloren.',
   'smog.countdown': 'Boven {limit}%: over {n}s is de stad verloren!',
+
+  // ---------- added in 0.7, increment 2 (G2): decorations ----------
+  'cat.decorations': 'Decoraties',
+  'pc.bench': 'Bankje',
+  'pc.bench.effect': 'Frame van schrootbuizen en houten latten; draait 4 kanten op',
+  'pc.planter': 'Plantenbak',
+  'pc.planter.effect': 'Tulpen of zonnebloemen: de tegel kiest',
+  'pc.sign': 'Neonbord',
+  'pc.sign.effect': "Botgezicht, recyclepijlen of hartje (de tegel kiest); 's nachts verlicht",
+  'pc.pergola': 'Pergola',
+  'pc.pergola.effect': 'Blauweregen langs een stalen frame; draait 2 kanten op',
+  'pc.cathouse': 'Huisje van Miso',
+  'pc.cathouse.effect': 'Kattenhuisje met kussen; Miso houdt zijn gewoontes',
+  'pc.sculpture': 'Schrootbeeld',
+  'pc.sculpture.effect': 'Een robot gelast van overtollig schroot; het schroot komt alleen terug als de opslag ruimte heeft',
+  'place.bench': 'Hier staat een bankje: haal het eerst weg',
+  'place.planter': 'Hier staat een plantenbak: haal hem eerst weg',
+  'place.sign': 'Hier staat een neonbord: haal het eerst weg',
+  'place.pergola': 'Hier staat een pergola: haal hem eerst weg',
+  'place.cathouse': 'Hier staat het huisje van Miso: haal het eerst weg',
+  'place.sculpture': 'Hier staat een schrootbeeld: haal het eerst weg',
+  'insp.scrapRoom': 'De opslag heeft ruimte voor {n} van de {max} schroot: de rest komt niet terug.',
 };

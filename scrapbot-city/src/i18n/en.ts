@@ -693,7 +693,7 @@ export const en = {
   'insp.decoration': 'Decoration: no effect on the economy',
   'msg.rowPartial': '{n} of {total} laid: the other tiles were taken or out of budget.',
   'extras.controls.5': '<kbd>O</kbd>: objects & modules · <kbd>R</kbd>: rotate (<kbd>Shift</kbd>+<kbd>R</kbd>: the other way) · drag with the left button: a row of floor or fence',
-  'extras.controls.pad3': '<kbd>Y</kbd> also turns a fence, gate or lamp post while you place it.',
+  'extras.controls.pad3': '<kbd>Y</kbd> also turns the piece in your hand (fence, gate, lamp post, bench…) while you place it.',
 
   // ---------- added in 0.7, increment 2: readable smog ----------
   'hud.smog.more': 'Click or tap for where it comes from and where it goes.',
@@ -711,4 +711,26 @@ export const en = {
   'smog.power': 'Power at {n}%: industry and Purifiers work slower.',
   'smog.limit': 'Above {limit}% for {seconds} seconds the city is lost.',
   'smog.countdown': 'Above {limit}%: the city is lost in {n}s!',
+
+  // ---------- added in 0.7, increment 2 (G2): decorations ----------
+  'cat.decorations': 'Decorations',
+  'pc.bench': 'Bench',
+  'pc.bench.effect': 'Scrap-pipe frame and wooden slats; turns 4 ways',
+  'pc.planter': 'Planter',
+  'pc.planter.effect': 'Tulips or sunflowers: the tile chooses',
+  'pc.sign': 'Neon sign',
+  'pc.sign.effect': 'Bot face, recycling arrows or heart (the tile chooses); lit at night',
+  'pc.pergola': 'Pergola',
+  'pc.pergola.effect': 'Wisteria climbing a steel frame; turns 2 ways',
+  'pc.cathouse': "Miso's house",
+  'pc.cathouse.effect': "A cat house with a cushion; Miso's habits stay the same",
+  'pc.sculpture': 'Scrap sculpture',
+  'pc.sculpture.effect': 'A robot welded from spare scrap; its scrap comes back only if storage has room',
+  'place.bench': 'A bench is in the way: remove it first',
+  'place.planter': 'A planter is in the way: remove it first',
+  'place.sign': 'A neon sign is in the way: remove it first',
+  'place.pergola': 'A pergola is in the way: remove it first',
+  'place.cathouse': "Miso's house is in the way: remove it first",
+  'place.sculpture': 'A scrap sculpture is in the way: remove it first',
+  'insp.scrapRoom': 'Storage has room for {n} of the {max} scrap: the rest is not given back.',
 };

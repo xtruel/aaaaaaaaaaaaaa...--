@@ -111,7 +111,7 @@ export interface Stats {
   industrialBuilt: number;
   catPets: number;
   partsMade: number;
-  piecesPlaced: number; // floors, fences, gates and lamps bought
+  piecesPlaced: number; // catalog pieces bought (floors, fences, gates, lamps, decorations)
   modulesInstalled: number;
 }
 
@@ -141,7 +141,7 @@ export interface GameState {
   occ: Int32Array; // building id per tile or -1 (derived, not saved)
   claims: Uint8Array; // bots heading to each junk tile (derived, not saved)
   floor: Uint8Array; // industrial floor per tile: 0 none, 1 floor (stays under buildings, solids and junk)
-  solid: Uint8Array; // solid piece per tile: 0 none, 1 fence, 2 gate, 3 lamp (never on a building's tiles)
+  solid: Uint8Array; // solid piece per tile: 0 none, 1 fence, 2 gate, 3 lamp, 4 bench, 5 planter, 6 sign, 7 pergola, 8 cathouse, 9 sculpture (never on a building's tiles)
   rot: Uint8Array; // rotation of the solid piece on each tile (0..3)
   buildings: Building[];
   nextId: number;
@@ -347,7 +347,7 @@ export function pushMessage(s: GameState, text: string, tone: MessageTone = 'inf
 
 // Everything except the map arrays (stored compactly) and runtime-only data.
 // Pieces (0.7) are stored sparsely: `floors` lists the floored tile indexes, `solids` the [index, kind, rot]
-// of every fence/gate/lamp (kind as in GameState.solid). Both are optional: 0.6 saves have neither.
+// of every solid piece (kind as in GameState.solid, codes 1-9). Both are optional: 0.6 saves have neither.
 type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' | 'solid' | 'rot' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages'> & {
   tiles: string;
   amount: number[];

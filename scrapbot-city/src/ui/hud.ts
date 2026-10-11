@@ -5,7 +5,7 @@ import { cityById, goalText } from '../game/cities';
 import { freeHintsLeft, hintPrice } from '../game/hints';
 import { BUILD_ORDER, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, PARTS_RESERVE, SMOG_DANGER, SMOG_LIMIT_SECONDS } from '../game/defs';
 import type { BuildingType, Cost } from '../game/defs';
-import { CATALOG_ORDER, MODULES, buildingStats, demolishRefund, installedModules, isModuleKind, isPieceKind, moduleRefund, pieceRefund } from '../game/pieces';
+import { CATALOG_ORDER, MODULES, PIECES, buildingStats, demolishRefund, installedModules, isModuleKind, isPieceKind, moduleRefund } from '../game/pieces';
 import type { CatalogKind, ModuleKind } from '../game/pieces';
 import { dayPhase } from '../game/sim';
 import { day } from '../game/state';
@@ -20,6 +20,7 @@ import { atlasImage, frame } from '../render/iso/atlas';
 import { PAL, makeCanvas } from '../render/sprites';
 import {
   CONSTRUCTION,
+  DECORATIONS,
   MACHINE_MODULES,
   catalogCost,
   catalogEffect,
@@ -729,6 +730,9 @@ export class Hud {
         <h4 class="cat-section">${t('cat.construction')}</h4>
         <p class="cat-note">${t('insp.decoration')}</p>
         <div class="cat-list">${CONSTRUCTION.map(item).join('')}</div>
+        <h4 class="cat-section">${t('cat.decorations')}</h4>
+        <p class="cat-note">${t('insp.decoration')}</p>
+        <div class="cat-list">${DECORATIONS.map(item).join('')}</div>
         <h4 class="cat-section">${t('cat.modules')}</h4>
         <div class="cat-list">${MACHINE_MODULES.map(item).join('')}</div>
       </div>`;
@@ -802,6 +806,8 @@ export class Hud {
         this.inspectorKey = key;
         this.renderPiece(piece, view.selectedPiece);
       }
+      // what Remove gives back follows the storage in place (the sculpture's scrap: only as far as there is room)
+      this.markPieceRefund(piece);
       return;
     }
     if (!b) return;
@@ -978,7 +984,8 @@ export class Hud {
       </div>`;
   }
 
-  // A selected fence, gate, lamp or floor: what it is, that it is only for looks, Rotate and Remove.
+  // A selected piece (floor, fence, gate, lamp or decoration): what it is, that it is only for looks, Rotate and
+  // Remove with what it really gives back (markPieceRefund keeps that up to date).
   private renderPiece(info: PieceInfo, i: number): void {
     const panel = this.el.inspector;
     panel.style.setProperty('--path', 'var(--muted)');
@@ -986,19 +993,35 @@ export class Hud {
       <div class="insp-head">
         <span class="tool-plate cat-plate"><img src="${catalogPicture(info.kind)}" alt="" /></span>
         <div>
-          <p class="tag">${t('cat.construction')}</p>
+          <p class="tag">${t(PIECES[info.kind].decoration ? 'cat.decorations' : 'cat.construction')}</p>
           <h3>${esc(catalogName(info.kind))}</h3>
         </div>
         <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
       </div>
       <p class="insp-status piece-note">${t('insp.decoration')}</p>
       <p class="insp-desc">${esc(catalogEffect(info.kind))}</p>
+      <p class="insp-warn" data-scrap-room hidden></p>
       <div class="insp-actions">
         ${info.rotatable ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
-        ${info.removable ? `<button type="button" class="btn" data-remove-piece>${t('insp.remove', { refund: costText(pieceRefund(info.kind)) })}</button>` : ''}
+        ${info.removable ? `<button type="button" class="btn" data-remove-piece></button>` : ''}
       </div>`;
+    this.markPieceRefund(info);
     panel.querySelector('[data-close]')!.addEventListener('click', () => this.handlers.onCloseInspector());
     panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotatePiece(i));
     panel.querySelector('[data-remove-piece]')?.addEventListener('click', () => this.handlers.onRemovePiece(i));
+  }
+
+  // The Remove button says what removing the piece gives back right now (pieceRefundAt, which is what is paid), and a
+  // line under the text says how much of the sculpture's scrap storage has no room for.
+  private markPieceRefund(info: PieceInfo): void {
+    const panel = this.el.inspector;
+    const btn = panel.querySelector<HTMLElement>('[data-remove-piece]');
+    const label = t('insp.remove', { refund: costText(info.refund) });
+    if (btn && btn.textContent !== label) btn.textContent = label;
+    const room = panel.querySelector<HTMLElement>('[data-scrap-room]');
+    if (!room) return;
+    const text = info.scrapShort > 0 ? t('insp.scrapRoom', { n: info.refund.scrap ?? 0, max: (info.refund.scrap ?? 0) + info.scrapShort }) : '';
+    if (room.textContent !== text) room.textContent = text;
+    room.hidden = !text;
   }
 }

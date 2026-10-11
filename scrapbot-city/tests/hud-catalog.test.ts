@@ -110,11 +110,12 @@ describe('catalog panel', () => {
     expect(q(root, '[data-inspector]')!.hidden).toBe(true);
     expect(q(root, '[data-catalog]')!.classList.contains('active')).toBe(true);
     const items = [...panel.querySelectorAll<HTMLElement>('[data-item]')];
-    expect(items.map((b) => b.dataset.item)).toEqual(['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter']);
+    expect(items.map((b) => b.dataset.item)).toEqual(['floor', 'fence', 'gate', 'lamp', 'bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture', 'dockStorage', 'smelterFilter']);
     expect(panel.textContent).toContain('Construction');
+    expect(panel.textContent).toContain('Decorations');
     expect(panel.textContent).toContain('Machine modules');
     // no Dock yet: the module says why it cannot be had
-    const dock = items[4];
+    const dock = items.find((b) => b.dataset.item === 'dockStorage')!;
     expect(dock.classList.contains('cant')).toBe(true);
     expect(dock.querySelector('.cat-reason')!.textContent).toBe('Only on a finished Bot Dock');
     expect(dock.textContent).toContain('80 → 180');

@@ -692,7 +692,7 @@ export const de: Dict = {
   'insp.decoration': 'Dekoration: keine Wirkung auf die Wirtschaft',
   'msg.rowPartial': '{n} von {total} gesetzt: Die übrigen Felder waren belegt, oder das Geld reichte nicht.',
   'extras.controls.5': '<kbd>O</kbd>: Objekte & Module · <kbd>R</kbd>: drehen (<kbd>Shift</kbd>+<kbd>R</kbd>: andersherum) · mit der linken Taste ziehen: eine Reihe Boden oder Zaun',
-  'extras.controls.pad3': '<kbd>Y</kbd> dreht beim Setzen auch Zaun, Tor oder Laterne.',
+  'extras.controls.pad3': '<kbd>Y</kbd> dreht beim Setzen auch das Teil in der Hand (Zaun, Tor, Laterne, Bank…).',
 
   // ---------- added in 0.7, increment 2: readable smog ----------
   'hud.smog.more': 'Klicken oder tippen: woher er kommt und wohin er geht.',
@@ -710,4 +710,26 @@ export const de: Dict = {
   'smog.power': 'Energie bei {n}%: Industrie und Filteranlagen arbeiten langsamer.',
   'smog.limit': 'Liegt der Smog {seconds} Sekunden lang über {limit}%, ist die Stadt verloren.',
   'smog.countdown': 'Über {limit}%: In {n} s ist die Stadt verloren!',
+
+  // ---------- added in 0.7, increment 2 (G2): decorations ----------
+  'cat.decorations': 'Dekorationen',
+  'pc.bench': 'Bank',
+  'pc.bench.effect': 'Gestell aus Schrottrohren und Holzlatten; in 4 Richtungen drehbar',
+  'pc.planter': 'Pflanzkübel',
+  'pc.planter.effect': 'Tulpen oder Sonnenblumen: das Feld entscheidet',
+  'pc.sign': 'Neonschild',
+  'pc.sign.effect': 'Bot-Gesicht, Recyclingpfeile oder Herz (das Feld entscheidet); leuchtet nachts',
+  'pc.pergola': 'Pergola',
+  'pc.pergola.effect': 'Glyzinie an einem Stahlgerüst; in 2 Richtungen drehbar',
+  'pc.cathouse': 'Misos Häuschen',
+  'pc.cathouse.effect': 'Katzenhaus mit Kissen; Miso bleibt bei seinen Gewohnheiten',
+  'pc.sculpture': 'Schrottskulptur',
+  'pc.sculpture.effect': 'Ein Roboter aus übrigem Schrott; den Schrott gibt es nur zurück, wenn im Lager Platz ist',
+  'place.bench': 'Hier steht eine Bank: entferne sie zuerst',
+  'place.planter': 'Hier steht ein Pflanzkübel: entferne ihn zuerst',
+  'place.sign': 'Hier steht ein Neonschild: entferne es zuerst',
+  'place.pergola': 'Hier steht eine Pergola: entferne sie zuerst',
+  'place.cathouse': 'Hier steht Misos Häuschen: entferne es zuerst',
+  'place.sculpture': 'Hier steht eine Schrottskulptur: entferne sie zuerst',
+  'insp.scrapRoom': 'Im Lager ist Platz für {n} von {max} Schrott: der Rest kommt nicht zurück.',
 };

@@ -13,6 +13,7 @@ import type { Building, GameState } from '../src/game/state';
 import { t } from '../src/i18n';
 import {
   CONSTRUCTION,
+  DECORATIONS,
   MACHINE_MODULES,
   catalogEffect,
   catalogLimit,
@@ -77,10 +78,11 @@ function row3(s: GameState): { x: number; y: number }[] {
 }
 
 describe('catalog wording', () => {
-  it('lists the four construction pieces, then the two machine modules, each with a name, effect and limit', () => {
-    expect(CONSTRUCTION).toEqual(['floor', 'fence', 'gate', 'lamp']);
+  it('lists the construction pieces, the decorations, then the two machine modules, each with a name, effect and limit', () => {
+    expect(CONSTRUCTION).toEqual(['floor', 'fence', 'gate']);
+    expect(DECORATIONS).toEqual(['lamp', 'bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture']);
     expect(MACHINE_MODULES).toEqual(['dockStorage', 'smelterFilter']);
-    for (const kind of [...CONSTRUCTION, ...MACHINE_MODULES]) {
+    for (const kind of [...CONSTRUCTION, ...DECORATIONS, ...MACHINE_MODULES]) {
       for (const text of [catalogName(kind), catalogEffect(kind), catalogLimit(kind)]) {
         expect(text, kind).not.toMatch(/^(pc|mod|cat)\./);
         expect(text, kind).not.toMatch(/\{\w+\}/);

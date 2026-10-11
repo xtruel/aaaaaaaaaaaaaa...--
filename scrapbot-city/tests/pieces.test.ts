@@ -120,7 +120,8 @@ function wealth(s: GameState): Record<Resource, number> {
 
 describe('catalog data (the owner-approved table)', () => {
   it('has exactly the six items with the agreed prices, refunds and effects', () => {
-    expect(CATALOG_ORDER).toEqual(['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter']);
+    // (increment 2's decorations come after the lamp: tests/decorations.test.ts)
+    expect(CATALOG_ORDER.filter((k) => !PIECES[k as PieceKind]?.decoration || k === 'lamp')).toEqual(['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter']);
     expect(PIECES.floor).toMatchObject({ layer: 'surface', cost: { credits: 3 }, rotations: 1 });
     expect(PIECES.fence).toMatchObject({ layer: 'solid', cost: { credits: 4 }, rotations: 2, joins: true });
     expect(PIECES.gate).toMatchObject({ layer: 'solid', cost: { credits: 12 }, rotations: 2 });
@@ -788,7 +789,8 @@ describe('saves', () => {
     data.buildings.find((b: Building) => b.id === dock.id).modules = ['dockStorage', 'dockStorage', 'smelterFilter', 'warpDrive'];
     data.buildings.find((b: Building) => b.id === hq.id).modules = ['dockStorage'];
     data.floors = [idx(hq.x, hq.y), -1, 1e9, 'x', 3.5];
-    data.solids = [[idx(hq.x, hq.y), 1, 0], [idx(0, 0), 9, 0], [idx(1, 0), 3, 6], 'junk', [-5, 1, 0]];
+    // (code 250 is no piece: 4-9 are increment 2's decorations, 10-14 are taken for its constructions)
+    data.solids = [[idx(hq.x, hq.y), 1, 0], [idx(0, 0), 250, 0], [idx(1, 0), 3, 6], 'junk', [-5, 1, 0]];
     const back = deserialize(JSON.stringify(data));
     expect(back.buildings.find((b) => b.id === dock.id)!.modules).toEqual(['dockStorage']);
     expect(back.buildings.find((b) => b.id === hq.id)!.modules).toBeUndefined();
