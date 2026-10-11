@@ -15,7 +15,12 @@
   d'aria naturale, ciascuno al giorno, il totale al giorno, la soglia del 95% e, quando parte, il conto alla rovescia
   dei 30 secondi; segnala anche gli straordinari e l'energia che manca. I numeri sono quelli della simulazione: le parti
   sommano esattamente al ritmo con cui lo smog cambia. Si chiude con `Esc`, `B`, la × o un clic fuori. Misuratore,
-  freccia e allarme restano come prima. In 8 lingue.
+  freccia e allarme restano come prima. In 8 lingue; i nomi lunghi vanno a capo invece di essere tagliati. Su una
+  finestra molto bassa (1024×640) il pannello aperto prende il posto dell'allarme, di cui ripete il conto alla
+  rovescia, così le liste restano visibili; mentre è aperto, i trofei compaiono in basso invece di coprirlo.
+- **Le scritte sulla mappa** (perché un edificio o un pezzo non va lì, l'effetto di un modulo) si
+  disegnano sopra lo smog e il buio, come i numeri che salgono dagli edifici: restano leggibili anche nella foschia
+  più fitta e di notte.
 - **Corretto**: una fila di pavimenti o recinzioni trascinata col tasto sinistro e rilasciata sopra un pannello o la
   barra degli strumenti non posa e non paga nulla (prima posava e faceva pagare caselle nascoste sotto il pannello);
   finché il puntatore è sopra un pannello la fila non si vede. Lo stesso per un edificio: premuto sulla mappa e

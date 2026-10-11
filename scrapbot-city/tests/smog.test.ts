@@ -105,6 +105,22 @@ describe('where the smog comes from and where it goes', () => {
     expect(Math.abs(partsSum(s) - s.derived.pollutionRate)).toBeLessThan(1e-12);
   });
 
+  it('on overtime and short of power the parts still add up, each as the sim applies it', () => {
+    const s = industrialCity();
+    s.overtimeUntil = s.time + 30;
+    // the Solar Arrays and the Burner rebuilding (4 s): the HQ alone powers half the city meanwhile
+    for (const b of s.buildings) if (b.type === 'solar' || b.type === 'burner') b.built = 0;
+    run(s, 1);
+    expect(s.time).toBeLessThan(s.overtimeUntil);
+    expect(s.derived.efficiency).toBeGreaterThan(0);
+    expect(s.derived.efficiency).toBeLessThan(1);
+    expect(Math.abs(partsSum(s) - s.derived.pollutionRate)).toBeLessThan(1e-12);
+    // industry: ×1.5 on overtime, slowed down by the power it gets; a Purifier slowed down too, not sped up
+    expect(s.derived.air.byType.factory).toBeCloseTo(0.06 * 1.5 * s.derived.efficiency, 12);
+    expect(s.derived.air.byType.purifier).toBeCloseTo(-0.08 * s.derived.efficiency, 12);
+    expect(airReport(s).notes).toHaveLength(2);
+  });
+
   it('clean air: nothing to renew at 0%', () => {
     const s = createGame({ seed: 71 });
     s.pollution = 0;
