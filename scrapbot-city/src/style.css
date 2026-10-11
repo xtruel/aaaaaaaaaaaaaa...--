@@ -1542,10 +1542,10 @@ select {
   font-size: 14px;
 }
 
+/* a long name ("Naturalna wymiana powietrza", "Lodo tóxico (19 quadrados)") wraps instead of being cut off */
 .air-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .air-bar {
@@ -1674,6 +1674,19 @@ select {
     margin-top: 5px;
     padding: 4px 8px;
     font-size: 12px;
+  }
+}
+
+/* a very short window (1024×640): the open panel takes the smog alarm's place, so that during the countdown the
+   lists keep their room; its own red line counts down the same seconds */
+@media (max-height: 680px) {
+  .smog-panel {
+    top: calc(var(--top-c, 64px) + 14px);
+    max-height: calc(100% - var(--top-c, 64px) - var(--dock, 186px) - 28px);
+  }
+
+  .hud:has(.smog-panel:not([hidden])) .smog-alert {
+    visibility: hidden;
   }
 }
 
@@ -3175,9 +3188,11 @@ input[type='number'] {
 }
 
 /* over a dialog (an ending, a story event) toasts go to the bottom, clear of its title, also when the
-   dialog opens while a toast is already showing */
+   dialog opens while a toast is already showing; so they do while the smog panel is open, which sits where they
+   would come down */
 .toasts.below,
-body:has(#modal-root .modal-backdrop) .toasts {
+body:has(#modal-root .modal-backdrop) .toasts,
+body:has(.smog-panel:not([hidden])) .toasts {
   top: auto;
   bottom: 24px;
 }
