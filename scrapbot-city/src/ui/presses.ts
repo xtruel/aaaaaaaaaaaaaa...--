@@ -9,13 +9,14 @@ export interface Press {
   y: number;
   cam: string; // where the map was ('' when it does not matter)
   tile: string; // "x,y" of the tile under it on the map, '' elsewhere (a dialog, a panel)
+  tool?: string; // the tool in hand when it was made (the session's; '' none)
 }
 
 // A press this soon after the one before (ms) and this close to it (screen px) is the second press of a double press.
 export const DOUBLE_PRESS = 350;
 export const DOUBLE_DIST = 10;
 
-const none = (): Press => ({ t: -Infinity, x: 0, y: 0, cam: '', tile: '' });
+const none = (): Press => ({ t: -Infinity, x: 0, y: 0, cam: '', tile: '', tool: '' });
 let before = none();
 let last = none();
 

@@ -866,12 +866,17 @@ export class GameSession implements PadTarget {
   private notePress(x: number, y: number, onMap: boolean): void {
     const r = this.renderer;
     const tile = onMap ? r.screenToTile(x, y) : null;
-    notePress({ t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tile: tile ? `${tile.x},${tile.y}` : '' });
+    notePress({ t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tile: tile ? `${tile.x},${tile.y}` : '', tool: this.toolKey() });
+  }
+
+  private toolKey(): string {
+    return this.build ? `b:${this.build}` : this.bulldoze ? 'doze' : this.piece ? `p:${this.piece.kind}` : '';
   }
 
   // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
   // second press of a double click, double tap or A A, the press at (sx, sy) coming within DOUBLE_PRESS ms and
-  // DOUBLE_DIST px of the one before with the map where it was, when it would do something the first one did not mean:
+  // DOUBLE_DIST px of the one before with the map where it was and the same tool in hand (a click, then the bulldozer
+  // taken and a click on the same spot, is two meant presses), when it would do something the first one did not mean:
   // land on the next tile across an edge (it would buy a second piece), land on the map behind a dialog or a panel the
   // first press closed, or take up a second layer with the bulldozer (the floor under the fence just removed). On the
   // tile the first press used, a piece or building tool goes ahead: there it can only be refused, with the reason.
@@ -879,7 +884,7 @@ export class GameSession implements PadTarget {
     const [before, now] = lastPresses();
     const r = this.renderer;
     const cam = `${r.cam.x},${r.cam.y},${r.zoom}`;
-    const double = now.t - before.t < DOUBLE_PRESS && cam === before.cam && Math.hypot(sx - before.x, sy - before.y) < DOUBLE_DIST;
+    const double = now.t - before.t < DOUBLE_PRESS && cam === before.cam && before.tool === this.toolKey() && Math.hypot(sx - before.x, sy - before.y) < DOUBLE_DIST;
     if (!double) return true;
     const tile = r.screenToTile(sx, sy);
     return !this.bulldoze && before.tile !== '' && before.tile === `${tile.x},${tile.y}`;
