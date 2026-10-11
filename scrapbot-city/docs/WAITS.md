@@ -226,3 +226,261 @@ Cause: Riciclatori (1) al lavoro 95% del tempo, fermi senza rottami 5%, senza co
 | +1 Fix-It Lab appena possibile (pezzi → crediti) | quando bastano 50 cr e 70 pezzi | 459 s | +117 s |
 | fermare Fix-It Lab e Fabbriche (non consumano pezzi) | 1 in pausa, meno crediti in entrata | 327 s | -15 s |
 | comprare pezzi da 2PM con i crediti in più | secondo necessità | 342 s | 0 s |
+
+## 0.7: moduli e configurazioni
+
+Versione misurata: 0.7.0-alpha.1 con gli otto moduli macchina (i due dell'incremento 1 e i sei dell'incremento 2,
+`docs/MODULAR-INC2.md` §2). **Solo misura: nessun numero del gioco è stato cambiato.** Stesso strumento (`npm run waits`),
+stesse città, stessa sequenza casuale: tutte le righe della 0.6.1 riportate sopra escono identiche, carattere per
+carattere; le righe nuove sono aggiunte in coda a ogni tabella e in una sezione finale dell'uscita.
+
+### Come è misurato (in più rispetto a sopra)
+
+- **Moduli**: all'inizio della fase di risparmio (la stessa copia della città da cui partono le altre mosse) il modulo
+  viene installato su ogni edificio compatibile già completato, pagandolo con le risorse della città, nell'ordine in cui
+  la città li ha costruiti; poi il pilota gioca come sempre. «3 su 6» vuol dire che le risorse bastavano per 3 edifici
+  su 6. «Non installabile» quando la città non ha quell'edificio completato o non può pagarne nemmeno uno: allora la
+  partita è quella di «aspettare» e la riga lo dice soltanto.
+- **Configurazioni comparabili** (definite anche nell'uscita dello strumento), con la stessa misura per tutte: secondi
+  dall'inizio della fase di risparmio alla Guglia piazzata; «conveniente» = almeno 20 s prima di aspettare.
+  - **Verde rigoroso**: città del percorso verde del pilota (Campo Solare, Giardini, Fix-It Lab, Purificatori più gli
+    edifici neutri: Riciclatori, Bot Dock, Capsule Bot) con mosse solo verdi o neutre: nessuna Fonderia, Bruciatore o
+    Fabbrica, nessun pezzo importato da 2PM; moduli solo su edifici verdi o neutri.
+  - **Industriale**: città del percorso industriale del pilota (Fonderie, Bruciatori, Fabbriche, pezzi importati, più
+    gli edifici neutri) con mosse industriali o neutre.
+  - **Ibrido**: una città di un percorso con una mossa dell'altro (verde + Fonderia o pezzi importati; industriale +
+    Fix-It Lab o Pannelli orientabili su un Campo Solare costruito dal pilota).
+  - La «centrale» è del percorso della città (Campo Solare nel verde, Bruciatore nell'industriale); comprare pezzi da 2PM
+    è una mossa industriale (ogni pacco sposta la città verso l'industria).
+
+### Risultati: i moduli, città per città
+
+Tempo della fase di risparmio rispetto ad aspettare (meno = Guglia prima; — = non installabile in quella città):
+
+| Modulo | Scrapbot verde | Rustbay verde | Neon verde | Greenvale verde | Company verde | Scrapbot ind. | Rustbay ind. | Neon ind. | Greenvale ind. | Company ind. |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Deposito aggiuntivo (Bot Dock) | +26 s | — | — | — | — | +19 s | +26 s | +35 s | — | +13 s |
+| Filtro antismog (Fonderia) | — | — | — | — | — | **−76 s** | +2 s | +43 s | — | — |
+| Separatore magnetico (Riciclatore) | **−35 s** | — | — | — | — | **−21 s** | **−27 s** | −8 s | — | +20 s |
+| Selezionatore di precisione (Riciclatore) | +20 s | — | — | — | — | −16 s | +74 s | −11 s | — | +25 s |
+| Braccio doppio (Fabbrica 2PM) | — | — | — | — | — | — | +78 s | +45 s | — | — |
+| Capsula abitativa (Capsule Bot) | +23 s | — | — | — | — | +33 s | +76 s | +46 s | — | +71 s |
+| Pannelli orientabili (Campo Solare) | +22 s | — | — | — | — | — | — | +42 s | — | — |
+| Ugello esteso (Purificatore) | +17 s | — | — | — | — | — | — | — | — | — |
+
+### Risultati: le configurazioni
+
+| Città | Verde rigoroso: migliore mossa | Industriale: migliore mossa | Ibrido: migliore mossa |
+|---|---|---|---|
+| Scrapbot City | +1 Riciclatore −48 s (separatore magnetico −35 s) | +2 Riciclatori −197 s (filtro −76 s, separatore −21 s) | verde + Fonderia −16 s |
+| Rustbay | +2 Riciclatori −42 s | +2 Riciclatori −129 s (separatore −27 s) | verde + Fonderia −12 s |
+| Neon Heights | +1 Fix-It Lab −110 s | +2 Riciclatori −87 s | **verde + Fonderia −250 s** |
+| Greenvale | +2 Riciclatori −319 s | +2 Riciclatori −142 s | verde + pezzi importati −51 s |
+| 2PM Company Town | nessuna mossa conveniente (migliore −1 s) | +2 Riciclatori −116 s | nessuna conveniente |
+
+Nelle città industriali le prove ibride (un Fix-It Lab; i pannelli orientabili a Neon Heights) peggiorano sempre, da
++42 a +137 s.
+
+### Che cosa se ne ricava (misura, nessun ritocco)
+
+1. **Nessun modulo domina**: nessuno accorcia l'attesa in tutte le città in cui si può installare, e nessuno batte la
+   mossa migliore che esisteva già (quasi sempre un Riciclatore in più, 50 crediti).
+2. **Moduli che in questa misura non aiutano mai**: Deposito aggiuntivo (0 città su 5, peggiora in 3), Selezionatore di
+   precisione (0 su 5, peggiora in 3), Braccio doppio (0 su 2, peggiora in 2), Capsula abitativa (0 su 5, peggiora in
+   5), Pannelli orientabili (0 su 2, peggiora in 2), Ugello esteso (0 su 1). Costano pezzi proprio quando mancano i pezzi
+   della Guglia, e il loro guadagno (alloggi, energia, raggio, crediti al secondo consumando più pezzi) non è quello che
+   manca in quel momento. Il braccio doppio, in particolare, consuma pezzi più in fretta: nella fase di risparmio è il
+   contrario di ciò che serve.
+3. **Il separatore magnetico è l'unico che aiuta più volte** (−35, −21, −27 s in 3 città su 5), perché aumenta i pezzi
+   al secondo quando i Riciclatori hanno rottami; a 2PM Company Town industriale peggiora (+20 s, al limite del rumore)
+   con l'energia già sotto il fabbisogno per il 28% del tempo. Il selezionatore aiuta un poco solo dove i Riciclatori
+   restano senza rottami (Scrapbot e Neon industriali, −16 e −11 s: sotto la soglia).
+4. **Il filtro antismog** accorcia di 76 s Scrapbot City industriale e allunga di 43 s Neon Heights industriale. Il
+   filtro non cambia la produzione; la spiegazione più probabile (non verificata qui) è il pilota, che nel risparmio
+   mette in pausa Fonderie e Bruciatori sopra il 60% di smog: con meno smog restano accese più a lungo, oppure no.
+5. **Nelle città verdi i moduli quasi non si possono comprare all'inizio del risparmio**: in 4 città verdi su 5 nessun
+   modulo è installabile (7–13 pezzi in cassa contro i 15–40 pezzi di un modulo; lo stesso a Greenvale industriale, 8
+   pezzi). Non è un difetto da correggere qui:
+   i moduli si comprano prima, quando la città ha pezzi; questa misura guarda solo il risparmio per la Guglia.
+6. Le conclusioni della 0.6.1 restano: la mossa che conviene dipende da che cosa manca (pezzi, crediti, rottami,
+   energia), e i consigli di USA-9 ora la seguono (niente deposito quando mancano crediti, niente Riciclatore senza
+   energia e rottami: `src/game/hints.ts`).
+
+Limiti: una sola sequenza casuale per città e percorso (sotto i 20–30 s è rumore); il pilota non è una persona e compra
+i moduli nel momento peggiore per la Guglia; si misura solo la fase di risparmio, non a che cosa servono i moduli nel
+resto della partita (spazio risparmiato con la capsula, sludge lontana con l'ugello, energia senza nuovi edifici con i
+pannelli). Eventuali ritocchi economici si propongono a parte, con dati prima/dopo.
+
+### Uscita dello strumento: le righe nuove
+
+#### Scrapbot City — percorso verde
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | 3×, 90 cr, 45 pezzi | 225 s | +26 s |
+| modulo Filtro antismog su ogni Fonderia (0.7) | non installabile (nessuna Fonderia completata) | — | — |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | 2×, 80 cr, 30 pezzi | 164 s | -35 s |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | 2×, 80 cr, 30 pezzi | 219 s | +20 s |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | non installabile (nessuna Fabbrica 2PM completata) | — | — |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | 3 su 6, 105 cr, 45 pezzi | 222 s | +23 s |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | 1 su 4, 60 cr, 40 pezzi | 221 s | +22 s |
+| modulo Ugello esteso su ogni Purificatore (0.7) | 1×, 50 cr, 30 pezzi | 216 s | +17 s |
+
+#### Rustbay — percorso verde
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Filtro antismog su ogni Fonderia (0.7) | non installabile (nessuna Fonderia completata) | — | — |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | non installabile (nessuna Fabbrica 2PM completata) | — | — |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (nessun Purificatore completato) | — | — |
+
+#### Neon Heights — percorso verde
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Filtro antismog su ogni Fonderia (0.7) | non installabile (nessuna Fonderia completata) | — | — |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | non installabile (nessuna Fabbrica 2PM completata) | — | — |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (risorse insufficienti) | — | — |
+
+#### Greenvale — percorso verde
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Filtro antismog su ogni Fonderia (0.7) | non installabile (nessuna Fonderia completata) | — | — |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | non installabile (nessuna Fabbrica 2PM completata) | — | — |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (risorse insufficienti) | — | — |
+
+#### 2PM Company Town — percorso verde
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Filtro antismog su ogni Fonderia (0.7) | non installabile (nessuna Fonderia completata) | — | — |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | non installabile (nessuna Fabbrica 2PM completata) | — | — |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (nessun Purificatore completato) | — | — |
+
+#### Scrapbot City — percorso industriale
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | 2 su 6, 60 cr, 30 pezzi | 382 s | +19 s |
+| modulo Filtro antismog su ogni Fonderia (0.7) | 1 su 3, 45 cr, 20 pezzi | 287 s | -76 s |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | 1×, 40 cr, 15 pezzi | 342 s | -21 s |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | 1×, 40 cr, 15 pezzi | 347 s | -16 s |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | non installabile (nessuna Fabbrica 2PM completata) | — | — |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | 2 su 7, 70 cr, 30 pezzi | 396 s | +33 s |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | non installabile (nessun Campo Solare completato) | — | — |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (nessun Purificatore completato) | — | — |
+
+#### Rustbay — percorso industriale
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | 2 su 6, 60 cr, 30 pezzi | 371 s | +26 s |
+| modulo Filtro antismog su ogni Fonderia (0.7) | 1 su 3, 45 cr, 20 pezzi | 347 s | +2 s |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | 1×, 40 cr, 15 pezzi | 318 s | -27 s |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | 1×, 40 cr, 15 pezzi | 419 s | +74 s |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | 1 su 3, 90 cr, 30 pezzi | 423 s | +78 s |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | 2 su 8, 70 cr, 30 pezzi | 421 s | +76 s |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | non installabile (nessun Campo Solare completato) | — | — |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (nessun Purificatore completato) | — | — |
+
+#### Neon Heights — percorso industriale
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | 3 su 6, 90 cr, 45 pezzi | 367 s | +35 s |
+| modulo Filtro antismog su ogni Fonderia (0.7) | 2 su 3, 90 cr, 40 pezzi | 375 s | +43 s |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | 1×, 40 cr, 15 pezzi | 324 s | -8 s |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | 1×, 40 cr, 15 pezzi | 321 s | -11 s |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | 1 su 2, 90 cr, 30 pezzi | 377 s | +45 s |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | 3 su 7, 105 cr, 45 pezzi | 378 s | +46 s |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | 1 su 2, 60 cr, 40 pezzi | 374 s | +42 s |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (nessun Purificatore completato) | — | — |
+
+#### Greenvale — percorso industriale
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Filtro antismog su ogni Fonderia (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (nessun Purificatore completato) | — | — |
+
+#### 2PM Company Town — percorso industriale
+| Modulo installato all'inizio del risparmio | Costo | Guglia piazzata dopo | Rispetto ad aspettare |
+|---|---|---|---|
+| modulo Deposito aggiuntivo su ogni Bot Dock (0.7) | 1 su 6, 30 cr, 15 pezzi | 355 s | +13 s |
+| modulo Filtro antismog su ogni Fonderia (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Separatore magnetico su ogni Riciclatore (0.7) | 1×, 40 cr, 15 pezzi | 362 s | +20 s |
+| modulo Selezionatore di precisione su ogni Riciclatore (0.7) | 1×, 40 cr, 15 pezzi | 367 s | +25 s |
+| modulo Braccio doppio su ogni Fabbrica 2PM (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Capsula abitativa su ogni Capsule Bot (0.7) | 1 su 8, 35 cr, 15 pezzi | 413 s | +71 s |
+| modulo Pannelli orientabili su ogni Campo Solare (0.7) | non installabile (risorse insufficienti) | — | — |
+| modulo Ugello esteso su ogni Purificatore (0.7) | non installabile (nessun Purificatore completato) | — | — |
+
+Definizioni comparabili, uguali per tutte le città:
+- **Misura**: secondi dall'inizio della fase di risparmio alla Guglia piazzata, sulla stessa copia della città e con la stessa sequenza casuale; una mossa è «conveniente» se arriva almeno 20 s prima di aspettare (sotto i 20–30 s è rumore).
+- **Verde rigoroso**: città del percorso verde del pilota (Campo Solare, Giardini, Fix-It Lab, Purificatori, più gli edifici neutri: Riciclatori, Bot Dock, Capsule Bot) con mosse solo verdi o neutre: nessuna Fonderia, Bruciatore o Fabbrica, nessun pezzo importato da 2PM; moduli solo su edifici verdi o neutri.
+- **Industriale**: città del percorso industriale del pilota (Fonderie, Bruciatori, Fabbriche, pezzi importati da 2PM, più gli edifici neutri) con mosse industriali o neutre.
+- **Ibrido**: una città di un percorso con una mossa dell'altro (verde + Fonderia o pezzi importati; industriale + Fix-It Lab).
+- **Moduli**: installati all'inizio della fase di risparmio su ogni edificio compatibile già completato, pagandoli con le risorse della città; «non installabile» quando la città non ha quell'edificio completato o non può pagarlo (la partita resta quella di «aspettare»).
+
+#### verde rigoroso
+| Città — percorso | Mosse provate | Migliore mossa | Rispetto ad aspettare | Mosse convenienti (≥ 20 s) |
+|---|---|---|---|---|
+| Scrapbot City — verde | 12 | +1 Riciclatore subito | -48 s | +1 Riciclatore subito -48 s; +2 Riciclatori subito -41 s; Separatore magnetico -35 s |
+| Rustbay — verde | 6 | +2 Riciclatori subito | -42 s | +1 Riciclatore subito -28 s; +2 Riciclatori subito -42 s |
+| Neon Heights — verde | 6 | +1 Fix-It Lab appena possibile (pezzi → crediti) | -110 s | +1 Fix-It Lab appena possibile (pezzi → crediti) -110 s |
+| Greenvale — verde | 6 | +2 Riciclatori subito | -319 s | +1 Riciclatore subito -252 s; +2 Riciclatori subito -319 s; +1 centrale appena possibile (Pannello solare nel verde, Bruciatore nell'industriale) -133 s; fermare Fix-It Lab e Fabbriche (non consumano pezzi) -41 s |
+| 2PM Company Town — verde | 6 | +1 centrale appena possibile (Pannello solare nel verde, Bruciatore nell'industriale) | -1 s | nessuna |
+
+#### industriale
+| Città — percorso | Mosse provate | Migliore mossa | Rispetto ad aspettare | Mosse convenienti (≥ 20 s) |
+|---|---|---|---|---|
+| Scrapbot City — industriale | 12 | +2 Riciclatori subito | -197 s | +1 Riciclatore subito -149 s; +2 Riciclatori subito -197 s; +1 Bot Dock subito (più bot, più rottami) -45 s; +1 Fonderia subito (rottami in più → crediti, inquina) -107 s; Filtro antismog -76 s; Separatore magnetico -21 s |
+| Rustbay — industriale | 13 | +2 Riciclatori subito | -129 s | +1 Riciclatore subito -99 s; +2 Riciclatori subito -129 s; Separatore magnetico -27 s |
+| Neon Heights — industriale | 13 | +2 Riciclatori subito | -87 s | +1 Riciclatore subito -58 s; +2 Riciclatori subito -87 s; +1 Bot Dock subito (più bot, più rottami) -23 s; fermare Fix-It Lab e Fabbriche (non consumano pezzi) -30 s |
+| Greenvale — industriale | 7 | +2 Riciclatori subito | -142 s | +1 Riciclatore subito -117 s; +2 Riciclatori subito -142 s; fermare Fix-It Lab e Fabbriche (non consumano pezzi) -72 s |
+| 2PM Company Town — industriale | 11 | +2 Riciclatori subito | -116 s | +1 Riciclatore subito -78 s; +2 Riciclatori subito -116 s |
+
+#### ibrido
+| Città — percorso | Mosse provate | Migliore mossa | Rispetto ad aspettare | Mosse convenienti (≥ 20 s) |
+|---|---|---|---|---|
+| Scrapbot City — verde | 2 | +1 Fonderia subito (rottami in più → crediti, inquina) | -16 s | nessuna |
+| Rustbay — verde | 2 | +1 Fonderia subito (rottami in più → crediti, inquina) | -12 s | nessuna |
+| Neon Heights — verde | 2 | +1 Fonderia subito (rottami in più → crediti, inquina) | -250 s | +1 Fonderia subito (rottami in più → crediti, inquina) -250 s |
+| Greenvale — verde | 2 | comprare pezzi da 2PM con i crediti in più | -51 s | comprare pezzi da 2PM con i crediti in più -51 s |
+| 2PM Company Town — verde | 2 | comprare pezzi da 2PM con i crediti in più | 0 s | nessuna |
+| Scrapbot City — industriale | 1 | +1 Fix-It Lab appena possibile (pezzi → crediti) | +137 s | nessuna |
+| Rustbay — industriale | 1 | +1 Fix-It Lab appena possibile (pezzi → crediti) | +122 s | nessuna |
+| Neon Heights — industriale | 2 | modulo Pannelli orientabili | +42 s | nessuna |
+| Greenvale — industriale | 1 | +1 Fix-It Lab appena possibile (pezzi → crediti) | +117 s | nessuna |
+| 2PM Company Town — industriale | 1 | +1 Fix-It Lab appena possibile (pezzi → crediti) | +117 s | nessuna |
+
+#### Moduli, città per città (rispetto ad aspettare; — = non installabile)
+| Modulo | Scrapbot City verde | Rustbay verde | Neon Heights verde | Greenvale verde | 2PM Company Town verde | Scrapbot City industriale | Rustbay industriale | Neon Heights industriale | Greenvale industriale | 2PM Company Town industriale | Aiuta (≥ 20 s) / peggiora (≥ 20 s) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Deposito aggiuntivo (Bot Dock) | +26 s | — | — | — | — | +19 s | +26 s | +35 s | — | +13 s | 0 / 3 su 5 installabili |
+| Filtro antismog (Fonderia) | — | — | — | — | — | -76 s | +2 s | +43 s | — | — | 1 / 1 su 3 installabili |
+| Separatore magnetico (Riciclatore) | -35 s | — | — | — | — | -21 s | -27 s | -8 s | — | +20 s | 3 / 1 su 5 installabili |
+| Selezionatore di precisione (Riciclatore) | +20 s | — | — | — | — | -16 s | +74 s | -11 s | — | +25 s | 0 / 3 su 5 installabili |
+| Braccio doppio (Fabbrica 2PM) | — | — | — | — | — | — | +78 s | +45 s | — | — | 0 / 2 su 2 installabili |
+| Capsula abitativa (Capsule Bot) | +23 s | — | — | — | — | +33 s | +76 s | +46 s | — | +71 s | 0 / 5 su 5 installabili |
+| Pannelli orientabili (Campo Solare) | +22 s | — | — | — | — | — | — | +42 s | — | — | 0 / 2 su 2 installabili |
+| Ugello esteso (Purificatore) | +17 s | — | — | — | — | — | — | — | — | — | 0 / 0 su 1 installabili |
+
