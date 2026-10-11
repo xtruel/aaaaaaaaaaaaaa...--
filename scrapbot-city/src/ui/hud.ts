@@ -109,6 +109,10 @@ function costChips(cost: Cost): string {
   return chips.join('') || `<span class="cost">${t('common.free')}</span>`;
 }
 
+// A module's Remove confirmation takes no click in its first moments (ms), so a double click on Remove does not
+// confirm it.
+const CONFIRM_DELAY = 350;
+
 // Catalog pictures: the item's icon frame from the atlas at its own size (30×35 up to 64×32), centred in one
 // 64×44 box, so the rows line up and the pixels stay crisp. Before the atlas has decoded the box stays empty.
 const PIC_W = 64;
@@ -163,6 +167,7 @@ export class Hud {
   private inspectorKey = '';
   private confirmDemolish = false;
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
+  private confirmRemoveAt = 0; // when it was asked for (performance.now())
   private catalogKey = '';
   private starsKey = '';
   private s: GameState;
@@ -814,6 +819,7 @@ export class Hud {
       btn.addEventListener('click', () => {
         audio.play('click');
         this.confirmRemove = btn.dataset.remove as ModuleKind;
+        this.confirmRemoveAt = performance.now();
         this.confirmDemolish = false;
         this.inspectorKey = `${b.id}:`;
       });
@@ -823,6 +829,8 @@ export class Hud {
       this.inspectorKey = `${b.id}:`;
     });
     panel.querySelector<HTMLElement>('[data-remove-confirm]')?.addEventListener('click', (e) => {
+      // the confirmation comes up where Remove was: the second click of a double click must not confirm it
+      if (performance.now() - this.confirmRemoveAt < CONFIRM_DELAY) return;
       const kind = (e.currentTarget as HTMLElement).dataset.removeConfirm as ModuleKind;
       this.confirmRemove = null;
       this.inspectorKey = `${b.id}:`;

@@ -211,17 +211,28 @@ describe('building panel modules', () => {
     expect(on.querySelector('.mod-count')!.textContent).toBe('1/1');
     // the building rows now show the storage with the module
     expect(insp.querySelector('dl')!.textContent).toContain('180 scrap');
-    q(on, '[data-remove]')!.click();
-    update({ selectedId: dock.id });
-    // more scrap than the storage left would hold: the confirmation says how much goes
-    s.res.scrap = 300;
-    update({ selectedId: dock.id });
-    const warn = q(insp, '[data-loss]')!;
-    expect(warn.hidden).toBe(false);
-    expect(warn.textContent).toBe('Storage drops to 230: 70 scrap will be lost.');
-    expect(q(insp, '[data-remove-confirm]')!.textContent).toBe('Remove (+15 credits + 7 parts)');
-    q(insp, '[data-remove-confirm]')!.click();
-    expect(calls.at(-1)).toEqual(['onRemoveModule', dock.id, 'dockStorage']);
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(10_000);
+    try {
+      q(on, '[data-remove]')!.click();
+      update({ selectedId: dock.id });
+      // more scrap than the storage left would hold: the confirmation says how much goes
+      s.res.scrap = 300;
+      update({ selectedId: dock.id });
+      const warn = q(insp, '[data-loss]')!;
+      expect(warn.hidden).toBe(false);
+      expect(warn.textContent).toBe('Storage drops to 230: 70 scrap will be lost.');
+      expect(q(insp, '[data-remove-confirm]')!.textContent).toBe('Remove (+15 credits + 7 parts)');
+      // the second click of a double click on Remove lands on the confirmation: it does not count
+      clock.mockReturnValue(10_150);
+      q(insp, '[data-remove-confirm]')!.click();
+      expect(calls.at(-1)).toEqual(['onInstall', dock.id, 'dockStorage']);
+      // a click of its own does
+      clock.mockReturnValue(11_000);
+      q(insp, '[data-remove-confirm]')!.click();
+      expect(calls.at(-1)).toEqual(['onRemoveModule', dock.id, 'dockStorage']);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('greys out Install with the reason, and the demolish refund counts the modules', () => {
