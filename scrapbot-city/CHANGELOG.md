@@ -18,6 +18,10 @@
   se gli edifici in costruzione ne useranno una parte, il consiglio lo dice a parte («ora te ne avanza 3, ma gli
   edifici in costruzione ne useranno altri 2») invece di dare un numero che contraddice la barra. La decisione resta la
   stessa di G1 (conta anche ciò che si sta costruendo).
+- **L'anello del Purificatore si legge**: invece di 72 puntini da un pixel quasi invisibili, un anello tratteggiato
+  (trattini di due pixel con un bordino scuro sotto) e una velatura leggerissima sul terreno raggiunto, al raggio vero
+  (5 caselle, 8 con l'ugello), anche per il fantasma quando lo si piazza; disegnato sul terreno, sotto edifici, bot e
+  rottami, quindi non copre la mappa. Con il movimento ridotto i trattini stanno fermi.
 
 ## In lavorazione — incremento 2: le città della campagna nei loro temi
 

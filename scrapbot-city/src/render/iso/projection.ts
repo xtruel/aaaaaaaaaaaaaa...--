@@ -41,3 +41,22 @@ export function tileCenter(tx: number, ty: number): { X: number; Y: number } {
 export function diamondHalfWidth(row: number): number {
   return 2 * Math.min(row, TILE_H - 1 - row) + 1;
 }
+
+// A ground circle of `radius` world units around (cx, cy), as the iso view shows it: an ellipse centred on the
+// circle's centre, twice as wide as it is tall (the Purifier's reach). `dashes`: the iso pixel of every dot of a
+// dashed outline at angle offset `spin`, one dot every 2 px or so along the ellipse, 3 dots on and 2 off.
+export function groundRing(cx: number, cy: number, radius: number, spin = 0): { X: number; Y: number; ax: number; ay: number; dashes: { X: number; Y: number }[] } {
+  const X = isoX(cx, cy);
+  const Y = isoY(cx, cy);
+  const ax = radius * Math.SQRT2;
+  const ay = ax / 2;
+  const around = Math.PI * (3 * (ax + ay) - Math.sqrt((3 * ax + ay) * (ax + 3 * ay)));
+  const steps = Math.max(40, Math.round(around / 2 / 5) * 5);
+  const dashes: { X: number; Y: number }[] = [];
+  for (let k = 0; k < steps; k++) {
+    if (k % 5 >= 3) continue;
+    const a = (k / steps) * Math.PI * 2 + spin;
+    dashes.push({ X: Math.round(X + Math.cos(a) * ax), Y: Math.round(Y + Math.sin(a) * ay) });
+  }
+  return { X, Y, ax, ay, dashes };
+}

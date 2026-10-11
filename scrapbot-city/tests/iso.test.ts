@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { MAP_W, TILE } from '../src/game/defs';
 import { isSolidAt, placePiece } from '../src/game/pieces';
 import { createGame, idx } from '../src/game/state';
-import { groundAt, isoX, isoY, tileAt, tileCenter, tileTop, diamondHalfWidth } from '../src/render/iso/projection';
+import { groundAt, groundRing, isoX, isoY, tileAt, tileCenter, tileTop, diamondHalfWidth } from '../src/render/iso/projection';
+import { BUILDINGS } from '../src/game/defs';
+import { buildingStats } from '../src/game/piecedefs';
 import { DepthSorter, compareDepth } from '../src/render/iso/depth';
 import type { DepthItem } from '../src/render/iso/depth';
 import { Walkers } from '../src/render/iso/life';
@@ -87,6 +89,39 @@ function sortAll(items: DepthItem[]): number[] {
   const n = sorter.sort(out);
   return out.slice(0, n).map((i) => i.ref);
 }
+
+describe('the Purifier\'s ring', () => {
+  it('outlines the sim\'s reach (5 tiles, 8 with the nozzle) with a dot every 2 px or so, 3 on and 2 off', () => {
+    const def = BUILDINGS.purifier;
+    const radii = [buildingStats({ type: 'purifier' }).cleanRadius, buildingStats({ type: 'purifier', modules: ['purifierNozzle'] }).cleanRadius];
+    expect(radii).toEqual([5, 8]);
+    for (const tiles of radii) {
+      for (const spin of [0, 1.234]) {
+        // a Purifier at (20, 10): its centre on the ground, as cleanSludge measures it
+        const cx = (20 + def.w / 2) * TILE;
+        const cy = (10 + def.h / 2) * TILE;
+        const ring = groundRing(cx, cy, tiles * TILE, spin);
+        expect([ring.X, ring.Y]).toEqual([isoX(cx, cy), isoY(cx, cy)]);
+        // every dot lies on the ground circle of that radius (within the rounding to whole pixels)
+        for (const d of ring.dashes) {
+          const g = groundAt(d.X, d.Y);
+          expect(Math.abs(Math.hypot(g.x - cx, g.y - cy) - tiles * TILE), `${tiles} tiles`).toBeLessThan(2);
+        }
+        // dense enough to read as a line: 3 dots of every 5 steps, a step about 2 px along the ellipse
+        const around = Math.PI * (3 * (ring.ax + ring.ay) - Math.sqrt((3 * ring.ax + ring.ay) * (ring.ax + 3 * ring.ay)));
+        expect(ring.dashes.length / around).toBeGreaterThan(0.28);
+        expect(ring.dashes.length / around).toBeLessThan(0.32);
+        // within a dash the dots touch (a 2 px wide dot every ~2 px): no gap wider than 3 px
+        for (let k = 0; k + 1 < ring.dashes.length; k++) {
+          if (k % 3 === 2) continue; // the gap between two dashes
+          const a = ring.dashes[k];
+          const b = ring.dashes[k + 1];
+          expect(Math.max(Math.abs(a.X - b.X), Math.abs(a.Y - b.Y))).toBeLessThanOrEqual(3);
+        }
+      }
+    }
+  });
+});
 
 describe('depth sorting', () => {
   it('draws a big building behind a small one in front of its edge (where x + y sorting fails)', () => {

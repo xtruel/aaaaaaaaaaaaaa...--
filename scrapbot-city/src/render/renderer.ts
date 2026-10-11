@@ -21,7 +21,7 @@ import { atlasImage, buildingArt, citizenVariants, cityTheme, decorArt, frame, o
 import type { BuildingArtMeta, Frame } from './iso/atlas';
 import { DepthSorter, standsInFront } from './iso/depth';
 import type { DepthItem } from './iso/depth';
-import { groundAt, tileAt, tileTop } from './iso/projection';
+import { groundAt, groundRing, tileAt, tileTop } from './iso/projection';
 import { Walkers, isCanal, isRoadCol, isRoadRow, placeScenery, ringKey } from './iso/life';
 import type { SceneryItem } from './iso/life';
 
@@ -1591,7 +1591,7 @@ export class Renderer {
   private drawGroundMarks(s: GameState, view: ViewState, camX: number, camY: number): void {
     const selected = view.selectedId >= 0 ? s.buildings.find((b) => b.id === view.selectedId) : undefined;
     // the radius the sim cleans: 8 tiles with the Purifier's nozzle
-    if (selected && BUILDINGS[selected.type].cleanRadius) this.drawRadius(selected.x, selected.y, selected.type, camX, camY, buildingStats(selected).cleanRadius);
+    if (selected && BUILDINGS[selected.type].cleanRadius) this.drawRadius(selected.x, selected.y, selected.type, camX, camY, buildingStats(selected).cleanRadius, view.reducedMotion);
     if (view.piece?.kind === 'floor') this.drawFloorGhosts(camX, camY);
     const h = view.hover;
     // a catalog tool shows its own preview (drawPiecePreview)
@@ -1906,21 +1906,26 @@ export class Renderer {
     }
   }
 
-  private drawRadius(tx: number, ty: number, type: BuildingType, camX: number, camY: number, radius = BUILDINGS[type].cleanRadius ?? 0): void {
+  // The reach of a Purifier's cleaning (radius in tiles: 8 with the nozzle), as the sim measures it from the building's
+  // centre: a faint wash over the ground it covers and a dashed ring with a dark edge under each dash, so it reads on
+  // dark and light ground, by day and under the night. Drawn on the ground: buildings, bots and junk stay on top.
+  // The dashes turn slowly (still with reduced motion).
+  private drawRadius(tx: number, ty: number, type: BuildingType, camX: number, camY: number, radius = BUILDINGS[type].cleanRadius ?? 0, still = false): void {
     const def = BUILDINGS[type];
-    const r = radius * TILE;
-    const cx = (tx + def.w / 2) * TILE;
-    const cy = (ty + def.h / 2) * TILE;
+    const ring = groundRing((tx + def.w / 2) * TILE, (ty + def.h / 2) * TILE, radius * TILE, still ? 0 : this.clock * 0.15);
     const ctx = this.ctx;
-    ctx.fillStyle = 'rgba(66,226,210,0.7)';
-    const steps = 72;
-    for (let k = 0; k < steps; k++) {
-      const a = (k / steps) * Math.PI * 2 + this.clock * 0.3;
-      const wx = cx + Math.cos(a) * r;
-      const wy = cy + Math.sin(a) * r;
-      ctx.fillRect(Math.round(wx - wy) - camX, Math.round((wx + wy) / 2) - camY, 1, 1);
+    ctx.fillStyle = 'rgba(66,226,210,0.09)';
+    ctx.beginPath();
+    ctx.ellipse(ring.X - camX, ring.Y - camY, ring.ax, ring.ay, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // each dot 2 px wide, with a dark one under it
+    for (const [color, dy] of [['rgba(10,8,26,0.75)', 1], ['#7ff7e8', 0]] as const) {
+      ctx.fillStyle = color;
+      for (const d of ring.dashes) ctx.fillRect(d.X - 1 - camX, d.Y + dy - camY, 2, 1);
     }
   }
+
+
 
   private drawPlacement(s: GameState, view: ViewState, camX: number, camY: number, img: HTMLImageElement): void {
     const ctx = this.ctx;
@@ -1946,7 +1951,7 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     this.outlineFootprint(ox, oy, def.w, def.h, check.ok ? PAL.lime : PAL.yellow, camX, camY);
-    if (def.cleanRadius) this.drawRadius(ox, oy, type, camX, camY);
+    if (def.cleanRadius) this.drawRadius(ox, oy, type, camX, camY, def.cleanRadius, view.reducedMotion);
     if (!check.ok && check.reason) {
       const top = tileTop(ox, oy);
       this.addLabel(check.reason, top.X - camX, top.Y - (f ? f.ay : 40) - 12 - camY, PAL.red);
