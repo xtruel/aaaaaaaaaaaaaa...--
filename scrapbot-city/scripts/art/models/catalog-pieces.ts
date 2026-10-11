@@ -292,7 +292,9 @@ export function signPiece(motif: number, dir: number): Vox {
 
 // ---------- pergola ----------
 // Four posts, two beams along the axis, slats across them; wisteria climbs the two front posts and spills over the
-// top in purple clusters.
+// top in purple clusters. The frame, the vines and the hanging clusters are built along x and turned for y, but the
+// leafy crown on the slats is laid out in the final orientation, always in a row across the screen (x − y): turned
+// with the frame, its lobes lined up down the screen on the y pergola and read as a tree standing on the roof.
 export function pergolaPiece(axis: 'x' | 'y'): Vox {
   const P = catalogPieceMats();
   const v = new Vox(16, 16, 22);
@@ -309,18 +311,8 @@ export function pergolaPiece(axis: 'x' | 'y'): Vox {
       v.set(x + (s & 1 ? 2 : -1), 12 + (s >> 1), z, P.vine);
       if (z % 3 === 0) v.set(x + (s & 1 ? -1 : 2), 13, z, M.green);
     }
-  balls(
-    v,
-    [
-      [4, 13, H + 2, 3, 2],
-      [12, 4, H + 2.5, 3, 2],
-      [8, 9, H + 3, 3.5, 1.6],
-    ],
-    M.green,
-    M.greenL,
-    M.greenD,
-  );
-  // hanging wisteria clusters under the slats
+  // hanging wisteria clusters under the slats (stamped over the crown below, so their tops stay purple)
+  const hang = new Vox(16, 16, 22);
   for (const [x, y, len] of [
     [4, 14, 5],
     [7, 14, 4],
@@ -330,17 +322,38 @@ export function pergolaPiece(axis: 'x' | 'y'): Vox {
     [5, 3, 3],
   ] as const)
     for (let k = 0; k < len; k++) {
-      v.set(x, y, H - k, k % 2 ? P.wisteriaD : P.wisteria);
-      if (k < len - 2) v.set(x + 1, y, H - k, P.wisteria);
+      hang.set(x, y, H - k, k % 2 ? P.wisteriaD : P.wisteria);
+      if (k < len - 2) hang.set(x + 1, y, H - k, P.wisteria);
     }
-  return axis === 'x' ? v : v.rotated();
+  const out = axis === 'x' ? v : v.rotated();
+  // the crown: three lobes across the screen, the first over the side the vines climb
+  const lobes =
+    axis === 'x'
+      ? [
+          [4, 13, H + 2, 3, 2],
+          [12, 4, H + 2.5, 3, 2],
+          [8, 9, H + 3, 3.5, 1.6],
+        ]
+      : [
+          [13, 4, H + 2, 3, 2],
+          [4, 12, H + 2.5, 3, 2],
+          [9, 8, H + 3, 3.5, 1.6],
+        ];
+  balls(out, lobes, M.green, M.greenL, M.greenD);
+  out.stamp(axis === 'x' ? hang : hang.rotated(), 0, 0, 0);
+  return out;
 }
 
 // ---------- Miso's house ----------
 // Facing +y: a little wooden house on a raised floor, a red gable roof (ridge along y) with a white paw print on
-// both slopes (one of them always faces the camera), a round-topped door in the +y gable, a pink cushion on the
-// porch in front of it, a fish cut-out over the door and a food bowl by the porch.
-const PAW = ['.#.#.', '#...#', '.###.', '.###.'];
+// the slope that faces the camera, a round-topped door in the +y gable, a pink cushion on the porch in front of it,
+// a fish cut-out over the door and a food bowl by the porch.
+// The paw is painted after the house is turned (catHousePiece), always on the camera's slope and always on the same
+// voxel parity: the projection works in half voxels, so a one-voxel toe on a roof step shows its lit top on one
+// parity and only its shaded riser on the other (painted in the model, the paw read as a ring in two directions
+// and as a dot in the other two). Rows from the ridge down: four toes in an arc, then a round pad over steps 2..0.
+const PAW = ['.#.#.', '#...#', '.###.', '#####', '.###.'];
+const PAW_K = 4; // the roof step of the paw's top row (step 0 is the eave, 6 the ridge, whose top hides step 5)
 function catHouseModel(): Vox {
   const P = catalogPieceMats();
   const v = new Vox(16, 16, 15);
@@ -358,19 +371,6 @@ function catHouseModel(): Vox {
   // gable ends: fill the triangle on the walls' planes
   for (let k = 0; k < 6; k++) {
     v.box(3 + k, 3, 8 + k, 13 - k, 12, 9 + k, P.plank);
-  }
-  // paw prints on both slopes (painted on the slope's surface voxels)
-  for (const side of [0, 1]) {
-    PAW.forEach((row, r) =>
-      [...row].forEach((ch, c) => {
-        if (ch !== '#') return;
-        const y = 6 + c;
-        // step r up the slope
-        const k = 2 + r;
-        const x = side ? 13 - k : 2 + k;
-        v.set(x, y, 8 + k, M.white);
-      }),
-    );
   }
   // door: a round-topped opening in the +y gable
   v.box(6, 11, 1, 10, 12, 6, M.ink);
@@ -393,7 +393,19 @@ function catHouseModel(): Vox {
 }
 
 export function catHousePiece(dir: number): Vox {
-  return facingDir(catHouseModel(), dir);
+  const v = facingDir(catHouseModel(), dir);
+  // the slope facing the camera: +x (x = 13 − k) when the ridge runs along y (dirs 1, 3), +y (y = 13 − k) when it
+  // runs along x (dirs 0, 2); step k is at z 8 + k. Columns 6..10 along the ridge, the middle of the roof.
+  const alongY = (dir & 1) === 1;
+  PAW.forEach((row, r) =>
+    [...row].forEach((ch, c) => {
+      if (ch !== '#') return;
+      const k = PAW_K - r;
+      if (alongY) v.set(13 - k, 6 + c, 8 + k, M.white);
+      else v.set(6 + c, 13 - k, 8 + k, M.white);
+    }),
+  );
+  return v;
 }
 
 // ---------- scrap sculpture ----------

@@ -529,6 +529,43 @@ describe('catalogue art, increment 2 (0.7)', () => {
     }
   });
 
+  it("Miso's house shows its paw print on the roof in every direction, and the pergola's crown spreads across both ways", () => {
+    // the paw is painted on the camera's slope after the turn, on one voxel parity: the same white mark whichever
+    // way the door faces (painted in the model it read as a ring two ways and as a single dot the other two)
+    const white = (name: string) => {
+      const p = pixels(name);
+      let n = 0;
+      for (let i = 0; i < p.px.length; i += 4) if (p.px[i + 3] && p.px[i] > 200 && p.px[i + 1] > 200 && p.px[i + 2] > 200) n++;
+      return n;
+    };
+    const paws = DIRS4.map((d) => white(`pc/cathouse/${d}`));
+    expect(Math.min(...paws), `paw pixels ${paws}`).toBeGreaterThanOrEqual(15);
+    expect(Math.max(...paws) / Math.min(...paws), `paw pixels ${paws}`).toBeLessThanOrEqual(1.5);
+    // the leafy crown on the slats: a band across the screen on both pergolas (turned with the frame, the y one's
+    // lobes stacked up the screen into a tree standing on the roof)
+    for (const axis of ['x', 'y']) {
+      const p = pixels(`pc/pergola/${axis}`);
+      let x0 = p.w;
+      let x1 = -1;
+      let y0 = p.h;
+      let y1 = -1;
+      for (let y = 0; y < p.h / 2; y++)
+        for (let x = 0; x < p.w; x++) {
+          const o = (y * p.w + x) * 4;
+          const [r, g, b, a] = [p.px[o], p.px[o + 1], p.px[o + 2], p.px[o + 3]];
+          if (!a || g < 120 || g < r + 40 || g < b + 40) continue;
+          x0 = Math.min(x0, x);
+          x1 = Math.max(x1, x);
+          y0 = Math.min(y0, y);
+          y1 = Math.max(y1, y);
+        }
+      const w = x1 - x0 + 1;
+      const h = y1 - y0 + 1;
+      expect(w, `pergola ${axis} crown ${w}×${h}`).toBeGreaterThanOrEqual(22);
+      expect(w, `pergola ${axis} crown ${w}×${h}`).toBeGreaterThan(1.5 * h);
+    }
+  });
+
   it('walls and pillars have a frame for every mask, all lined up with the fence', () => {
     for (const kind of ['wall', 'pillar', 'fence']) {
       const shapes = kind === 'pillar' ? ['0', ...MASKS] : ['x', 'y', ...MASKS];
