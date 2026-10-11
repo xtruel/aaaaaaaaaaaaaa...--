@@ -51,6 +51,10 @@ const GLYPHS: Record<string, string> = {
   '(': '010100100100010',
   ')': '010001001001010',
   '×': '000101010101000',
+  // before -> after in module labels ("STORAGE 80 -> 180"; an arrow → is written -> too, see foldText)
+  '>': '100010001010100',
+  '<': '001010100010001',
+  '=': '000111000111000',
   ' ': '000000000000000',
 };
 
@@ -60,12 +64,14 @@ const UMLAUT: Record<string, string> = { Ä: 'AE', Ö: 'OE', Ü: 'UE' };
 
 // The font only has A–Z: accents are dropped (É → E, Ż → Z, ß → SS) so every language still reads.
 // German writes umlauts out instead (Ü → UE), the way it is done wherever they are missing.
+// Arrows are too small for 3×5 pixels: → is written ->.
 export function foldText(text: string): string {
   const up = text.toUpperCase();
   return (lang() === 'de' ? up.replace(/[ÄÖÜ]/g, (c) => UMLAUT[c]) : up)
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
-    .replace(/[ŁØÆŒẞĐÐÞ]/g, (c) => FOLD[c] ?? c);
+    .replace(/[ŁØÆŒẞĐÐÞ]/g, (c) => FOLD[c] ?? c)
+    .replace(/→/g, '->');
 }
 
 export function pixelTextWidth(text: string, scale = 1): number {

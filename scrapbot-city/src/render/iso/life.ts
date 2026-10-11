@@ -1,6 +1,7 @@
 // Things that make the city feel alive but are not part of the simulation (never saved, no effect on play):
 // citizens walking the old streets, and the scenery around the playable map.
 import { MAP_H, MAP_W, T, TILE } from '../../game/defs';
+import { isSolidAt } from '../../game/pieces';
 import { idx, inBounds } from '../../game/state';
 import type { GameState } from '../../game/state';
 import { hash2 } from '../../game/world';
@@ -29,11 +30,12 @@ export interface Walker {
 const SPEED = 0.45; // tiles per second
 const MAX_WALKERS = 16;
 
+// The old streets, where no building, fence, gate or lamp stands (a floor is fine).
 function walkable(s: GameState, tx: number, ty: number): boolean {
   if (!inBounds(tx, ty)) return false;
   if (!isRoadRow(ty) && !isRoadCol(tx)) return false;
   const i = idx(tx, ty);
-  return s.tiles[i] === T.GROUND && s.occ[i] === -1;
+  return s.tiles[i] === T.GROUND && s.occ[i] === -1 && !isSolidAt(s, i);
 }
 
 export class Walkers {
@@ -45,8 +47,12 @@ export class Walkers {
     const want = Math.min(MAX_WALKERS, Math.floor(s.pop / 4));
     while (this.list.length > want) this.list.pop();
     if (this.list.length < want) this.spawn(s, variants);
+    let kept = 0;
     for (const w of this.list) {
       if (!walkable(s, w.nx, w.ny)) {
+        // shut in on both sides (pieces laid on the two tiles it walks between): it goes, another one starts
+        // somewhere else instead of turning on the spot
+        if (!walkable(s, w.tx, w.ty)) continue;
         // a building went up on the street: turn back
         const tx = w.tx;
         const ty = w.ty;
@@ -69,7 +75,9 @@ export class Walkers {
       const py = (w.ty + 0.5 + dy * w.t) * TILE + (dx !== 0 ? w.lane * 4.5 : 0);
       w.x = px;
       w.y = py;
+      this.list[kept++] = w;
     }
+    this.list.length = kept;
   }
 
   private rand(): number {

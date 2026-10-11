@@ -1,12 +1,15 @@
 // Isometric 2.5D renderer. The simulation grid is unchanged: this only decides how the world is drawn and
 // which tile or building is under a screen point. Art comes from the generated atlas (npm run art).
 //
-// Layers: background → terrain cache (tiles, junk heaps, rubble) → shadows → ground marks → depth-sorted
-// objects (buildings, bots, cat) → particles → placement preview → night glow → smog → floating text → blimp.
+// Layers: background → terrain cache (tiles, industrial floors, junk heaps, rubble) → shadows → ground marks →
+// depth-sorted objects (buildings, fences/gates/lamps, bots, cat) → particles → placement preview → night glow →
+// smog → floating text → blimp.
 import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
-import type { BuildingType } from '../game/defs';
-import { placeCheck } from '../game/actions';
-import type { CatalogKind } from '../game/pieces';
+import type { BuildingType, Cost, Resource } from '../game/defs';
+import { costText, placeCheck } from '../game/actions';
+import type { PlaceCheck } from '../game/actions';
+import { MODULES, PIECES, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
+import type { CatalogKind, ModuleKind, PieceKind, SolidKind } from '../game/pieces';
 import { dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
 import type { Bot, Building, FxEvent, GameState } from '../game/state';
@@ -14,8 +17,8 @@ import { hash2 } from '../game/world';
 import { t } from '../i18n';
 import { drawPixelText, pixelTextWidth } from './pixelfont';
 import { PAL } from './sprites';
-import { atlasImage, buildingArt, citizenVariants, decorArt, frame, opaqueAt, whenAtlasReady } from './iso/atlas';
-import type { Frame } from './iso/atlas';
+import { atlasImage, buildingArt, citizenVariants, decorArt, frame, opaqueAt, variantArt, variantKey, whenAtlasReady } from './iso/atlas';
+import type { BuildingArtMeta, Frame } from './iso/atlas';
 import { DepthSorter } from './iso/depth';
 import type { DepthItem } from './iso/depth';
 import { groundAt, tileAt, tileTop } from './iso/projection';
@@ -69,8 +72,8 @@ interface BotVis {
 
 interface Drawn {
   kind: number;
-  ref: number; // building or bot id
-  index: number; // position in s.buildings / s.bots this frame
+  ref: number; // building or bot id, tile index of a piece
+  index: number; // position in s.buildings / s.bots this frame (a piece: its tile index)
   f: Frame | null;
   sx: number; // iso px of the frame's top-left corner
   sy: number;
@@ -90,7 +93,47 @@ const K_CAT = 3;
 const K_WALKER = 4;
 const K_DECOR = 5;
 const K_LAMP = 6;
+const K_PIECE = 7;
 const POOL = [5, 10, 14, 16, 14, 10, 5]; // half-widths of a lamp's light pool, row by row
+
+// Player-built pieces (0.7): how tall the solid ones stand (voxels; draw order, bots fly over them), and their
+// frames: a fence by the mask of its fence/gate neighbours (alone: along x or y by its rotation), a gate by its
+// rotation (0 along x, 1 along y), a lamp by the direction of its arm (0 +x, 1 +y, 2 −x, 3 −y).
+const PIECE_H: Record<SolidKind, number> = { fence: 10, gate: 12, lamp: 22 };
+const FENCE_FRAMES = Array.from({ length: 16 }, (_, mask) => `pc/fence/${mask}`);
+const GATE_FRAMES = ['pc/gate/x', 'pc/gate/y'];
+const LAMP_FRAMES = [0, 1, 2, 3].map((dir) => `pc/lamp/${dir}`);
+const FLOOR_FRAMES = [0, 1, 2, 3].map((k) => `t/floor/${k}`);
+const GHOST_OK = 'rgba(198,244,50,0.35)';
+const GHOST_BAD = 'rgba(226,54,75,0.5)';
+
+function pieceFrameOf(kind: SolidKind, rot: number, mask: number): string {
+  if (kind === 'fence') return mask ? FENCE_FRAMES[mask] : rot & 1 ? 'pc/fence/y' : 'pc/fence/x';
+  if (kind === 'gate') return GATE_FRAMES[rot & 1];
+  return LAMP_FRAMES[rot & 3];
+}
+
+// Which of the four plates a floor tile shows: fixed per tile, so a laid floor looks like its preview.
+function floorFrameOf(tx: number, ty: number): string {
+  return FLOOR_FRAMES[Math.floor(hash2(tx, ty, 47) * 4)];
+}
+
+// A floor shows unless something covers it: a building standing on it, or junk, sludge or rubble on the tile.
+function floorShown(s: GameState, i: number): boolean {
+  return s.floor[i] !== 0 && s.occ[i] === -1 && (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS);
+}
+
+// The old streets' lamps stand on their curb tiles until a building, junk or a player's piece takes the tile.
+function streetLampShown(s: GameState, tx: number, ty: number): boolean {
+  if (!inBounds(tx, ty)) return true;
+  const i = idx(tx, ty);
+  return s.occ[i] === -1 && s.solid[i] === 0 && s.tiles[i] === T.GROUND;
+}
+
+// Can the resources pay `n` times this cost? (a dragged row is paid tile by tile)
+function affords(res: Record<Resource, number>, cost: Cost, n: number): boolean {
+  return (Object.keys(cost) as Resource[]).every((r) => res[r] >= (cost[r] ?? 0) * n);
+}
 
 
 function valueNoise(x: number, y: number, salt: number): number {
@@ -105,15 +148,16 @@ function valueNoise(x: number, y: number, salt: number): number {
   return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
 }
 
-// Frame names per building type, built once: the renderer asks for them several times per building per frame.
+// Frame names per building type (or variant with modules, e.g. 'dock+dockStorage'), built once: the renderer asks
+// for them several times per building per frame.
 interface BuildingNames {
   c: string[];
   off: string;
   w: string[];
   shadow: string;
 }
-const buildingNames = new Map<BuildingType, BuildingNames>();
-function namesOf(type: BuildingType, frames: number): BuildingNames {
+const buildingNames = new Map<string, BuildingNames>();
+function namesOf(type: string, frames: number): BuildingNames {
   let n = buildingNames.get(type);
   if (!n || n.w.length !== frames) {
     n = {
@@ -126,6 +170,26 @@ function namesOf(type: BuildingType, frames: number): BuildingNames {
   }
   return n;
 }
+
+// The art a building is drawn with: the variant with its installed modules when the atlas has one, else its own
+// type. Same frame size and anchor either way, so installing a module never moves the building. Cached per modules
+// list (installing or removing a module gives the building a new list).
+const artKeys = new WeakMap<readonly ModuleKind[], string>();
+function artKey(b: Building): string {
+  const m = b.modules;
+  if (!m || m.length === 0) return b.type;
+  let k = artKeys.get(m);
+  if (k === undefined) {
+    const v = variantKey(b.type, m);
+    k = variantArt[v] ? v : b.type;
+    artKeys.set(m, k);
+  }
+  return k;
+}
+function artOf(b: Building): BuildingArtMeta | undefined {
+  const k = artKey(b);
+  return k === b.type ? buildingArt[b.type] : variantArt[k];
+}
 const glowNames = new Map<string, string>();
 function glowOf(name: string): string {
   let g = glowNames.get(name);
@@ -134,6 +198,32 @@ function glowOf(name: string): string {
     glowNames.set(name, g);
   }
   return g;
+}
+const shadowNames = new Map<string, string>();
+function shadowOf(name: string): string {
+  let g = shadowNames.get(name);
+  if (!g) {
+    g = `${name}/shadow`;
+    shadowNames.set(name, g);
+  }
+  return g;
+}
+
+// What a catalog tool would lay on one tile this frame.
+interface Ghost {
+  x: number;
+  y: number;
+  ok: boolean;
+  reason?: string;
+}
+
+// A module tool over a building: the building, whether the module fits its type, the check, and the art of the
+// building with the module (null when no preview of it is drawn).
+interface ModulePreview {
+  b: Building;
+  fits: boolean;
+  check: PlaceCheck;
+  ghost: string | null;
 }
 
 function isWorking(s: GameState, b: Building): boolean {
@@ -176,10 +266,22 @@ export class Renderer {
   private scenery: SceneryItem[] = [];
   private sceneryTaken = new Set<number>();
   private catVis = { lx: 0, ly: 0, dir: 0 };
-  // buildings seen last frame, to animate the ones that disappear (demolished)
-  private known = new Map<number, { type: BuildingType; x: number; y: number; built: number }>();
+  // buildings seen last frame, to animate the ones that disappear (demolished); key: the art they were drawn with
+  private known = new Map<number, { type: BuildingType; key: string; x: number; y: number; built: number }>();
   private seen = new Set<number>();
-  private collapsing: { type: BuildingType; x: number; y: number; t: number }[] = [];
+  private collapsing: { type: BuildingType; key: string; x: number; y: number; t: number }[] = [];
+  // pieces as they were at the end of the last frame: one laid or removed since then gets a light effect
+  private lastSolid = new Uint8Array(MAP_W * MAP_H);
+  private lastFloor = new Uint8Array(MAP_W * MAP_H);
+  // the catalog tool this frame: the ghosts of the pieces it would lay, the tiles of those that fences join (real
+  // fences next to them are drawn joined, as they will be), and the building a module tool points at
+  private ghosts: Ghost[] = [];
+  private ghostJoin = new Set<number>();
+  private ghostRow = new Set<number>(); // every ghost of a fence or gate row: the refused ones join each other
+  private ghostSeen = new Set<number>();
+  private modulePreview: ModulePreview | null = null;
+  private reduced = false; // reduced motion, this frame
+  private pieceNames: string[] = new Array<string>(MAP_W * MAP_H).fill(''); // frame of each visible piece this frame
 
   // terrain cache
   private terrain: HTMLCanvasElement;
@@ -320,22 +422,62 @@ export class Renderer {
       if (d.f && !opaqueAt(d.f, ix - d.sx, iy - d.sy)) continue;
       if (d.kind === K_BUILDING) return d.ref;
       if (d.kind === K_CAT) return -2;
-      // bots, citizens and scenery never take a click: what is behind them stays clickable
+      // bots, citizens, scenery and pieces never take a click here: what is behind them stays clickable (a fence
+      // in front of a building does not hide it; pieces are found by pickPiece)
     }
     return -1;
   }
 
-  // The fence, gate or lamp drawn under a screen point, else the floor tile under it: its tile index, or -1.
-  // A building drawn in front of it wins (pickBuilding is asked first).
-  pickPiece(_sx: number, _sy: number): number {
-    return -1;
+  // The fence, gate or lamp drawn under a screen point (its visible pixels, nearest first), else the tile under the
+  // point when it holds a piece or a visible floor: its tile index, or -1. A building drawn in front of the point
+  // covers what is behind it (pickBuilding is asked first).
+  pickPiece(sx: number, sy: number): number {
+    const ix = Math.floor(this.cam.x + sx / this.pxZoom);
+    const iy = Math.floor(this.cam.y + sy / this.pxZoom);
+    for (let k = this.drawnCount - 1; k >= 0; k--) {
+      const d = this.drawn[k];
+      if (ix < d.sx || iy < d.sy || ix >= d.sx + d.w || iy >= d.sy + d.h) continue;
+      if (d.f && !opaqueAt(d.f, ix - d.sx, iy - d.sy)) continue;
+      if (d.kind === K_PIECE) return d.ref;
+      if (d.kind === K_BUILDING) return -1;
+    }
+    const s = this.terrainState;
+    const tile = this.screenToTile(sx, sy);
+    if (!s || !inBounds(tile.x, tile.y)) return -1;
+    const i = idx(tile.x, tile.y);
+    return s.solid[i] !== 0 || floorShown(s, i) ? i : -1;
   }
 
-  // Screen box (CSS px) covering the piece on a tile.
+  // Screen box (CSS px) covering the piece on a tile: the sprite of a fence, gate or lamp, else the tile.
   pieceScreenBox(i: number): { left: number; top: number; right: number; bottom: number } {
-    const top = tileTop(i % MAP_W, Math.floor(i / MAP_W));
+    const tx = i % MAP_W;
+    const ty = Math.floor(i / MAP_W);
+    const top = tileTop(tx, ty);
     const z = this.pxZoom;
+    const s = this.terrainState;
+    const f = s && inBounds(tx, ty) && s.solid[i] !== 0 ? frame(this.pieceFrameName(s, tx, ty, i)) : undefined;
+    if (f) return { left: (top.X - f.ax - this.cam.x) * z, top: (top.Y - f.ay - this.cam.y) * z, right: (top.X - f.ax + f.w - this.cam.x) * z, bottom: (top.Y - f.ay + f.h - this.cam.y) * z };
     return { left: (top.X - TILE - this.cam.x) * z, top: (top.Y - this.cam.y) * z, right: (top.X + TILE - this.cam.x) * z, bottom: (top.Y + TILE - this.cam.y) * z };
+  }
+
+  // The frame of the fence, gate or lamp on a tile. A fence joins its fence and gate neighbours, and the ghosts of
+  // the ones being laid next to it.
+  private pieceFrameName(s: GameState, tx: number, ty: number, i: number): string {
+    const kind = solidKind(s.solid[i]) ?? 'fence';
+    if (kind !== 'fence') return pieceFrameOf(kind, s.rot[i], 0);
+    return pieceFrameOf(kind, s.rot[i], this.joinMask(s, tx, ty, this.ghostJoin));
+  }
+
+  // fenceMask, plus the ghosts in `g` (tile indexes) next to the tile
+  private joinMask(s: GameState, tx: number, ty: number, g: Set<number>): number {
+    let m = fenceMask(s, tx, ty);
+    if (g.size) {
+      if (ty > 0 && g.has(idx(tx, ty - 1))) m |= 1;
+      if (tx < MAP_W - 1 && g.has(idx(tx + 1, ty))) m |= 2;
+      if (ty < MAP_H - 1 && g.has(idx(tx, ty + 1))) m |= 4;
+      if (tx > 0 && g.has(idx(tx - 1, ty))) m |= 8;
+    }
+    return m;
   }
 
   pickCat(sx: number, sy: number): boolean {
@@ -454,6 +596,9 @@ export class Renderer {
       this.blitT(`t/ground/${n < 0.38 ? 0 : n < 0.62 ? 1 : 2}/0`, tx, ty);
     }
     this.blitT(this.groundFrame(s, tx, ty), tx, ty);
+    // industrial floor laid by the player; the tile is repainted (s.dirtyTiles) when a building goes up on it or
+    // is demolished, and when junk lands on it or is collected
+    if (inside && floorShown(s, idx(tx, ty))) this.blitT(floorFrameOf(tx, ty), tx, ty);
   }
 
   private paintProp(s: GameState, tx: number, ty: number): void {
@@ -532,6 +677,14 @@ export class Renderer {
   onFx(fx: FxEvent): void {
     const X = fx.x - fx.y;
     const Y = (fx.x + fx.y) / 2;
+    if (this.isPieceFx(fx)) {
+      // a floor, fence, gate or lamp laid or removed: a dragged row lays dozens of them, so a small puff, no shake
+      const laid = fx.kind === 'placed';
+      for (let k = 0; k < 5; k++) this.spawn(X + (Math.random() - 0.5) * 14, Y - Math.random() * 6, (Math.random() - 0.5) * 24, -Math.random() * 22, 0.6, 1, laid ? (k % 2 ? PAL.white : PAL.lime) : k % 2 ? PAL.concrete : PAL.rust, 0);
+      for (let k = 0; k < 2; k++) this.spawn(X + (Math.random() - 0.5) * 16, Y + 3, (Math.random() - 0.5) * 10, -2 - Math.random() * 4, 1, 2, '#8f8a9e', 1.5);
+      if (fx.text) this.float(X, Y - 16, fx.text, PAL.white);
+      return;
+    }
     switch (fx.kind) {
       case 'collect':
         for (let k = 0; k < 6; k++) this.spawn(X, Y - 4, (Math.random() - 0.5) * 24, -12 - Math.random() * 16, 0.6, 1, k % 2 ? PAL.rust : PAL.concreteL, 0);
@@ -563,6 +716,19 @@ export class Renderer {
         this.shake = Math.max(this.shake, 0.6);
         break;
     }
+  }
+
+  // Was this 'placed' / 'demolish' effect a piece laid or removed? The core puts those at the centre of a tile
+  // without a building (a building's own effects, and its modules', are at its centre, on one of its tiles), where
+  // a floor or a fence/gate/lamp has appeared or gone since the last frame.
+  private isPieceFx(fx: FxEvent): boolean {
+    const s = this.terrainState;
+    if (!s || (fx.kind !== 'placed' && fx.kind !== 'demolish')) return false;
+    const tx = Math.floor(fx.x / TILE);
+    const ty = Math.floor(fx.y / TILE);
+    if (!inBounds(tx, ty) || fx.x !== (tx + 0.5) * TILE || fx.y !== (ty + 0.5) * TILE) return false;
+    const i = idx(tx, ty);
+    return s.occ[i] === -1 && (s.solid[i] !== this.lastSolid[i] || s.floor[i] !== this.lastFloor[i]);
   }
 
   private spawn(x: number, y: number, vx: number, vy: number, life: number, size: number, color: string, grow: number): void {
@@ -598,12 +764,16 @@ export class Renderer {
   render(s: GameState, view: ViewState, dt: number, simRunning: boolean): void {
     const started = performance.now();
     this.renderFrame(s, view, dt, simRunning);
+    // what the effects that come before the next frame are compared with (isPieceFx)
+    this.lastSolid.set(s.solid);
+    this.lastFloor.set(s.floor);
     this.lastWork = performance.now() - started;
   }
 
   private renderFrame(s: GameState, view: ViewState, dt: number, simRunning: boolean): void {
     const ctx = this.ctx;
     this.clock += dt;
+    this.reduced = view.reducedMotion;
     ctx.fillStyle = '#0f0d18';
     ctx.fillRect(0, 0, this.viewW, this.viewH);
     const img = atlasImage();
@@ -622,6 +792,7 @@ export class Renderer {
     }
     this.trackRemovals(s, view.reducedMotion);
     this.adaptQuality(dt);
+    this.planPreview(s, view);
     this.updateFocus(view);
     this.resolvePulses(s, dt);
 
@@ -652,6 +823,7 @@ export class Renderer {
     if (simRunning && !view.reducedMotion) this.emitAmbient(s, dt);
     this.updateParticles(dt, camX, camY, simRunning);
     if (view.hover && view.build) this.drawPlacement(s, view, camX, camY, img);
+    else if (view.piece) this.drawPiecePreview(s, view, camX, camY, img);
     this.drawSelection(s, view, camX, camY);
 
     this.drawLighting(s, camX, camY, img);
@@ -697,6 +869,32 @@ export class Renderer {
   }
 
   private updateFocus(view: ViewState): void {
+    if (!view.build && this.ghosts.length && view.piece && isPieceKind(view.piece.kind)) {
+      // pieces being laid, one or a dragged row: the box around their ghosts
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      for (const g of this.ghosts) {
+        x0 = Math.min(x0, g.x);
+        y0 = Math.min(y0, g.y);
+        x1 = Math.max(x1, g.x + 1);
+        y1 = Math.max(y1, g.y + 1);
+      }
+      const kind = view.piece.kind;
+      const height = kind === 'floor' ? 4 : PIECE_H[kind];
+      this.focus = {
+        x0: x0 * TILE,
+        x1: x1 * TILE,
+        y0: y0 * TILE,
+        y1: y1 * TILE,
+        sx0: (x0 - y1) * TILE,
+        sx1: (x1 - y0) * TILE,
+        sy0: ((x0 + y0) * TILE) / 2 - height,
+        sy1: ((x1 + y1) * TILE) / 2,
+      };
+      return;
+    }
     const h = view.hover;
     if (!h || !(view.build || view.bulldoze || (view.hoverId ?? -1) < 0)) {
       this.focus = null;
@@ -770,8 +968,13 @@ export class Renderer {
     th.fill(0);
     for (const b of s.buildings) {
       const def = BUILDINGS[b.type];
-      const hgt = (buildingArt[b.type]?.height ?? 20) * Math.min(1, b.built);
+      const hgt = (artOf(b)?.height ?? 20) * Math.min(1, b.built);
       for (let y = b.y; y < b.y + def.h; y++) for (let x = b.x; x < b.x + def.w; x++) if (inBounds(x, y)) th[idx(x, y)] = hgt;
+    }
+    // the bots fly over the lamps too (never on a building's tiles)
+    for (let i = 0; i < th.length; i++) {
+      const kind = s.solid[i] ? solidKind(s.solid[i]) : null;
+      if (kind) th[i] = PIECE_H[kind];
     }
   }
 
@@ -806,13 +1009,41 @@ export class Renderer {
       it.y0 = b.y * TILE;
       it.y1 = (b.y + def.h) * TILE;
       it.z0 = 0;
-      it.z1 = Math.max(4, (buildingArt[b.type]?.height ?? 20) * Math.min(1, Math.max(0.15, b.built)));
+      it.z1 = Math.max(4, (artOf(b)?.height ?? 20) * Math.min(1, Math.max(0.15, b.built)));
       it.sx0 = sx;
       it.sy0 = sy;
       it.sx1 = sx + f.w;
       it.sy1 = sy + f.h;
       it.kind = K_BUILDING;
       it.ref = k;
+    }
+    // fences, gates and lamps: one tile each, as tall as their art
+    for (let i = 0; i < s.solid.length; i++) {
+      const kind = s.solid[i] ? solidKind(s.solid[i]) : null;
+      if (!kind) continue;
+      const tx = i % MAP_W;
+      const ty = (i - tx) / MAP_W;
+      const name = this.pieceFrameName(s, tx, ty, i);
+      const f = frame(name);
+      if (!f) continue;
+      const top = tileTop(tx, ty);
+      const sx = top.X - f.ax;
+      const sy = top.Y - f.ay;
+      if (sx > vx1 || sy > vy1 || sx + f.w < vx0 || sy + f.h < vy0) continue;
+      this.pieceNames[i] = name;
+      const it = sorter.add();
+      it.x0 = tx * TILE;
+      it.x1 = it.x0 + TILE;
+      it.y0 = ty * TILE;
+      it.y1 = it.y0 + TILE;
+      it.z0 = 0;
+      it.z1 = PIECE_H[kind];
+      it.sx0 = sx;
+      it.sy0 = sy;
+      it.sx1 = sx + f.w;
+      it.sy1 = sy + f.h;
+      it.kind = K_PIECE;
+      it.ref = i;
     }
     // bots: altitude and heading are purely visual, kept here and never saved
     const now = this.clock;
@@ -906,10 +1137,10 @@ export class Renderer {
       it.kind = K_DECOR;
       it.ref = k;
     }
-    // street lamps, only where no building stands
+    // street lamps, only where no building or piece stands
     for (let k = 0; k < this.lamps.length; k++) {
       const l = this.lamps[k];
-      if (inBounds(l.tx, l.ty) && (s.occ[idx(l.tx, l.ty)] !== -1 || s.tiles[idx(l.tx, l.ty)] !== T.GROUND)) continue;
+      if (!streetLampShown(s, l.tx, l.ty)) continue;
       const f = frame(`p/lamp/${l.axis}`);
       if (!f) break;
       const top = tileTop(l.tx, l.ty);
@@ -971,13 +1202,25 @@ export class Renderer {
   }
 
   private buildingFrameName(s: GameState, b: Building): string {
-    const art = buildingArt[b.type];
-    const n = namesOf(b.type, art?.frames ?? 1);
-    if (b.built < 1) return n.c[Math.min(3, Math.floor(b.built * 4))];
+    if (b.built < 1) {
+      const n = namesOf(b.type, buildingArt[b.type]?.frames ?? 1);
+      return n.c[Math.min(3, Math.floor(b.built * 4))];
+    }
+    return this.finishedFrameName(s, b, artKey(b));
+  }
+
+  // The frame of a finished building drawn with the art `key`: its own type, or a variant with modules
+  // (b/dock+dockStorage/w2).
+  private finishedFrameName(s: GameState, b: Building, key: string): string {
+    const art = key === b.type ? buildingArt[b.type] : variantArt[key];
+    const n = namesOf(key, art?.frames ?? 1);
     if (!art) return n.off;
     // always-animated buildings (radar, lights, elevators) still go dark without power or when paused
     const animate = ALWAYS_ANIMATED.has(b.type) ? !b.paused && b.status !== 'noPower' : isWorking(s, b);
     if (!animate) return n.off;
+    // reduced motion: the modules' moving parts (the filter's fan, the silo's gauge) stand still, and so does a
+    // building while a module is previewed on it, so that the preview stays on it
+    if (this.reduced && (key !== b.type || this.modulePreview?.b === b)) return n.w[0];
     const f = Math.floor(this.clock * art.fps + b.id * 0.37) % art.frames;
     return n.w[f];
   }
@@ -988,9 +1231,21 @@ export class Renderer {
     sc.clearRect(0, 0, this.viewW, this.viewH);
     for (const b of s.buildings) {
       if (b.built < 0.5) continue;
-      const f = frame(namesOf(b.type, buildingArt[b.type]?.frames ?? 1).shadow);
+      const f = frame(namesOf(artKey(b), artOf(b)?.frames ?? 1).shadow);
       if (!f) continue;
       const top = tileTop(b.x, b.y);
+      const x = top.X - f.ax - camX;
+      const y = top.Y - f.ay - camY;
+      if (x > this.viewW || y > this.viewH || x + f.w < 0 || y + f.h < 0) continue;
+      sc.drawImage(img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
+    }
+    for (let i = 0; i < s.solid.length; i++) {
+      if (!s.solid[i] || !solidKind(s.solid[i])) continue;
+      const tx = i % MAP_W;
+      const ty = (i - tx) / MAP_W;
+      const f = frame(shadowOf(this.pieceFrameName(s, tx, ty, i)));
+      if (!f) continue;
+      const top = tileTop(tx, ty);
       const x = top.X - f.ax - camX;
       const y = top.Y - f.ay - camY;
       if (x > this.viewW || y > this.viewH || x + f.w < 0 || y + f.h < 0) continue;
@@ -1113,11 +1368,31 @@ export class Renderer {
   private drawGroundMarks(s: GameState, view: ViewState, camX: number, camY: number): void {
     const selected = view.selectedId >= 0 ? s.buildings.find((b) => b.id === view.selectedId) : undefined;
     if (selected && BUILDINGS[selected.type].cleanRadius) this.drawRadius(selected.x, selected.y, selected.type, camX, camY);
+    if (view.piece?.kind === 'floor') this.drawFloorGhosts(camX, camY);
     const h = view.hover;
-    if (!h || view.build) return;
+    // a catalog tool shows its own preview (drawPiecePreview)
+    if (!h || view.build || view.piece) return;
     if (view.hoverId !== undefined && view.hoverId >= 0) return; // the building itself gets highlighted
     if (!inBounds(h.x, h.y)) return;
     this.outlineFootprint(h.x, h.y, 1, 1, view.bulldoze ? PAL.red : 'rgba(236,232,246,0.6)', camX, camY);
+  }
+
+  // Floors being laid lie on the ground under everything that stands: drawn with the ground marks. A refused tile
+  // only turns red, so what is in the way (junk, a floor already there) stays in view.
+  private drawFloorGhosts(camX: number, camY: number): void {
+    const img = atlasImage();
+    const ctx = this.ctx;
+    for (const g of this.ghosts) {
+      const f = frame(floorFrameOf(g.x, g.y));
+      if (f && img && g.ok) {
+        const top = tileTop(g.x, g.y);
+        ctx.globalAlpha = 0.8;
+        ctx.drawImage(img, f.x, f.y, f.w, f.h, top.X - f.ax - camX, top.Y - f.ay - camY, f.w, f.h);
+        ctx.globalAlpha = 1;
+      }
+      this.fillFootprint(g.x, g.y, 1, 1, g.ok ? GHOST_OK : GHOST_BAD, camX, camY);
+      this.outlineFootprint(g.x, g.y, 1, 1, g.ok ? PAL.lime : PAL.red, camX, camY);
+    }
   }
 
   private drawObjects(s: GameState, view: ViewState, camX: number, camY: number, img: HTMLImageElement): void {
@@ -1127,7 +1402,12 @@ export class Renderer {
     for (let k = 0; k < n; k++) {
       const it = this.order[k];
       if (it.kind === K_BUILDING) this.drawBuilding(s, s.buildings[it.ref], it.ref, camX, camY, img, view);
-      else if (it.kind === K_BOT) this.drawBot(s.bots[it.ref], it.ref, camX, camY, img, view.reducedMotion);
+      else if (it.kind === K_PIECE) {
+        const f = frame(this.pieceNames[it.ref]);
+        if (!f) continue;
+        ctx.drawImage(img, f.x, f.y, f.w, f.h, it.sx0 - camX, it.sy0 - camY, f.w, f.h);
+        this.pushDrawn(K_PIECE, it.ref, it.ref, f, it.sx0, it.sy0, f.w, f.h);
+      } else if (it.kind === K_BOT) this.drawBot(s.bots[it.ref], it.ref, camX, camY, img, view.reducedMotion);
       else if (it.kind === K_CAT) {
         const cat = s.cat;
         const walking = !cat.sitting;
@@ -1163,15 +1443,17 @@ export class Renderer {
     for (const b of s.buildings) {
       seen.add(b.id);
       const k = this.known.get(b.id);
-      if (k) k.built = b.built;
-      else this.known.set(b.id, { type: b.type, x: b.x, y: b.y, built: b.built });
+      if (k) {
+        k.built = b.built;
+        k.key = artKey(b);
+      } else this.known.set(b.id, { type: b.type, key: artKey(b), x: b.x, y: b.y, built: b.built });
     }
     if (this.known.size === seen.size) return;
     for (const [id, k] of this.known) {
       if (seen.has(id)) continue;
       this.known.delete(id);
       // a new game or a loaded save replaces the whole list: only animate single removals
-      if (!reduced && this.terrainState === s && this.known.size > 0 && k.built >= 1) this.collapsing.push({ type: k.type, x: k.x, y: k.y, t: 0 });
+      if (!reduced && this.terrainState === s && this.known.size > 0 && k.built >= 1) this.collapsing.push({ type: k.type, key: k.key, x: k.x, y: k.y, t: 0 });
     }
   }
 
@@ -1182,7 +1464,7 @@ export class Renderer {
     const DUR = 0.7;
     for (const c of this.collapsing) {
       c.t += dt;
-      const f = frame(`b/${c.type}/off`);
+      const f = frame(`b/${c.key}/off`);
       if (!f) continue;
       const def = BUILDINGS[c.type];
       const top = tileTop(c.x, c.y);
@@ -1283,6 +1565,17 @@ export class Renderer {
     ctx.drawImage(img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
     if (seeThrough) ctx.globalAlpha = 1;
     this.pushDrawn(K_BUILDING, b.id, idxOf, f, sx, sy, f.w, f.h);
+    // a module tool over it: the building as it will look with the module, faint, over itself (same size and
+    // anchor, so only the module shows), in the building's place in the draw order
+    const mp = this.modulePreview;
+    if (mp && mp.b === b && mp.ghost) {
+      const g = frame(this.finishedFrameName(s, b, mp.ghost));
+      if (g) {
+        ctx.globalAlpha = mp.check.ok ? 0.6 : 0.35;
+        ctx.drawImage(img, g.x, g.y, g.w, g.h, top.X - g.ax - camX, top.Y - g.ay - camY, g.w, g.h);
+        ctx.globalAlpha = 1;
+      }
+    }
     // a short flash when a production cycle ends, a longer one (and a ring on the ground) when it is finished
     const pulse = this.pulseOf(b.id);
     if (pulse && !view.reducedMotion) {
@@ -1322,7 +1615,8 @@ export class Renderer {
       return;
     }
     // hover highlight: a soft white rim drawn by re-blitting the sprite brighter would cost a canvas; a marker is enough
-    if (view.hoverId === b.id && view.selectedId !== b.id) {
+    // (not while a catalog tool is in hand: a click then lays or installs, and the preview shows where)
+    if (view.hoverId === b.id && view.selectedId !== b.id && !view.piece) {
       ctx.globalAlpha = 0.18;
       ctx.globalCompositeOperation = 'lighter';
       ctx.drawImage(img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
@@ -1416,37 +1710,169 @@ export class Renderer {
     this.outlineFootprint(ox, oy, def.w, def.h, check.ok ? PAL.lime : PAL.yellow, camX, camY);
     if (def.cleanRadius) this.drawRadius(ox, oy, type, camX, camY);
     if (!check.ok && check.reason) {
-      const text = check.reason;
-      const w = pixelTextWidth(text);
       const top = tileTop(ox, oy);
-      const fh = f ? f.ay : 40;
-      const lx = Math.round(top.X - w / 2) - camX;
-      const ly = Math.round(top.Y - fh - 12) - camY;
-      ctx.fillStyle = 'rgba(13,11,22,0.85)';
-      ctx.fillRect(lx - 2, ly - 2, w + 4, 9);
-      drawPixelText(ctx, text, lx, ly, PAL.red);
+      this.drawLabel(check.reason, top.X - camX, top.Y - (f ? f.ay : 40) - 12 - camY, PAL.red);
     }
   }
 
+  // A line of words on the map in a dark box, centred on x (view px) with its top at y: why a placement is refused,
+  // a module's effect. Kept inside the view.
+  private drawLabel(text: string, x: number, y: number, color: string): void {
+    const ctx = this.ctx;
+    const w = pixelTextWidth(text);
+    const lx = Math.max(2, Math.min(this.viewW - w - 2, Math.round(x - w / 2)));
+    const ly = Math.max(2, Math.min(this.viewH - 7, Math.round(y)));
+    ctx.fillStyle = 'rgba(13,11,22,0.85)';
+    ctx.fillRect(lx - 2, ly - 2, w + 4, 9);
+    drawPixelText(ctx, text, lx, ly, color);
+  }
+
+  // What the catalog tool would do this frame, worked out before anything is drawn (real fences join the ghosts):
+  // a ghost per tile for a piece (the pointer's tile, or every tile of a dragged row), or the building a module
+  // tool points at.
+  private planPreview(s: GameState, view: ViewState): void {
+    this.ghosts.length = 0;
+    this.ghostJoin.clear();
+    this.ghostRow.clear();
+    this.modulePreview = null;
+    const tool = view.piece;
+    if (!tool || view.build) return;
+    if (isModuleKind(tool.kind)) {
+      this.modulePreview = this.planModule(s, view, tool.kind);
+      return;
+    }
+    if (!isPieceKind(tool.kind)) return;
+    const kind = tool.kind;
+    const def = PIECES[kind];
+    const dragged = !!view.pieceRow && view.pieceRow.length > 0;
+    const row = dragged ? view.pieceRow! : view.hover ? [view.hover] : [];
+    const seen = this.ghostSeen;
+    seen.clear();
+    let laid = 0;
+    for (const p of row) {
+      const key = (p.y + 1024) * 4096 + p.x + 1024; // each tile once, inside the map or not
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const inside = inBounds(p.x, p.y);
+      const i = inside ? idx(p.x, p.y) : -1;
+      // a dragged row passing over the same piece already there just carries on: no ghost on it
+      if (dragged && inside && (kind === 'floor' ? s.floor[i] !== 0 : solidKind(s.solid[i]) === kind)) continue;
+      let check = pieceCheck(s, kind, p.x, p.y, tool.rot);
+      // each tile of a row is paid when it is laid: past what the money covers, the ghosts say so
+      if (check.ok && !affords(s.res, def.cost, laid + 1)) check = { ok: false, reason: t('place.costs', { cost: costText(def.cost) }), costOnly: true };
+      if (check.ok) laid++;
+      this.ghosts.push({ x: p.x, y: p.y, ok: check.ok, reason: check.reason });
+      if (def.joins && inside) {
+        this.ghostRow.add(i);
+        if (check.ok) this.ghostJoin.add(i);
+      }
+    }
+  }
+
+  // The building under the pointer for a module tool: the one whose pixels are hovered, else the one on the tile.
+  private planModule(s: GameState, view: ViewState, kind: ModuleKind): ModulePreview | null {
+    const id = view.hoverId ?? -1;
+    let b = id >= 0 ? s.buildings.find((o) => o.id === id) : undefined;
+    if (!b && view.hover && inBounds(view.hover.x, view.hover.y)) {
+      const occ = s.occ[idx(view.hover.x, view.hover.y)];
+      if (occ >= 0) b = s.buildings.find((o) => o.id === occ);
+    }
+    if (!b) return null;
+    const fits = MODULES[kind].building === b.type;
+    const check = moduleCheck(s, kind, b);
+    let ghost: string | null = null;
+    if (fits && (check.ok || check.costOnly)) {
+      const key = variantKey(b.type, [...installedModules(b), kind]);
+      if (variantArt[key]) ghost = key;
+    }
+    return { b, fits, check, ghost };
+  }
+
+  private drawPiecePreview(s: GameState, view: ViewState, camX: number, camY: number, img: HTMLImageElement): void {
+    const tool = view.piece!;
+    const mp = this.modulePreview;
+    if (mp) {
+      // only a building the module fits is outlined; on any other one the reason says where it goes
+      const def = BUILDINGS[mp.b.type];
+      if (mp.fits) this.outlineFootprint(mp.b.x, mp.b.y, def.w, def.h, mp.check.ok ? PAL.lime : mp.check.costOnly ? PAL.yellow : PAL.red, camX, camY);
+      const text = mp.fits ? view.pieceLabel || (mp.check.ok ? null : mp.check.reason) : mp.check.reason;
+      const f = frame(namesOf(mp.b.type, buildingArt[mp.b.type]?.frames ?? 1).off);
+      const top = tileTop(mp.b.x, mp.b.y);
+      if (text) this.drawLabel(text, top.X + ((def.w - def.h) * TILE) / 2 - camX, top.Y - (f ? f.ay : 40) - 12 - camY, mp.fits && mp.check.ok ? PAL.lime : PAL.red);
+      return;
+    }
+    if (!isPieceKind(tool.kind) || !this.ghosts.length) return;
+    const kind = tool.kind;
+    const ctx = this.ctx;
+    if (kind !== 'floor') {
+      for (const g of this.ghosts) this.fillFootprint(g.x, g.y, 1, 1, g.ok ? GHOST_OK : GHOST_BAD, camX, camY);
+      // back to front, so the nearer ghosts of a row cover the farther ones
+      const order = this.ghosts.slice().sort((a, b) => a.x + a.y - (b.x + b.y));
+      for (const g of order) {
+        this.outlineFootprint(g.x, g.y, 1, 1, g.ok ? PAL.lime : PAL.red, camX, camY);
+        const f = frame(this.ghostFrameName(s, kind, tool.rot, g));
+        if (!f) continue;
+        const top = tileTop(g.x, g.y);
+        ctx.globalAlpha = g.ok ? 0.75 : 0.45;
+        ctx.drawImage(img, f.x, f.y, f.w, f.h, top.X - f.ax - camX, top.Y - f.ay - camY, f.w, f.h);
+        ctx.globalAlpha = 1;
+      }
+    }
+    // one label: on the pointer's tile (the end of a dragged row), or on the first tile that will be skipped
+    const h = view.hover;
+    const at = (h && this.ghosts.find((g) => g.x === h.x && g.y === h.y)) || this.ghosts[this.ghosts.length - 1];
+    const bad = at.ok ? this.ghosts.find((g) => !g.ok) : at;
+    const label = view.pieceLabel ? { g: at, text: view.pieceLabel } : bad?.reason ? { g: bad, text: bad.reason } : null;
+    if (!label) return;
+    const f = kind === 'floor' ? undefined : frame(this.ghostFrameName(s, kind, tool.rot, label.g));
+    const top = tileTop(label.g.x, label.g.y);
+    this.drawLabel(label.text, top.X - camX, top.Y - (f ? f.ay : 0) - 12 - camY, label.g.ok ? PAL.lime : PAL.red);
+  }
+
+  // The frame of a ghost: a fence joins the real fences and gates around it and the ghosts of its row that will be
+  // laid, exactly as it will look (a refused one joins the whole row, so the row still reads as one); alone, it lies
+  // along its rotation. A gate and a lamp follow the tool's rotation.
+  private ghostFrameName(s: GameState, kind: Exclude<PieceKind, 'floor'>, rot: number, g: Ghost): string {
+    if (kind !== 'fence' || !inBounds(g.x, g.y)) return pieceFrameOf(kind, rot, 0);
+    return pieceFrameOf(kind, rot, this.joinMask(s, g.x, g.y, g.ok ? this.ghostJoin : this.ghostRow));
+  }
+
   private drawSelection(s: GameState, view: ViewState, camX: number, camY: number): void {
+    const color = view.bulldoze ? PAL.red : PAL.lime;
+    const blink = Math.floor(this.clock * 3) % 3 !== 2;
+    // a selected fence, gate, lamp or floor (while it is there): the same blinking outline and marker as a building
+    const i = view.selectedPiece ?? -1;
+    if (i >= 0 && i < s.solid.length && (s.solid[i] !== 0 || floorShown(s, i))) {
+      const tx = i % MAP_W;
+      const ty = (i - tx) / MAP_W;
+      if (blink) this.outlineFootprint(tx, ty, 1, 1, color, camX, camY);
+      const f = s.solid[i] !== 0 ? frame(this.pieceFrameName(s, tx, ty, i)) : undefined;
+      const top = tileTop(tx, ty);
+      this.drawMarker(top.X - camX, top.Y - (f ? f.ay : 0) - camY, color);
+    }
     if (view.selectedId < 0) return;
     const b = s.buildings.find((o) => o.id === view.selectedId);
     if (!b) return;
     const def = BUILDINGS[b.type];
-    if (Math.floor(this.clock * 3) % 3 !== 2) this.outlineFootprint(b.x, b.y, def.w, def.h, view.bulldoze ? PAL.red : PAL.lime, camX, camY);
-    // a bouncing marker over the roof
+    if (blink) this.outlineFootprint(b.x, b.y, def.w, def.h, color, camX, camY);
+    // a marker over the roof
     const f = frame(`b/${b.type}/off`);
     if (!f) return;
     const top = tileTop(b.x, b.y);
-    const mx = Math.round(top.X + ((def.w - def.h) * TILE) / 2) - camX;
-    const my = Math.round(top.Y - f.ay - 6 + Math.sin(this.clock * 5) * 2) - camY;
+    this.drawMarker(top.X + ((def.w - def.h) * TILE) / 2 - camX, top.Y - f.ay - camY, color);
+  }
+
+  // The selection marker: a small arrow pointing down at (x, y) (view px). It bobs, except with reduced motion.
+  private drawMarker(x: number, y: number, color: string): void {
+    const mx = Math.round(x);
+    const my = Math.round(y - 6 + (this.reduced ? 0 : Math.sin(this.clock * 5) * 2));
     const ctx = this.ctx;
     ctx.fillStyle = PAL.ink;
     ctx.fillRect(mx - 4, my - 1, 9, 4);
     ctx.fillRect(mx - 3, my + 3, 7, 1);
     ctx.fillRect(mx - 2, my + 4, 5, 1);
     ctx.fillRect(mx - 1, my + 5, 3, 1);
-    ctx.fillStyle = view.bulldoze ? PAL.red : PAL.lime;
+    ctx.fillStyle = color;
     ctx.fillRect(mx - 3, my, 7, 2);
     ctx.fillRect(mx - 2, my + 2, 5, 1);
     ctx.fillRect(mx - 1, my + 3, 3, 1);
@@ -1475,7 +1901,8 @@ export class Renderer {
     }
     for (const b of s.buildings) {
       if (b.built < 1) continue;
-      const art = buildingArt[b.type];
+      // with modules, the variant's points: a Smelter with the filter has no smoke, its tower lets out steam
+      const art = artOf(b);
       if (!art) continue;
       const working = isWorking(s, b);
       const top = tileTop(b.x, b.y);
@@ -1484,6 +1911,12 @@ export class Renderer {
         const p = smoke[Math.floor(Math.random() * smoke.length)];
         const dirty = s.pollution > 60 ? '#4a3c32' : '#6d6878';
         this.spawn(top.X + p[0], top.Y + p[1], 4 + Math.random() * 6, -8 - Math.random() * 6, 2.6, 2, dirty, 1.4);
+      }
+      // light, thin steam, much sparser than smoke
+      const steam = art.points.steam;
+      if (working && steam && Math.random() < dt * 2) {
+        const p = steam[0];
+        this.spawn(top.X + p[0] + (Math.random() - 0.5) * 3, top.Y + p[1], 2 + Math.random() * 4, -9 - Math.random() * 5, 1.6, 1, Math.random() < 0.5 ? '#e4e2ee' : '#c3c0d4', 1.2);
       }
       const spark = art.points.spark;
       if (working && spark && Math.random() < dt * 3) {
@@ -1561,12 +1994,20 @@ export class Renderer {
       const g = frame(glowOf(this.buildingFrameName(s, b)));
       if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, d.sx - camX, d.sy - camY, g.w, g.h);
       // blinking beacons from the model's light points
-      const art = buildingArt[b.type];
+      const art = artOf(b);
       if (blinkOn && art?.points.light) {
         const top = tileTop(b.x, b.y);
         ctx.fillStyle = PAL.red;
         for (const p of art.points.light) ctx.fillRect(top.X + p[0] - 2 - camX, top.Y + p[1] - 2 - camY, 4, 4);
       }
+    }
+    // placed gates and lamps: the gate's amber light; the lamp's lens and the pool of light it throws on the ground,
+    // both in its glow frame (so no street-lamp pool here: it would light the ground twice)
+    for (let k = 0; k < this.drawnCount; k++) {
+      const d = this.drawn[k];
+      if (d.kind !== K_PIECE) continue;
+      const g = frame(glowOf(this.pieceNames[d.ref]));
+      if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, d.sx - camX, d.sy - camY, g.w, g.h);
     }
     for (let k = 0; k < this.drawnCount; k++) {
       const d = this.drawn[k];
@@ -1601,7 +2042,7 @@ export class Renderer {
       const lf = frame('p/lamp/x/g');
       const lg = frame('p/lamp/y/g');
       for (const l of this.lamps) {
-        if (inBounds(l.tx, l.ty) && (s.occ[idx(l.tx, l.ty)] !== -1 || s.tiles[idx(l.tx, l.ty)] !== T.GROUND)) continue;
+        if (!streetLampShown(s, l.tx, l.ty)) continue;
         const top = tileTop(l.tx, l.ty);
         const x = top.X - camX;
         const y = top.Y - camY;
