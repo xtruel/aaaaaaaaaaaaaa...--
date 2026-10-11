@@ -96,8 +96,8 @@ const K_DECOR = 5;
 const K_LAMP = 6;
 const K_PIECE = 7;
 const POOL = [5, 10, 14, 16, 14, 10, 5]; // half-widths of a lamp's light pool, row by row
-// The light of a city without a theme (atlas.ts ThemeArtMeta.light): no daylight multiply ('' or 'r,g,b'), the night
-// veil's colour, a factor on its opacity.
+// The light of a city without a theme (atlas.ts ThemeArtMeta.light): no daylight colour ('' or 'r,g,b', multiplied
+// into the ground of the terrain cache), the night veil's colour, a factor on its opacity.
 const GAME_LIGHT = { day: '', veil: '16,12,52', dark: 1 };
 
 // Player-built pieces (0.7): how tall the solid ones stand (voxels; draw order, bots fly over them), and their
@@ -298,6 +298,8 @@ export class Renderer {
   // the city's theme (atlas.ts cityTheme), set with the terrain: its ground, its border scenery and its light
   private theme: string | null = null;
   private light = GAME_LIGHT;
+  private tinted = new Map<Frame, HTMLCanvasElement | null>(); // ground frames in the theme's daylight (tintedFrame)
+  private glowCut: HTMLCanvasElement | null = null; // scratch for drawBackGlow
 
   // shadows are drawn opaque into their own layer, then blended once
   private shadow: HTMLCanvasElement;
@@ -516,7 +518,9 @@ export class Renderer {
       this.terrainPainted = false;
       return;
     }
-    const theme = (this.theme = cityTheme(s.cityId));
+    const theme = cityTheme(s.cityId);
+    if (theme !== this.theme) this.tinted.clear();
+    this.theme = theme;
     const look = theme ? themeArt[theme] : null;
     this.light = look ? { day: look.light.day.some((c) => c < 255) ? look.light.day.join(',') : '', veil: look.light.night.join(','), dark: look.light.dark } : GAME_LIGHT;
     const sc = placeScenery(s.seed, RING, decorArt, theme && look ? { id: theme, scenery: look.scenery, decor: look.decor } : null);
@@ -552,13 +556,41 @@ export class Renderer {
     this.terrainPainted = true;
   }
 
-  // Terrain cache only: a themed city paints its twin of every t/ frame it has one of.
+  // Terrain cache only: a themed city paints its twin of every t/ frame it has one of, in its daylight colour.
   private blitT(name: string, tx: number, ty: number): void {
     const f = frame(themedFrame(name, this.theme));
     const img = atlasImage();
     if (!f || !img) return;
     const top = tileTop(tx, ty);
-    this.tctx.drawImage(img, f.x, f.y, f.w, f.h, top.X - f.ax - this.tox, top.Y - f.ay - this.toy, f.w, f.h);
+    const tinted = this.light.day ? this.tintedFrame(f, img) : null;
+    if (tinted) this.tctx.drawImage(tinted, top.X - f.ax - this.tox, top.Y - f.ay - this.toy);
+    else this.tctx.drawImage(img, f.x, f.y, f.w, f.h, top.X - f.ax - this.tox, top.Y - f.ay - this.toy, f.w, f.h);
+  }
+
+  // A frame multiplied by the theme's daylight colour (alpha kept), made on first use. The ground carries the
+  // theme's light in the terrain cache, so it costs no pass over the whole screen every frame.
+  private tintedFrame(f: Frame, img: HTMLImageElement): HTMLCanvasElement | null {
+    let c = this.tinted.get(f);
+    if (c !== undefined) return c;
+    try {
+      c = document.createElement('canvas');
+      c.width = f.w;
+      c.height = f.h;
+      const g = c.getContext('2d', { willReadFrequently: true })!;
+      g.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+      const px = g.getImageData(0, 0, f.w, f.h);
+      const [r, gr, b] = this.light.day.split(',').map((v) => Number(v) / 255);
+      for (let i = 0; i < px.data.length; i += 4) {
+        px.data[i] *= r;
+        px.data[i + 1] *= gr;
+        px.data[i + 2] *= b;
+      }
+      g.putImageData(px, 0, 0);
+    } catch {
+      c = null; // the plain frame, then
+    }
+    this.tinted.set(f, c);
+    return c;
   }
 
   private groundFrame(s: GameState, tx: number, ty: number): string {
@@ -2048,17 +2080,7 @@ export class Renderer {
   private drawLighting(s: GameState, camX: number, camY: number, img: HTMLImageElement): void {
     const ctx = this.ctx;
     const light = this.light;
-    const night = darkness(dayPhase(s));
-    // a themed city's daylight fades out as its night veil comes in (gone at midnight, darkness 0.55; under 2% it
-    // changes no colour by a whole level)
-    const daylight = 1 - night / 0.55;
-    if (light.day && daylight > 0.02) {
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = `rgba(${light.day},${daylight})`;
-      ctx.fillRect(0, 0, this.viewW, this.viewH);
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    const dark = Math.min(0.9, night * light.dark);
+    const dark = Math.min(0.9, darkness(dayPhase(s)) * light.dark);
     if (dark <= 0.01) return;
     ctx.fillStyle = `rgba(${light.veil},${dark})`;
     ctx.fillRect(0, 0, this.viewW, this.viewH);
@@ -2149,7 +2171,8 @@ export class Renderer {
       const x = top.X - g.ax - camX;
       const y = top.Y - g.ay - camY;
       if (x > this.viewW || y > this.viewH || x + g.w < 0 || y + g.h < 0) continue;
-      ctx.drawImage(img, g.x, g.y, g.w, g.h, x, y, g.w, g.h);
+      if (this.theme && d.back) this.drawBackGlow(g, x + camX, y + camY, camX, camY, img);
+      else ctx.drawImage(img, g.x, g.y, g.w, g.h, x, y, g.w, g.h);
     }
     if (this.blimp.active) {
       const g = frame(`blimp/${Math.floor(this.clock * 6) % 2}/g`);
@@ -2157,6 +2180,33 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // The glow of a themed city's back scenery (towers full of windows) at (sx, sy), iso px, with the current alpha and
+  // blending: what was drawn over the piece (buildings, bots, pieces, the cat, all on the map in front of it) hides
+  // its glow too.
+  private drawBackGlow(g: Frame, sx: number, sy: number, camX: number, camY: number, img: HTMLImageElement): void {
+    let cut: CanvasRenderingContext2D | null = null;
+    for (let k = 0; k < this.drawnCount; k++) {
+      const d = this.drawn[k];
+      const f = d.f;
+      if (!f || d.sx >= sx + g.w || d.sy >= sy + g.h || d.sx + d.w <= sx || d.sy + d.h <= sy) continue;
+      if (!cut) {
+        const c = (this.glowCut ??= document.createElement('canvas'));
+        if (c.width < g.w || c.height < g.h) {
+          c.width = Math.max(c.width, g.w);
+          c.height = Math.max(c.height, g.h);
+        }
+        cut = c.getContext('2d')!;
+        cut.globalCompositeOperation = 'source-over';
+        cut.clearRect(0, 0, g.w, g.h);
+        cut.drawImage(img, g.x, g.y, g.w, g.h, 0, 0, g.w, g.h);
+        cut.globalCompositeOperation = 'destination-out';
+      }
+      cut.drawImage(img, f.x, f.y, f.w, f.h, d.sx - sx, d.sy - sy, f.w, f.h);
+    }
+    if (cut) this.ctx.drawImage(cut.canvas, 0, 0, g.w, g.h, sx - camX, sy - camY, g.w, g.h);
+    else this.ctx.drawImage(img, g.x, g.y, g.w, g.h, sx - camX, sy - camY, g.w, g.h);
   }
 
   private drawSmog(s: GameState, reducedMotion: boolean): void {
