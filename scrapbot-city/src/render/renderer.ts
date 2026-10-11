@@ -1725,8 +1725,9 @@ export class Renderer {
   private drawLabel(text: string, x: number, y: number, color: string): void {
     const ctx = this.ctx;
     const w = pixelTextWidth(text);
+    // (the box spans ly - 2 to ly + 7; the view is rounded up to whole art pixels, so keep one more off the bottom)
     const top = Math.ceil(this.insets.top / this.pxZoom) + 2;
-    const bottom = this.viewH - Math.ceil(this.insets.bottom / this.pxZoom) - 7;
+    const bottom = this.viewH - Math.ceil(this.insets.bottom / this.pxZoom) - 8;
     const lx = Math.max(2, Math.min(this.viewW - w - 2, Math.round(x - w / 2)));
     const ly = Math.max(top, Math.min(bottom, Math.round(y)));
     ctx.fillStyle = 'rgba(13,11,22,0.85)';
