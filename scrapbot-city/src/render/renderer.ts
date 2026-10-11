@@ -3,7 +3,7 @@
 //
 // Layers: background → terrain cache (tiles, industrial floors, junk heaps, rubble) → shadows → ground marks →
 // depth-sorted objects (buildings, fences/gates/lamps, bots, cat) → blimp → particles → placement preview →
-// night glow → smog clouds and haze → floating text.
+// night glow → smog clouds and haze → words on the map → floating text.
 import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { costText, placeCheck } from '../game/actions';
@@ -402,6 +402,9 @@ export class Renderer {
   private modulePreview: ModulePreview | null = null;
   private reduced = false; // reduced motion, this frame
   private drift = 0; // seconds the wind has blown: the smog clouds move with it (not while paused or with reduced motion)
+  // the words on the map this frame (why a building or a piece cannot go there, a module's effect): drawn over the
+  // night and the smog, so they read in the thickest haze
+  private labels: { text: string; x: number; y: number; color: string }[] = [];
   private pieceNames: string[] = new Array<string>(MAP_W * MAP_H).fill(''); // frame of each visible piece this frame
 
   // terrain cache
@@ -964,6 +967,7 @@ export class Renderer {
     this.drawLighting(s, camX, camY, img);
     if (simRunning && !view.reducedMotion) this.drift += dt;
     this.drawSmog(s, camX, camY);
+    this.drawLabels();
     this.drawFloaters(dt, camX, camY);
   }
 
@@ -1863,7 +1867,7 @@ export class Renderer {
     if (def.cleanRadius) this.drawRadius(ox, oy, type, camX, camY);
     if (!check.ok && check.reason) {
       const top = tileTop(ox, oy);
-      this.drawLabel(check.reason, top.X - camX, top.Y - (f ? f.ay : 40) - 12 - camY, PAL.red);
+      this.addLabel(check.reason, top.X - camX, top.Y - (f ? f.ay : 40) - 12 - camY, PAL.red);
     }
   }
 
@@ -1871,6 +1875,16 @@ export class Renderer {
   // a module's effect. Kept inside the view, clear of the top bar and the build toolbar (insets): at a high zoom the
   // label of a building in the middle of the screen would otherwise sit under the top bar. A label under an open
   // side panel or the goal card (labelAvoid) moves out of it the shortest way: beside it, above or below it.
+  // Queued here and drawn over the night and the smog (drawLabels).
+  private addLabel(text: string, x: number, y: number, color: string): void {
+    this.labels.push({ text, x, y, color });
+  }
+
+  private drawLabels(): void {
+    for (const { text, x, y, color } of this.labels) this.drawLabel(text, x, y, color);
+    this.labels.length = 0;
+  }
+
   private drawLabel(text: string, x: number, y: number, color: string): void {
     const ctx = this.ctx;
     const z = this.pxZoom;
@@ -1994,7 +2008,7 @@ export class Renderer {
       const text = mp.check.ok ? view.pieceLabel || null : mp.check.reason;
       const f = frame(namesOf(mp.b.type, buildingArt[mp.b.type]?.frames ?? 1).off);
       const top = tileTop(mp.b.x, mp.b.y);
-      if (text) this.drawLabel(text, top.X + ((def.w - def.h) * TILE) / 2 - camX, top.Y - (f ? f.ay : 40) - 12 - camY, mp.fits && mp.check.ok ? PAL.lime : PAL.red);
+      if (text) this.addLabel(text, top.X + ((def.w - def.h) * TILE) / 2 - camX, top.Y - (f ? f.ay : 40) - 12 - camY, mp.fits && mp.check.ok ? PAL.lime : PAL.red);
       return;
     }
     if (!isPieceKind(tool.kind) || !this.ghosts.length) return;
@@ -2023,7 +2037,7 @@ export class Renderer {
     if (!label) return;
     const f = kind === 'floor' ? undefined : frame(this.ghostFrameName(s, kind, tool.rot, label.g));
     const top = tileTop(label.g.x, label.g.y);
-    this.drawLabel(label.text, top.X - camX, top.Y - (f ? f.ay : 0) - 12 - camY, label.g.ok ? PAL.lime : PAL.red);
+    this.addLabel(label.text, top.X - camX, top.Y - (f ? f.ay : 0) - 12 - camY, label.g.ok ? PAL.lime : PAL.red);
   }
 
   // The frame of a ghost: a fence joins the real fences and gates around it and the ghosts of its row that will be
@@ -2323,7 +2337,8 @@ export class Renderer {
       const top = tileTop(b.x, b.y);
       const X = top.X - camX;
       const Y = top.Y - camY;
-      if (X < -60 || X > this.viewW + 140 || Y < -20 || Y > this.viewH + 160) continue;
+      // (a plume reaches about 130 art px downwind, to the right, of the building's north corner)
+      if (X < -140 || X > this.viewW + 140 || Y < -20 || Y > this.viewH + 160) continue;
       const art = artOf(b);
       const def = BUILDINGS[b.type];
       // out of its chimneys (a filtered Smelter's steam tower), else off its roof
