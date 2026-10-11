@@ -365,13 +365,25 @@ function syncBots(s: GameState): void {
     });
   }
   while (s.bots.length > target) {
-    // retire an empty idle bot first; the scrap of a loaded one goes into storage as far as it fits
+    // retire an empty idle bot first; the load of a loaded one is unloaded (unloadPending: into storage as far
+    // as it fits, the rest waits for room) instead of vanishing
     let k = s.bots.findIndex((b) => b.state === 'idle' && b.carry === 0);
     if (k < 0) k = s.bots.length - 1;
     const bot = s.bots.splice(k, 1)[0];
     releaseClaim(s, bot);
-    if (bot.carry > 0) s.res.scrap = Math.min(s.derived.storage, s.res.scrap + bot.carry);
+    if (bot.carry > 0) s.scrapPending += bot.carry;
   }
+}
+
+// Scrap waiting for room (from a save made while the bots carried more than storage held, or from a retired
+// bot) goes in as soon as there is room, and counts as collected then, as a bot unloading does.
+function unloadPending(s: GameState): void {
+  if (!(s.scrapPending > 0)) return;
+  const dep = Math.min(s.scrapPending, Math.max(0, s.derived.storage - s.res.scrap));
+  if (dep <= 0) return;
+  s.res.scrap += dep;
+  s.scrapPending -= dep;
+  s.stats.scrapCollected += dep;
 }
 
 function homeFor(homes: Building[], k: number): Building {
@@ -442,6 +454,7 @@ function moveTo(bot: Bot, tx: number, ty: number, dist: number): boolean {
 
 function updateBots(s: GameState, dt: number, overtime: number): void {
   syncBots(s);
+  unloadPending(s);
   const speed = BOT_SPEED * s.botSpeedMul * overtime * dt;
   const storage = s.derived.storage;
   for (const bot of s.bots) {

@@ -131,6 +131,10 @@ export interface GameState {
   bots: Bot[];
   cat: Cat;
   res: Record<Resource, number>;
+  // Scrap the bots brought back that did not fit in storage: it goes in, and counts as collected, as soon as
+  // there is room (see unloadPending in sim.ts). A save turns the loads of the bots, which are not saved, into
+  // this; a bot retired with a load leaves it here too. Older saves have none.
+  scrapPending: number;
   pop: number;
   pollution: number;
   alignment: number; // -100 industrial .. +100 green
@@ -154,7 +158,9 @@ export interface GameState {
   pendingEvent: string | null;
 }
 
-export const SAVE_VERSION = 2;
+// 3 (0.7 increment 2): saves carry scrapPending. 2: 0.6 and 0.7.0-alpha.1. 1: before 0.5. A save of an older
+// version is copied aside once before it is first overwritten (see backupBeforeOverwrite in storage.ts).
+export const SAVE_VERSION = 3;
 
 // Automatic saves skip a running smog countdown: the retry offered after a smog loss loads the last
 // autosave, so it must be a moment the city can still recover from.
@@ -235,6 +241,7 @@ export function createGame(opts: NewGameOptions = {}): GameState {
       facing: -1,
     },
     res: { ...mods.startRes },
+    scrapPending: 0,
     pop: 0,
     pollution: mods.startPollution,
     alignment: 0,
@@ -332,23 +339,28 @@ type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' 
 
 export function serialize(s: GameState): string {
   const { tiles, amount, occ: _occ, claims: _claims, floor, solid, rot, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
-  // bots are not saved: the scrap they carry goes into storage (as far as it fits) instead of vanishing
+  // Bots are not saved: what they carry is unloaded in the save, as if they reached a drop-off now. It goes into
+  // storage as far as it fits (and counts as collected, once: the bots in the saved city are gone); the rest is
+  // written as scrapPending, which the loaded city unloads when there is room. Nothing is lost or made up.
   const carried = s.bots.reduce((n, b) => n + b.carry, 0);
   const room = Math.max(0, (s.derived.storage || 0) - s.res.scrap);
-  const res = { ...rest.res, scrap: rest.res.scrap + Math.min(carried, room) };
+  const fit = Math.min(carried, room);
+  const res = { ...rest.res, scrap: rest.res.scrap + fit };
+  const stats = { ...rest.stats, scrapCollected: rest.stats.scrapCollected + fit };
+  const scrapPending = (rest.scrapPending || 0) + carried - fit;
   const floors: number[] = [];
   const solids: [number, number, number][] = [];
   for (let i = 0; i < floor.length; i++) {
     if (floor[i]) floors.push(i);
     if (solid[i]) solids.push([i, solid[i], rot[i]]);
   }
-  const data: SaveData = { ...rest, res, tiles: Array.from(tiles).join(''), amount: Array.from(amount), floors, solids };
+  const data: SaveData = { ...rest, res, stats, scrapPending, tiles: Array.from(tiles).join(''), amount: Array.from(amount), floors, solids };
   return JSON.stringify(data);
 }
 
 export function deserialize(json: string): GameState {
   const d = JSON.parse(json) as Partial<SaveData> & { version: number; tiles: string; amount: number[]; buildings: Building[]; nextId: number };
-  if (d.version !== 1 && d.version !== SAVE_VERSION) throw new Error(`Unsupported save version ${d.version}`);
+  if (!Number.isInteger(d.version) || d.version < 1 || d.version > SAVE_VERSION) throw new Error(`Unsupported save version ${d.version}`);
   const size = MAP_W * MAP_H;
   if (d.tiles.length !== size || d.amount.length !== size) throw new Error('Corrupted save: wrong map size');
   const tiles = new Uint8Array(size);
@@ -364,6 +376,8 @@ export function deserialize(json: string): GameState {
     mods: { ...DEFAULT_MODS, ...(d.mods ?? {}) },
     stats: { ...base.stats, maxPollution: d.pollution ?? 0, ...(d.stats ?? {}) },
     hints: { ...base.hints, ...(d.hints ?? {}) },
+    // saves before version 3 have no pending scrap; a damaged value is not trusted
+    scrapPending: typeof d.scrapPending === 'number' && Number.isFinite(d.scrapPending) && d.scrapPending > 0 ? d.scrapPending : 0,
     stars: d.stars ?? [false, false, false],
     spireDone,
     endingKind: d.endingKind ?? (d.outcome && d.outcome.kind !== 'smog' ? d.outcome.kind : null),

@@ -31,7 +31,7 @@ import {
 } from '../src/game/pieces';
 import type { ModuleKind, PieceKind } from '../src/game/pieces';
 import { computeDerived, step } from '../src/game/sim';
-import { createGame, deserialize, idx, serialize } from '../src/game/state';
+import { SAVE_VERSION, createGame, deserialize, idx, serialize } from '../src/game/state';
 import type { Building, GameState } from '../src/game/state';
 import { mulberry32 } from '../src/game/world';
 import { t } from '../src/i18n';
@@ -755,7 +755,7 @@ describe('saves', () => {
     expect(placePiece(s, 'lamp', tiles[3].x, tiles[3].y, 3)).toBe(true);
     const json = serialize(s);
     const data = JSON.parse(json);
-    expect(data.version).toBe(2);
+    expect(data.version).toBe(SAVE_VERSION);
     expect(data.floors).toEqual([idx(tiles[0].x, tiles[0].y), idx(tiles[1].x, tiles[1].y)].sort((a, b) => a - b));
     expect(data.solids).toHaveLength(3);
     expect(data.floor).toBeUndefined();

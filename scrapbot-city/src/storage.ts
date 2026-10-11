@@ -1,6 +1,6 @@
 // Saves and settings. The desktop build keeps them as files (synced by Steam Cloud); the browser build
 // uses localStorage, which can be blocked (private mode, sandboxed frames), so every access is guarded.
-import { deserialize, day, serialize } from './game/state';
+import { SAVE_VERSION, deserialize, day, serialize } from './game/state';
 import { detectLang, isLang } from './i18n';
 import type { Lang } from './i18n';
 import type { GameState, OutcomeKind } from './game/state';
@@ -134,7 +134,39 @@ export interface SlotMeta {
   savedAt: number;
 }
 
+// The save format version written in a stored save (0 when it has none or cannot be read).
+export function saveVersionOf(raw: string): number {
+  try {
+    const v = (JSON.parse(raw) as { version?: unknown } | null)?.version;
+    return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function backupKey(slot: SlotId, version: number): string {
+  return `backup:save:${slot}:v${version}`;
+}
+
+// Before this version first overwrites a save written by another one (0.6 and 0.7.0-alpha.1 wrote version 2;
+// a save with no version or a damaged one counts as 0), the original text is copied aside, once per slot and
+// version, with its slot info: backup:save:<slot>:v<n> and backup:meta:<slot>:v<n>. Backups are never removed
+// or overwritten. False when the copy could not be written: the old save is then left alone.
+function backupBeforeOverwrite(slot: SlotId): boolean {
+  const raw = readKey(`save:${slot}`);
+  if (raw === null) return true;
+  const version = saveVersionOf(raw);
+  if (version === SAVE_VERSION) return true;
+  const key = backupKey(slot, version);
+  if (readKey(key) !== null) return true;
+  if (!writeKey(key, raw)) return false;
+  const meta = readKey(`meta:${slot}`);
+  if (meta !== null) writeKey(`backup:meta:${slot}:v${version}`, meta);
+  return true;
+}
+
 export function saveGame(slot: SlotId, s: GameState): boolean {
+  if (!backupBeforeOverwrite(slot)) return false;
   const meta: SlotMeta = {
     city: s.cityName,
     day: day(s),

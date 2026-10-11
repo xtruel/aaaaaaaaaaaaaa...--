@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { SIM_STEP, SMOG_DANGER } from '../src/game/defs';
 import { step } from '../src/game/sim';
-import { canAutosave, createGame, deserialize, serialize } from '../src/game/state';
+import { SAVE_VERSION, canAutosave, createGame, deserialize, serialize } from '../src/game/state';
 
 const require = createRequire(import.meta.url);
 const { usable } = require('../electron/storage-utils.cjs') as { usable: (key: string, text: string | null) => boolean };
@@ -88,7 +88,7 @@ describe('save contents', () => {
   it('refuses a save from a newer version instead of guessing', () => {
     const s = createGame({ seed: 24, cityName: 'Future' });
     const data = JSON.parse(serialize(s));
-    data.version = 3;
+    data.version = SAVE_VERSION + 1;
     expect(() => deserialize(JSON.stringify(data))).toThrow(/version/);
   });
 });
