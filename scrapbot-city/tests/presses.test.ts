@@ -1,5 +1,6 @@
 // The press record behind the owner's comfort rules for building (src/ui/presses.ts): the second press of a double
-// press (double click, double tap, A A) is the one within 350 ms and 10 px of the press before, the map not moved.
+// press (double click, double tap, A A) is the one within DOUBLE_PRESS ms and 10 px (a finger: 24 px) of the press
+// before, the map not moved.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DOUBLE_DIST, DOUBLE_PRESS, forgetPresses, lastPresses, notePress, secondPress } from '../src/ui/presses';
 
@@ -34,5 +35,31 @@ describe('presses', () => {
     expect(secondPress()).toBe(false);
     forgetPresses();
     expect(lastPresses().every((p) => p.t === -Infinity)).toBe(true);
+  });
+
+  it('a slow double click (up to 500 ms, read a frame late) is one; a finger\'s two taps may land further apart', () => {
+    let now = 10000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    forgetPresses();
+    const at = (x: number, touch = false) => notePress({ t: now, x, y: 200, cam: 'c', tile: '', touch });
+    at(100);
+    now += 515;
+    at(102);
+    expect(secondPress()).toBe(true); // a 500 ms double click, read 15 ms late
+    now += 2000;
+    at(100);
+    now += 120;
+    at(118);
+    expect(secondPress()).toBe(false); // the mouse 18 px away: another place
+    now += 2000;
+    at(100, true);
+    now += 120;
+    at(118, true);
+    expect(secondPress()).toBe(true); // a double tap, the second tap 18 px off
+    now += 2000;
+    at(100, true);
+    now += 120;
+    at(140, true);
+    expect(secondPress()).toBe(false); // a tap 40 px away: meant
   });
 });

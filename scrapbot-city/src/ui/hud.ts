@@ -694,8 +694,8 @@ export class Hud {
   }
 
   // An item or Done pressed redraws the panel for the new tool (the tool box above the list comes or goes, the list
-  // moves): the second press of a double press there (double click, double tap, A A: within 350 ms and 10 px of the
-  // press before, src/ui/presses.ts) would land on another item or on Done. It does nothing.
+  // moves): the second press of a double press there (double click, double tap, A A: soon after and close to the press
+  // before, src/ui/presses.ts) would land on another item or on Done. It does nothing.
   private catalogSettled(): boolean {
     return !secondPress();
   }

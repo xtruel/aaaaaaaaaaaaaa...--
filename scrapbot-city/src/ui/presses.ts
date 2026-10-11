@@ -10,11 +10,22 @@ export interface Press {
   cam: string; // where the map was ('' when it does not matter)
   tile: string; // "x,y" of the tile under it on the map, '' elsewhere (a dialog, a panel)
   tool?: string; // the tool in hand when it was made (the session's; '' none)
+  touch?: boolean; // made with a finger
 }
 
 // A press this soon after the one before (ms) and this close to it (screen px) is the second press of a double press.
-export const DOUBLE_PRESS = 350;
+// 500 ms is Windows' default double-click time (the building panel's guard uses it too, DOUBLE_PRESS_MS in
+// src/ui/pick.ts on the integration line), and a press can be read up to a frame late (the pad is polled once a frame,
+// a click may wait for a frame): 100 ms more. The mouse and the pad's cursor stay put between the two presses; the two
+// taps of a finger land up to about 20 px apart.
+export const DOUBLE_PRESS = 600;
 export const DOUBLE_DIST = 10;
+export const DOUBLE_DIST_TOUCH = 24;
+
+// How close two presses have to be to make a double press: a finger's reach when either was a finger.
+export function doubleDist(a: Press, b: Press): number {
+  return a.touch || b.touch ? DOUBLE_DIST_TOUCH : DOUBLE_DIST;
+}
 
 const none = (): Press => ({ t: -Infinity, x: 0, y: 0, cam: '', tile: '', tool: '' });
 let before = none();
@@ -34,7 +45,7 @@ export function lastPresses(): [Press, Press] {
 // press, landing where the one before did?
 export function secondPress(): boolean {
   if (performance.now() - last.t > 1000) return false;
-  return last.t - before.t < DOUBLE_PRESS && Math.hypot(last.x - before.x, last.y - before.y) < DOUBLE_DIST && last.cam === before.cam;
+  return last.t - before.t < DOUBLE_PRESS && Math.hypot(last.x - before.x, last.y - before.y) < doubleDist(before, last) && last.cam === before.cam;
 }
 
 // A city that starts afresh forgets the presses of the last one (and tests start clean).

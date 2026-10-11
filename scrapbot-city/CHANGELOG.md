@@ -34,8 +34,11 @@
   doppio tocco (prima comprava un pezzo); con la ruspa un doppio clic su una recinzione non toglie anche il pavimento
   sotto; sulla stessa casella il secondo tocco viene rifiutato con il motivo, come prima; un tocco sulla mappa che
   chiude il pannello dello smog lo chiude e basta; un doppio tocco su una voce del catalogo o su «Fatto» non prende
-  più un'altra voce quando la lista si sposta sotto il dito. Un tocco su un'altra casella, o dopo un attimo, funziona
-  come prima.
+  più un'altra voce quando la lista si sposta sotto il dito. Conta come doppio tocco un secondo tocco fino a mezzo
+  secondo dopo il primo (il doppio clic di Windows, come la protezione del pannello degli edifici, più il ritardo di un
+  fotogramma) e vicino: 10 px col mouse e il controller, 24 px col dito, perché i due tocchi di un dito non cadono mai
+  nello stesso punto (prima 350 ms e 10 px per tutti: un doppio tocco lento o un dito spostato di 12 px comprava
+  ancora due pezzi). Un tocco su un'altra casella, o dopo un attimo, funziona come prima.
 - Nessun numero degli edifici originali è cambiato: `npm run balance` (con la stessa sequenza casuale) e `npm run
   waits` danno le stesse uscite byte per byte.
 

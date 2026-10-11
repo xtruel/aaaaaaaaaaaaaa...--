@@ -28,7 +28,7 @@ import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEv
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
-import { DOUBLE_DIST, DOUBLE_PRESS, forgetPresses, lastPresses, notePress } from './ui/presses';
+import { DOUBLE_PRESS, doubleDist, forgetPresses, lastPresses, notePress } from './ui/presses';
 import type { ModalAction } from './ui/modal';
 import { Tutorial } from './ui/tutorial';
 import type { Box } from './ui/tutorial';
@@ -529,7 +529,7 @@ export class GameSession implements PadTarget {
   private bindInput(): void {
     const canvas = this.renderer.canvas;
     // every press, on the map or anywhere else (a dialog's button, a panel's ×), before the map's own handlers
-    this.listen(window, 'pointerdown', (e) => this.notePress(e.clientX, e.clientY, e.target === canvas), { capture: true });
+    this.listen(window, 'pointerdown', (e) => this.notePress(e.clientX, e.clientY, e.target === canvas, e.pointerType === 'touch'), { capture: true });
     this.listen(window, 'resize', () => {
       this.renderer.resize();
       this.held = false;
@@ -863,10 +863,10 @@ export class GameSession implements PadTarget {
 
   // Every press anywhere (mouse, finger, the pad's A at its cursor) is remembered (src/ui/presses.ts): the second press
   // of a double press buys nothing on the map (meantPress) and picks nothing in the catalog (the HUD).
-  private notePress(x: number, y: number, onMap: boolean): void {
+  private notePress(x: number, y: number, onMap: boolean, touch = false): void {
     const r = this.renderer;
     const tile = onMap ? r.screenToTile(x, y) : null;
-    notePress({ t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tile: tile ? `${tile.x},${tile.y}` : '', tool: this.toolKey() });
+    notePress({ t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tile: tile ? `${tile.x},${tile.y}` : '', tool: this.toolKey(), touch });
   }
 
   private toolKey(): string {
@@ -875,7 +875,7 @@ export class GameSession implements PadTarget {
 
   // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
   // second press of a double click, double tap or A A, the press at (sx, sy) coming within DOUBLE_PRESS ms and
-  // DOUBLE_DIST px of the one before with the map where it was and the same tool in hand (a click, then the bulldozer
+  // doubleDist px of the one before with the map where it was and the same tool in hand (a click, then the bulldozer
   // taken and a click on the same spot, is two meant presses), when it would do something the first one did not mean:
   // land on the next tile across an edge (it would buy a second piece), land on the map behind a dialog or a panel the
   // first press closed, or take up a second layer with the bulldozer (the floor under the fence just removed). On the
@@ -884,7 +884,7 @@ export class GameSession implements PadTarget {
     const [before, now] = lastPresses();
     const r = this.renderer;
     const cam = `${r.cam.x},${r.cam.y},${r.zoom}`;
-    const double = now.t - before.t < DOUBLE_PRESS && cam === before.cam && before.tool === this.toolKey() && Math.hypot(sx - before.x, sy - before.y) < DOUBLE_DIST;
+    const double = now.t - before.t < DOUBLE_PRESS && cam === before.cam && before.tool === this.toolKey() && Math.hypot(sx - before.x, sy - before.y) < doubleDist(before, now);
     if (!double) return true;
     const tile = r.screenToTile(sx, sy);
     return !this.bulldoze && before.tile !== '' && before.tile === `${tile.x},${tile.y}`;
