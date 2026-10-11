@@ -197,6 +197,7 @@ export class Hud {
   private confirmRemove: ModuleKind | null = null; // a module whose removal waits for a second click
   private confirmRemoveAt = 0; // when it was asked for (performance.now())
   private slotChangedAt = -Infinity; // when the last module removal was confirmed (performance.now())
+  private slotChangedId = -1; // on which building
   private renderedId = -1; // the building whose panel was drawn last (a piece's panel: -1)
   private catalogKey = '';
   private starsKey = '';
@@ -1016,7 +1017,8 @@ export class Hud {
         // After a removal the slot is drawn again with Install where the confirmation was: the second click of a
         // double click, a double tap or a double A press on the confirmation must not buy the module back (it
         // cost the full price for half of it back).
-        if (performance.now() - this.slotChangedAt < PRESS_GUARD_MS) return;
+        // (on that building only: another building's Install is not where the confirmation was)
+        if (this.slotChangedId === b.id && performance.now() - this.slotChangedAt < PRESS_GUARD_MS) return;
         // one click, one module: the second click of a double click finds the button greyed out (it comes back
         // with the next update if the module could not go on)
         btn.disabled = true;
@@ -1043,6 +1045,7 @@ export class Hud {
       this.confirmRemove = null;
       this.inspectorKey = `${b.id}:`;
       this.slotChangedAt = performance.now();
+      this.slotChangedId = b.id;
       this.handlers.onRemoveModule(b.id, kind);
     });
   }

@@ -9,7 +9,8 @@
   dopo la precedente: 500 ms più un margine, perché il gioco vede una pressione un po' dopo che è avvenuta (il
   controller si legge una volta per fotogramma) e due pressioni a 500 ms arrivavano anche a 515 ms (confermate). Una
   pressione a sé sulla conferma, dopo, funziona come prima. Il secondo clic che raggiunge l'edificio nascosto dietro un
-  altro conta da 500 ms.
+  altro conta da 500 ms. «Installa» ignora le pressioni solo sull'edificio a cui si è appena tolto il modulo: quello di
+  un altro edificio, aperto subito dopo, funziona.
 - **Pannello dell'edificio**: la riga del deposito ha di nuovo la sua unità («180 rottami», non «180»); nelle schede
   dei moduli «Pezzi usati / min» e «Rottami usati / min» restano su una riga anche con la barra di scorrimento (colonne
   un po' più strette, barra sottile come negli altri pannelli; nelle lingue più lunghe le etichette vanno a capo tra

@@ -362,6 +362,21 @@ describe('building panel modules', () => {
       update({ selectedId: rec.id });
       q(insp, '[data-install="recyclerMagnet"]')!.click();
       expect(calls.at(-1)).toEqual(['onInstall', rec.id, 'recyclerMagnet']);
+      // the guard is for the building whose module came off: another building's Install, right after, works
+      const other = build(s, 'recycler');
+      expect(installModule(s, 'recyclerMagnet', rec)).toBe(true);
+      update({ selectedId: rec.id });
+      at(3000);
+      q(insp, '[data-remove="recyclerMagnet"]')!.click();
+      update({ selectedId: rec.id });
+      at(3700);
+      q(insp, '[data-remove-confirm="recyclerMagnet"]')!.click();
+      expect(calls.at(-1)).toEqual(['onRemoveModule', rec.id, 'recyclerMagnet']);
+      at(3800);
+      update({ selectedId: other.id });
+      q(insp, '[data-install="recyclerSorter"]')!.click();
+      expect(calls.at(-1)).toEqual(['onInstall', other.id, 'recyclerSorter']);
+      update({ selectedId: rec.id });
       // Demolish, then its confirmation 450, 500 and 599 ms later: the building stays; 600 ms later it goes
       at(5000);
       q(insp, '[data-demolish]')!.click();
