@@ -29,6 +29,7 @@ import { BLIMP_FRAMES, blimpModel } from './models/blimp';
 import { fenceIcon, fenceModel, floorIcon, floorTiles, gateIcon, gateModel, lampHead, lampIcon, pieceLampModel, withLightPool } from './models/pieces';
 import type { FenceShape } from './models/pieces';
 import { dockStorageIcon, smelterFilterIcon, variantName } from './models/modules';
+import { withMist } from './models/catalog-modules';
 
 // npm runs scripts from the package root; fall back to walking up from this file
 function projectRoot(): string {
@@ -134,6 +135,13 @@ for (const type of Object.keys(BUILDINGS) as BuildingType[]) {
 const VARIANTS: { type: BuildingType; modules: string[] }[] = [
   { type: 'dock', modules: ['dockStorage'] },
   { type: 'smelter', modules: ['smelterFilter'] },
+  // increment 2 (catalog-modules.ts); kept after the first two so the lazily registered materials keep their ids
+  { type: 'recycler', modules: ['recyclerMagnet'] },
+  { type: 'recycler', modules: ['recyclerSorter'] },
+  { type: 'factory', modules: ['factoryArm'] },
+  { type: 'pods', modules: ['podsCapsule'] },
+  { type: 'solar', modules: ['solarTracker'] },
+  { type: 'purifier', modules: ['purifierNozzle'] },
 ];
 const variants: Record<string, BuildingMeta> = {};
 for (const { type, modules } of VARIANTS) {
@@ -145,7 +153,8 @@ for (const { type, modules } of VARIANTS) {
   for (let f = 0; f < art.frames; f++) {
     const v = art.model(f, true, modules);
     if (v.w !== def.w * 16 || v.d !== def.h * 16) throw new Error(`${name}: model footprint ${v.w}×${v.d} does not match ${def.w * 16}×${def.h * 16}`);
-    const r = render(v);
+    // the Purifier's extended nozzle sprays a half-transparent mist in its work frames
+    const r = modules.includes('purifierNozzle') ? withMist(render(v), f) : render(v);
     addRendered(`b/${name}/w${f}`, r);
     glow.push(r.hasGlow);
     height = Math.max(height, r.height);

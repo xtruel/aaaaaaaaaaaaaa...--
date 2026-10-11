@@ -7,7 +7,7 @@ import { M } from '../palette';
 import { Vox, hex, mat } from '../voxel';
 import { hazardBand, tank } from './common';
 
-export type ModuleName = 'dockStorage' | 'smelterFilter';
+export type ModuleName = 'dockStorage' | 'smelterFilter' | 'recyclerMagnet' | 'recyclerSorter' | 'factoryArm' | 'podsCapsule' | 'solarTracker' | 'purifierNozzle';
 
 // The atlas name of a building with modules: its type and the modules, sorted, joined by '+' (dock+dockStorage).
 export function variantName(type: string, modules: readonly string[]): string {

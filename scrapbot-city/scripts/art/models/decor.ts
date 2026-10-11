@@ -85,7 +85,7 @@ function isoText(v: Vox, str: string, face: '+x' | '+y', x: number, y: number, z
 const textW = (str: string) => str.length * 4 - 1;
 
 // A straight run of voxels from a to b, 'size' voxels thick.
-function line(v: Vox, a: readonly number[], b: readonly number[], m: number, size = 1): void {
+export function line(v: Vox, a: readonly number[], b: readonly number[], m: number, size = 1): void {
   const n = Math.max(1, Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]), Math.abs(b[2] - a[2])) * 2));
   for (let i = 0; i <= n; i++) {
     const t = i / n;
@@ -99,7 +99,7 @@ function line(v: Vox, a: readonly number[], b: readonly number[], m: number, siz
 // Leafy crown from a few soft cubes (superellipsoids: flat tops and sides, rounded corners, so the surface does not
 // break into a voxel staircase), shaded in clean bands: a light cap where a lobe faces the sky, a dark band on its
 // underside, the base colour between. Each lobe is [cx, cy, cz, r, rz?].
-function balls(v: Vox, list: readonly (readonly number[])[], base: number, light: number, dark: number, p = 3): void {
+export function balls(v: Vox, list: readonly (readonly number[])[], base: number, light: number, dark: number, p = 3): void {
   const inLobe = (l: readonly number[], x: number, y: number, z: number) => {
     const [cx, cy, cz, r] = l;
     const rz = l[4] ?? r;
@@ -129,7 +129,7 @@ function balls(v: Vox, list: readonly (readonly number[])[], base: number, light
 
 // Leafy crown from chunky blocks with their edges knocked off (the asset sheet's cube-cluster trees):
 // light top layer, dark bottom layer, the base colour between.
-function blocks(v: Vox, list: readonly (readonly number[])[], base: number, light: number, dark: number): void {
+export function blocks(v: Vox, list: readonly (readonly number[])[], base: number, light: number, dark: number): void {
   const inBlock = (b: readonly number[], x: number, y: number, z: number) => {
     const [x0, y0, z0, x1, y1, z1] = b;
     const edges = (x === x0 || x === x1 - 1 ? 1 : 0) + (y === y0 || y === y1 - 1 ? 1 : 0) + (z === z0 || z === z1 - 1 ? 1 : 0);

@@ -5,11 +5,13 @@
 import { M } from '../palette';
 import { footprint, plate, tank } from './common';
 import type { BuildingArt } from './common';
+import { purifierNozzle } from './catalog-modules';
+import { hasModule } from './modules';
 
 export const purifier: BuildingArt = {
   frames: 4,
   fps: 6,
-  model(frame, working) {
+  model(frame, working, modules) {
     const f = working ? frame % 4 : 0;
     const v = footprint(2, 2, 50);
     plate(v);
@@ -99,6 +101,7 @@ export const purifier: BuildingArt = {
     v.sphere(29, 3.5, 5, 2.2, M.green);
     v.paint(16, 26, 7, 21, 31, 8, M.greenL);
     v.paint(27, 1, 7, 32, 6, 8, M.greenL);
+    if (hasModule(modules, 'purifierNozzle')) purifierNozzle(v, frame, working);
     return v;
   },
 };
