@@ -1,9 +1,14 @@
-// Isometric projection and draw order: the math the renderer, the mouse and the controller rely on.
+// Isometric projection and draw order: the math the renderer, the mouse and the controller rely on; citizens
+// walking around the player's pieces; the in-world pixel font.
 import { describe, expect, it } from 'vitest';
-import { TILE } from '../src/game/defs';
+import { MAP_W, TILE } from '../src/game/defs';
+import { isSolidAt, placePiece } from '../src/game/pieces';
+import { createGame, idx } from '../src/game/state';
 import { groundAt, isoX, isoY, tileAt, tileCenter, tileTop, diamondHalfWidth } from '../src/render/iso/projection';
 import { DepthSorter, compareDepth } from '../src/render/iso/depth';
 import type { DepthItem } from '../src/render/iso/depth';
+import { Walkers } from '../src/render/iso/life';
+import { foldText, pixelTextWidth } from '../src/render/pixelfont';
 
 describe('projection', () => {
   it('round-trips ground points', () => {
@@ -103,6 +108,35 @@ describe('depth sorting', () => {
     expect(sortAll([above, b, behind])).toEqual([3, 1, 2]);
   });
 
+  it('a fence, gate or lamp touching a building is drawn in front of it only on its +x / +y sides', () => {
+    // the renderer's K_PIECE boxes: one tile, as tall as the art (fence 10, gate 12, lamp 22)
+    const T = TILE;
+    const b = box(4 * T, 4 * T, 6 * T, 6 * T, 0, 34, 0);
+    for (const h of [10, 12, 22])
+      for (let x = 3; x <= 6; x++)
+        for (let y = 3; y <= 6; y++) {
+          const inside = x >= 4 && x < 6 && y >= 4 && y < 6;
+          const front = x >= 6 || y >= 6;
+          const behind = x < 4 || y < 4;
+          if (inside || (front && behind)) continue; // the two side corners never overlap the building
+          const p = box(x * T, y * T, (x + 1) * T, (y + 1) * T, 0, h, 1);
+          expect(sortAll([p, b]), `piece ${h} at ${x},${y}`).toEqual(front ? [0, 1] : [1, 0]);
+          expect(sortAll([b, p]), `piece ${h} at ${x},${y}`).toEqual(front ? [0, 1] : [1, 0]);
+        }
+  });
+
+  it('a bot flying over a fence or a lamp is drawn after it', () => {
+    const T = TILE;
+    const fence = box(5 * T, 5 * T, 6 * T, 6 * T, 0, 10, 1);
+    const lamp = box(6 * T, 5 * T, 7 * T, 6 * T, 0, 22, 2);
+    // the renderer flies bots at 16 over fences and lifts them to 28 near a lamp
+    const overFence = box(5.5 * T - 4, 5.5 * T - 4, 5.5 * T + 4, 5.5 * T + 4, 16, 30, 3);
+    const overLamp = box(6.5 * T - 4, 5.5 * T - 4, 6.5 * T + 4, 5.5 * T + 4, 28, 42, 4);
+    const order = sortAll([overLamp, overFence, lamp, fence]);
+    expect(order.indexOf(1)).toBeLessThan(order.indexOf(3));
+    expect(order.indexOf(2)).toBeLessThan(order.indexOf(4));
+  });
+
   it('handles many items without losing any', () => {
     const items: DepthItem[] = [];
     for (let k = 0; k < 300; k++) {
@@ -119,5 +153,49 @@ describe('depth sorting', () => {
       if (k % 20 < 19) expect(pos.get(k)!).toBeLessThan(pos.get(k + 1)!);
       if (k + 20 < 300) expect(pos.get(k)!).toBeLessThan(pos.get(k + 20)!);
     }
+  });
+});
+
+describe('citizens and pieces', () => {
+  it('citizens never walk onto a fence, gate or lamp laid on their street', () => {
+    const s = createGame({ seed: 4242 });
+    s.pop = 64; // 16 citizens
+    s.res.credits = 1e6;
+    s.res.parts = 1e6;
+    const walkers = new Walkers();
+    const kinds = ['fence', 'gate', 'lamp'] as const;
+    let laid = 0;
+    let samples = 0;
+    let onPiece = 0;
+    // 40 s of walking at 30 fps; every half second a piece goes on a street tile, often right where a citizen is
+    // heading; a citizen caught on a tile when a piece lands there walks off it within half a tile (1.1 s)
+    const since = new Map<number, number>();
+    for (let frame = 0; frame < 1200; frame++) {
+      walkers.update(s, 1 / 30, 4);
+      if (frame % 15 === 0) {
+        const w = walkers.list[frame % Math.max(1, walkers.list.length)];
+        const [x, y] = w && frame % 30 === 0 ? [w.nx, w.ny] : [(frame * 7) % MAP_W, 4 + 11 * ((frame >> 4) % 3)];
+        if (placePiece(s, kinds[laid % 3], x, y, laid)) {
+          since.set(idx(x, y), frame);
+          laid++;
+        }
+      }
+      for (const w of walkers.list) {
+        const i = idx(Math.floor(w.x / TILE), Math.floor(w.y / TILE));
+        samples++;
+        if (isSolidAt(s, i) && frame - (since.get(i) ?? -1e9) > 37) onPiece++;
+      }
+    }
+    expect(laid).toBeGreaterThan(30);
+    expect(samples).toBeGreaterThan(10000);
+    expect(onPiece).toBe(0);
+  });
+});
+
+describe('pixel font', () => {
+  it('writes arrows and minus signs with the glyphs it has', () => {
+    expect(foldText('Storage 80 → 180')).toBe('STORAGE 80 -> 180');
+    expect(foldText('Energy −2 → −3')).toBe('ENERGY -2 -> -3');
+    expect(pixelTextWidth('a→b')).toBe(pixelTextWidth('a->b'));
   });
 });
