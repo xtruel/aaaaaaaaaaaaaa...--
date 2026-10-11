@@ -643,10 +643,17 @@ export class Renderer {
     void c;
   }
 
+  // The changed tiles are repainted together: each one's area is cleared, then everything that can reach into those
+  // areas is painted once, in the same order as paintAllTerrain. A row of floors laid at once (or a storm's junk)
+  // then costs about one repaint of the ground it covers, not one repaint per tile.
   private paintDirty(s: GameState): void {
     if (s.dirtyTiles.length === 0 || !this.terrainPainted) return;
     const ctx = this.tctx;
     const done = new Set<number>();
+    const near = new Set<number>(); // tiles to paint, by (y + RING) * RING_W + x + RING
+    const RING_W = MAP_W + 2 * RING;
+    ctx.save();
+    ctx.beginPath();
     for (const i of s.dirtyTiles) {
       if (done.has(i)) continue;
       done.add(i);
@@ -658,19 +665,18 @@ export class Renderer {
       const ry = top.Y - TILE - SPILL - this.toy;
       const rw = TILE * 6;
       const rh = TILE * 3 + SPILL;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(rx, ry, rw, rh);
-      ctx.clip();
       ctx.clearRect(rx, ry, rw, rh);
-      const near: [number, number][] = [];
-      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) near.push([tx + dx, ty + dy]);
-      near.sort((p, q) => p[0] + p[1] - (q[0] + q[1]));
-      for (const [x, y] of near) if (x >= -RING && y >= -RING && x < MAP_W + RING && y < MAP_H + RING) this.paintGround(s, x, y);
-      this.paintMapBorder();
-      for (const [x, y] of near) if (x >= -RING && y >= -RING && x < MAP_W + RING && y < MAP_H + RING) this.paintProp(s, x, y);
-      ctx.restore();
+      ctx.rect(rx, ry, rw, rh);
+      for (let y = Math.max(-RING, ty - 4); y <= Math.min(MAP_H + RING - 1, ty + 4); y++)
+        for (let x = Math.max(-RING, tx - 4); x <= Math.min(MAP_W + RING - 1, tx + 4); x++) near.add((y + RING) * RING_W + x + RING);
     }
+    ctx.clip();
+    const order = Array.from(near, (k) => [(k % RING_W) - RING, Math.floor(k / RING_W) - RING]);
+    order.sort((p, q) => p[0] + p[1] - (q[0] + q[1]) || p[0] - q[0]);
+    for (const [x, y] of order) this.paintGround(s, x, y);
+    this.paintMapBorder();
+    for (const [x, y] of order) this.paintProp(s, x, y);
+    ctx.restore();
     s.dirtyTiles.length = 0;
   }
 
