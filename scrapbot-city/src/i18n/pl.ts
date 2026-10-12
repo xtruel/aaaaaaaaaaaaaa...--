@@ -763,7 +763,7 @@ export const pl: Dict = {
   'insp.decoration': 'Dekoracja: bez wpływu na gospodarkę',
   'msg.rowPartial': 'Ułożono {n} z {total}: pozostałe pola były zajęte albo zabrakło pieniędzy.',
   'extras.controls.5': '<kbd>O</kbd>: obiekty i moduły · <kbd>R</kbd>: obrót (<kbd>Shift</kbd>+<kbd>R</kbd>: w drugą stronę) · przeciąganie lewym przyciskiem: rząd posadzki lub ogrodzenia',
-  'extras.controls.pad3': '<kbd>Y</kbd> obraca też ogrodzenie, bramę lub latarnię podczas stawiania.',
+  'extras.controls.pad3': '<kbd>Y</kbd> obraca też element w ręku podczas stawiania (ogrodzenie, bramę, latarnię, ławkę…).',
 
   // ---------- added in 0.7, increment 2: readable smog ----------
   'hud.smog.more': 'Kliknij lub dotknij: skąd się bierze i dokąd znika.',
@@ -781,4 +781,26 @@ export const pl: Dict = {
   'smog.power': 'Energia: {n}%. Przemysł i oczyszczacze pracują wolniej.',
   'smog.limit': 'Powyżej {limit}% przez {seconds} s miasto przepada.',
   'smog.countdown': 'Powyżej {limit}%: miasto przepadnie za {n} s!',
+
+  // ---------- added in 0.7, increment 2 (G2): decorations ----------
+  'cat.decorations': 'Dekoracje',
+  'pc.bench': 'Ławka',
+  'pc.bench.effect': 'Rama z rur ze złomu i drewniane listwy; obraca się w 4 kierunkach',
+  'pc.planter': 'Donica',
+  'pc.planter.effect': 'Tulipany lub słoneczniki: wybiera pole',
+  'pc.sign': 'Neon',
+  'pc.sign.effect': 'Buźka bota, strzałki recyklingu lub serce (wybiera pole); świeci nocą',
+  'pc.pergola': 'Pergola',
+  'pc.pergola.effect': 'Glicynia pnąca się po stalowej ramie; obraca się w 2 kierunkach',
+  'pc.cathouse': 'Domek Miso',
+  'pc.cathouse.effect': 'Budka z poduszką dla kota; Miso nie zmienia zwyczajów',
+  'pc.sculpture': 'Rzeźba ze złomu',
+  'pc.sculpture.effect': 'Robot zespawany z nadmiaru złomu; złom wraca tylko, jeśli w magazynie jest miejsce',
+  'place.bench': 'Stoi tu ławka: najpierw ją usuń',
+  'place.planter': 'Stoi tu donica: najpierw ją usuń',
+  'place.sign': 'Stoi tu neon: najpierw go usuń',
+  'place.pergola': 'Stoi tu pergola: najpierw ją usuń',
+  'place.cathouse': 'Stoi tu domek Miso: najpierw go usuń',
+  'place.sculpture': 'Stoi tu rzeźba ze złomu: najpierw ją usuń',
+  'insp.scrapRoom': 'W magazynie jest miejsce na {n} z {max} złomu: reszta nie wróci.',
 };

@@ -11,7 +11,7 @@ import { T, TILE } from './defs';
 import type { Cost, Resource } from './defs';
 import { canAfford, computeStorage, costText, pay, solidReason } from './actions';
 import type { PlaceCheck } from './actions';
-import { MODULES, PIECES, buildingStats, installedModules, isModuleKind, isPieceKind, moduleRefund, normRot, pieceRefund, solidCode, solidKind } from './piecedefs';
+import { MODULES, PIECES, buildingStats, installedModules, isModuleKind, isPieceKind, moduleRefund, normRot, pieceRefundAt, solidCode, solidKind } from './piecedefs';
 import type { ModuleKind, PieceKind } from './piecedefs';
 import { computeDerived } from './sim';
 import { buildingCenter, idx, inBounds } from './state';
@@ -76,8 +76,9 @@ export function placePiece(s: GameState, kind: PieceKind, x: number, y: number, 
   return true;
 }
 
-// Bulldozer on a tile: removes the fence/gate/lamp if there is one, else the floor (only a bare floor: not
-// under a building, junk, sludge or rubble). Gives back half the price; null when there was nothing to remove.
+// Bulldozer on a tile: removes the solid piece (fence, gate, lamp, decoration) if there is one, else the floor (only
+// a bare floor: not under a building, junk, sludge or rubble). Gives back half the price, scrap only as far as the
+// storage has room (pieceRefundAt: what the interface shows); null when there was nothing to remove.
 export function removePieceAt(s: GameState, x: number, y: number): Cost | null {
   if (!inBounds(x, y)) return null;
   const i = idx(x, y);
@@ -92,14 +93,15 @@ export function removePieceAt(s: GameState, x: number, y: number): Cost | null {
     s.dirtyTiles.push(i);
   }
   if (!kind) return null;
-  const refund = pieceRefund(kind);
+  const refund = pieceRefundAt(s, kind);
   giveBack(s, refund);
   s.fx.push({ kind: 'demolish', ...tileFx(x, y), text: `+${costText(refund)}` });
   return refund;
 }
 
-// Turns the gate (2 ways) or lamp (4 directions) on the tile; a fence only while it stands alone (a joined
-// fence follows its neighbours). Free. dir -1 turns the other way.
+// Turns the piece on the tile: a gate or pergola (2 ways), a lamp, bench, sign, Miso's house or sculpture (4
+// directions); a fence only while it stands alone (a joined fence follows its neighbours); a planter not at all.
+// Free. dir -1 turns the other way.
 export function rotatePieceAt(s: GameState, x: number, y: number, dir: 1 | -1 = 1): boolean {
   const p = pieceAt(s, x, y);
   if (!p) return false;
@@ -145,7 +147,7 @@ export function dragPath(x0: number, y0: number, x1: number, y1: number, xFirst 
   return out;
 }
 
-// The fence, gate or lamp on a tile (not the floor: see floorAt).
+// The solid piece on a tile, fence, gate, lamp or decoration (not the floor: see floorAt).
 export function pieceAt(s: GameState, x: number, y: number): { kind: PieceKind; rot: number } | null {
   if (!inBounds(x, y)) return null;
   const i = idx(x, y);

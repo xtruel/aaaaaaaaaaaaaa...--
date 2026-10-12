@@ -8,7 +8,7 @@ import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { costText, placeCheck } from '../game/actions';
 import type { PlaceCheck } from '../game/actions';
-import { MODULES, PIECES, buildingStats, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, solidKind } from '../game/pieces';
+import { MODULES, PIECES, buildingStats, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, pieceVariety, solidKind } from '../game/pieces';
 import type { CatalogKind, ModuleKind, PieceKind, SolidKind } from '../game/pieces';
 import { airEffect, dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
@@ -108,20 +108,49 @@ const GAME_LIGHT = { day: '', veil: '16,12,52', dark: 1 };
 
 // Player-built pieces (0.7): how tall the solid ones stand (voxels; draw order, bots fly over them), and their
 // frames: a fence by the mask of its fence/gate neighbours (alone: along x or y by its rotation), a gate by its
-// rotation (0 along x, 1 along y), a lamp by the direction of its arm (0 +x, 1 +y, 2 −x, 3 −y).
-const PIECE_H: Record<SolidKind, number> = { fence: 10, gate: 12, lamp: 22 };
+// rotation (0 along x, 1 along y), a lamp by the direction of its arm (0 +x, 1 +y, 2 −x, 3 −y). Increment 2's
+// decorations: bench, sign, Miso's house and sculpture by their direction (as the lamp), the pergola along x or y,
+// the planter's flowers and the sign's motif by the tile (pieceVariety).
+const PIECE_H: Record<SolidKind, number> = { fence: 10, gate: 12, lamp: 22, bench: 11, planter: 20, sign: 26, pergola: 22, cathouse: 15, sculpture: 27 };
 const PIECE_REACH = 64; // no piece's sprite or shadow reaches this far (px) from its tile: farther off-view ones are skipped early
 const FENCE_FRAMES = Array.from({ length: 16 }, (_, mask) => `pc/fence/${mask}`);
 const GATE_FRAMES = ['pc/gate/x', 'pc/gate/y'];
-const LAMP_FRAMES = [0, 1, 2, 3].map((dir) => `pc/lamp/${dir}`);
+const DIR_FRAMES = (kind: string) => [0, 1, 2, 3].map((dir) => `pc/${kind}/${dir}`);
+const LAMP_FRAMES = DIR_FRAMES('lamp');
+const BENCH_FRAMES = DIR_FRAMES('bench');
+const CATHOUSE_FRAMES = DIR_FRAMES('cathouse');
+const SCULPTURE_FRAMES = DIR_FRAMES('sculpture');
+const PLANTER_FRAMES = ['pc/planter/0', 'pc/planter/1'];
+const SIGN_FRAMES = [0, 1, 2].map((motif) => DIR_FRAMES(`sign/${motif}`));
+const PERGOLA_FRAMES = ['pc/pergola/x', 'pc/pergola/y'];
 const FLOOR_FRAMES = [0, 1, 2, 3].map((k) => `t/floor/${k}`);
+// the placed pieces' lights that a building in front of them cuts (drawPieceLights), made when first needed
+let lightLayer: HTMLCanvasElement | null = null;
 const GHOST_OK = 'rgba(198,244,50,0.35)';
 const GHOST_BAD = 'rgba(226,54,75,0.5)';
 
-function pieceFrameOf(kind: SolidKind, rot: number, mask: number): string {
-  if (kind === 'fence') return mask ? FENCE_FRAMES[mask] : rot & 1 ? 'pc/fence/y' : 'pc/fence/x';
-  if (kind === 'gate') return GATE_FRAMES[rot & 1];
-  return LAMP_FRAMES[rot & 3];
+// (variety: pieceVariety of the tile, for the planter and the sign)
+export function pieceFrameOf(kind: SolidKind, rot: number, mask: number, variety = 0): string {
+  switch (kind) {
+    case 'fence':
+      return mask ? FENCE_FRAMES[mask] : rot & 1 ? 'pc/fence/y' : 'pc/fence/x';
+    case 'gate':
+      return GATE_FRAMES[rot & 1];
+    case 'pergola':
+      return PERGOLA_FRAMES[rot & 1];
+    case 'bench':
+      return BENCH_FRAMES[rot & 3];
+    case 'cathouse':
+      return CATHOUSE_FRAMES[rot & 3];
+    case 'sculpture':
+      return SCULPTURE_FRAMES[rot & 3];
+    case 'planter':
+      return PLANTER_FRAMES[variety] ?? PLANTER_FRAMES[0];
+    case 'sign':
+      return (SIGN_FRAMES[variety] ?? SIGN_FRAMES[0])[rot & 3];
+    default:
+      return LAMP_FRAMES[rot & 3];
+  }
 }
 
 // Which of the four plates a floor tile shows: fixed per tile, so a laid floor looks like its preview.
@@ -565,10 +594,18 @@ export class Renderer {
       if (d.f && !opaqueAt(d.f, ix - d.sx, iy - d.sy)) continue;
       if (d.kind === K_BUILDING) return d.ref;
       if (d.kind === K_CAT) return -2;
-      // bots, citizens, scenery and pieces never take a click here: what is behind them stays clickable (a fence
-      // in front of a building does not hide it; pieces are found by pickPiece)
+      // a lamp or a decoration stands above the fence line: drawn in front of a building, its own pixels are what is
+      // seen there, so the building behind does not take the click (pickPiece finds the piece)
+      if (d.kind === K_PIECE && this.isTallPiece(d.ref)) return -1;
+      // bots, citizens, scenery, fences and gates never take a click here: what is behind them stays clickable (a
+      // fence in front of a building does not hide it; pieces are found by pickPiece)
     }
     return -1;
+  }
+
+  private isTallPiece(i: number): boolean {
+    const kind = this.terrainState ? solidKind(this.terrainState.solid[i]) : null;
+    return !!kind && !!PIECES[kind].decoration;
   }
 
   // The fence, gate or lamp drawn under a screen point (its visible pixels, nearest first), else the tile under the
@@ -603,11 +640,11 @@ export class Renderer {
     return { left: (top.X - TILE - this.cam.x) * z, top: (top.Y - this.cam.y) * z, right: (top.X + TILE - this.cam.x) * z, bottom: (top.Y + TILE - this.cam.y) * z };
   }
 
-  // The frame of the fence, gate or lamp on a tile. A fence joins its fence and gate neighbours, and the ghosts of
-  // the ones being laid next to it.
+  // The frame of the solid piece on a tile. A fence joins its fence and gate neighbours, and the ghosts of the ones
+  // being laid next to it; a planter or a sign shows the look its tile gives it.
   private pieceFrameName(s: GameState, tx: number, ty: number, i: number): string {
     const kind = solidKind(s.solid[i]) ?? 'fence';
-    if (kind !== 'fence') return pieceFrameOf(kind, s.rot[i], 0);
+    if (kind !== 'fence') return pieceFrameOf(kind, s.rot[i], 0, pieceVariety(kind, tx, ty));
     return pieceFrameOf(kind, s.rot[i], this.joinMask(s, tx, ty, this.ghostJoin));
   }
 
@@ -2129,11 +2166,87 @@ export class Renderer {
     this.addLabel(label.text, top.X - camX, top.Y - (f ? f.ay : 0) - 12 - camY, label.g.ok ? PAL.lime : PAL.red);
   }
 
+  private lightBuildings: number[] = []; // drawPieceLights: the buildings drawn this frame, in draw order
+
+  // The placed pieces' lights at night (the gate's lamp, the lamp's lens and pool, a sign's neon, the sculpture's eyes),
+  // cut where a building drawn in front of them covers them, as the pieces themselves are: a sign or a lamp behind a
+  // building does not shine through the building. A light no building in front reaches is drawn as it always was; the
+  // others go on a layer in draw order, where each building erases the lights behind it (a see-through one only in
+  // part), and the layer goes over the city as the lights did one by one (the context is already additive, at the
+  // night's strength). Other pieces do not cut a light: they are small, and a yard full of lamps costs what it did.
+  private drawPieceLights(s: GameState, camX: number, camY: number, img: HTMLImageElement): void {
+    const ctx = this.ctx;
+    // the buildings drawn, in draw order (few next to the pieces and bots)
+    const blds = this.lightBuildings;
+    blds.length = 0;
+    for (let k = 0; k < this.drawnCount; k++) if (this.drawn[k].kind === K_BUILDING && this.drawn[k].f) blds.push(k);
+    const cut: number[] = [];
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let k = 0; k < this.drawnCount; k++) {
+      const d = this.drawn[k];
+      if (d.kind !== K_PIECE) continue;
+      const g = frame(glowOf(this.pieceNames[d.ref]));
+      if (!g) continue;
+      const tx = d.ref % MAP_W;
+      const top = tileTop(tx, (d.ref - tx) / MAP_W);
+      const gx = top.X - g.ax;
+      const gy = top.Y - g.ay;
+      let behind = false;
+      for (let n = blds.length - 1; n >= 0 && blds[n] > k && !behind; n--) {
+        const o = this.drawn[blds[n]];
+        behind = o.sx < gx + g.w && o.sy < gy + g.h && o.sx + o.w > gx && o.sy + o.h > gy;
+      }
+      if (!behind) {
+        ctx.drawImage(img, g.x, g.y, g.w, g.h, gx - camX, gy - camY, g.w, g.h);
+        continue;
+      }
+      cut.push(k);
+      x0 = Math.min(x0, gx);
+      y0 = Math.min(y0, gy);
+      x1 = Math.max(x1, gx + g.w);
+      y1 = Math.max(y1, gy + g.h);
+    }
+    if (!cut.length) return;
+    const w = Math.ceil(x1 - x0);
+    const h = Math.ceil(y1 - y0);
+    lightLayer ??= document.createElement('canvas');
+    if (lightLayer.width < w || lightLayer.height < h) {
+      lightLayer.width = Math.max(lightLayer.width, w);
+      lightLayer.height = Math.max(lightLayer.height, h);
+    }
+    const m = lightLayer.getContext('2d')!;
+    m.globalAlpha = 1;
+    m.globalCompositeOperation = 'source-over';
+    m.clearRect(0, 0, w, h);
+    let next = 0;
+    for (let k = cut[0]; k < this.drawnCount; k++) {
+      const o = this.drawn[k];
+      if (o.kind === K_BUILDING && o.f && o.sx < x1 && o.sy < y1 && o.sx + o.w > x0 && o.sy + o.h > y0) {
+        const b = s.buildings[o.index];
+        m.globalCompositeOperation = 'destination-out';
+        m.globalAlpha = b && b.id === o.ref && this.coversFocus(b, o.sx, o.sy, o.w, o.h) ? 0.35 : 1;
+        m.drawImage(img, o.f.x, o.f.y, o.f.w, o.f.h, o.sx - x0, o.sy - y0, o.f.w, o.f.h);
+      } else if (k === cut[next]) {
+        next++;
+        const g = frame(glowOf(this.pieceNames[o.ref]))!;
+        const tx = o.ref % MAP_W;
+        const top = tileTop(tx, (o.ref - tx) / MAP_W);
+        m.globalCompositeOperation = 'lighter';
+        m.globalAlpha = 1;
+        m.drawImage(img, g.x, g.y, g.w, g.h, top.X - g.ax - x0, top.Y - g.ay - y0, g.w, g.h);
+      }
+    }
+    ctx.drawImage(lightLayer, 0, 0, w, h, x0 - camX, y0 - camY, w, h);
+  }
+
   // The frame of a ghost: a fence joins the real fences and gates around it and the ghosts of its row that will be
   // laid, exactly as it will look (a refused one joins the whole row, so the row still reads as one); alone, it lies
-  // along its rotation. A gate and a lamp follow the tool's rotation.
+  // along its rotation. The other pieces follow the tool's rotation; a planter or a sign shows its tile's look.
   private ghostFrameName(s: GameState, kind: Exclude<PieceKind, 'floor'>, rot: number, g: Ghost): string {
-    if (kind !== 'fence' || !inBounds(g.x, g.y)) return pieceFrameOf(kind, rot, 0);
+    if (kind !== 'fence' || !inBounds(g.x, g.y)) return pieceFrameOf(kind, rot, 0, pieceVariety(kind, g.x, g.y));
     return pieceFrameOf(kind, rot, this.joinMask(s, g.x, g.y, g.ok ? this.ghostJoin : this.ghostRow));
   }
 
@@ -2329,17 +2442,10 @@ export class Renderer {
         for (const p of art.points.light) ctx.fillRect(top.X + p[0] - 2 - camX, top.Y + p[1] - 2 - camY, 4, 4);
       }
     }
-    // placed gates and lamps: the gate's amber light; the lamp's lens and the pool of light it throws on the ground,
-    // both in its glow frame (so no street-lamp pool here: it would light the ground twice)
-    for (let k = 0; k < this.drawnCount; k++) {
-      const d = this.drawn[k];
-      if (d.kind !== K_PIECE) continue;
-      const g = frame(glowOf(this.pieceNames[d.ref]));
-      if (!g) continue;
-      const tx = d.ref % MAP_W;
-      const top = tileTop(tx, (d.ref - tx) / MAP_W);
-      ctx.drawImage(img, g.x, g.y, g.w, g.h, top.X - g.ax - camX, top.Y - g.ay - camY, g.w, g.h);
-    }
+    // placed gates, lamps and decorations: the gate's amber light; the lamp's lens and the pool of light it throws on
+    // the ground, both in its glow frame (so no street-lamp pool here: it would light the ground twice); a neon sign's
+    // tubes; the sculpture's eyes when it faces the camera (its frames 0 and 1 have a glow)
+    this.drawPieceLights(s, camX, camY, img);
     for (let k = 0; k < this.drawnCount; k++) {
       const d = this.drawn[k];
       if (d.kind !== K_BOT || !d.f) continue;

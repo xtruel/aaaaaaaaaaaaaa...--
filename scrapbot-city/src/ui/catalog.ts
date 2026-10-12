@@ -6,7 +6,7 @@ import { BUILDINGS, MAP_W, T } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { citizensLost, effectiveStats, statusInfo } from '../game/economy';
 import type { EffectiveStats, StatusCause } from '../game/economy';
-import { CATALOG_ORDER, MODULES, PIECES, buildingStats, buildingStatsWith, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, moduleNeeds, solidKind } from '../game/pieces';
+import { CATALOG_ORDER, MODULES, PIECES, buildingStats, buildingStatsWith, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, moduleNeeds, pieceRefund, pieceRefundAt, solidKind } from '../game/pieces';
 import type { BuildingStats, CatalogKind, ModuleKind, PieceKind } from '../game/pieces';
 import { CLEAN_EVERY, energyEffect } from '../game/sim';
 import { idx, inBounds } from '../game/state';
@@ -15,7 +15,10 @@ import { t, tk } from '../i18n';
 import type { Key } from '../i18n';
 import { buildingBehind } from './pick';
 
-export const CONSTRUCTION = CATALOG_ORDER.filter(isPieceKind);
+// The catalog's sections: Construction (floor, fence, gate), Decorations (the lamp and increment 2's six) and
+// Machine modules, each in catalog order.
+export const CONSTRUCTION = CATALOG_ORDER.filter((k): k is PieceKind => isPieceKind(k) && !PIECES[k].decoration);
+export const DECORATIONS = CATALOG_ORDER.filter((k): k is PieceKind => isPieceKind(k) && !!PIECES[k].decoration);
 export const MACHINE_MODULES = CATALOG_ORDER.filter(isModuleKind);
 
 export function catalogName(kind: CatalogKind): string {
@@ -26,7 +29,7 @@ export function catalogCost(kind: CatalogKind): Cost {
   return isPieceKind(kind) ? PIECES[kind].cost : MODULES[kind].cost;
 }
 
-// Fence (alone), gate and lamp turn; the floor and the modules do not.
+// Fence (alone), gate, lamp and the decorations with directions turn; the floor, the planter and the modules do not.
 export function isRotatable(kind: CatalogKind | null | undefined): boolean {
   return isPieceKind(kind) && PIECES[kind].rotations > 1;
 }
@@ -450,24 +453,30 @@ export interface PieceInfo {
   kind: PieceKind;
   x: number;
   y: number;
-  rotatable: boolean; // gate, lamp, and a fence that stands alone
+  rotatable: boolean; // gate, lamp, a fence that stands alone, the decorations with directions
   removable: boolean;
+  refund: Cost; // what Remove gives back now: pieceRefundAt, which removePieceAt pays
+  scrapShort: number; // scrap of the refund that storage has no room for (the sculpture's), 0 when it all fits
 }
 
-// The fence, gate or lamp on tile index i, else its floor: what the panel of a selected piece shows.
+// The solid piece on tile index i, else its floor: what the panel of a selected piece shows.
 export function pieceInfo(s: GameState, i: number): PieceInfo | null {
   if (i < 0 || i >= s.solid.length) return null;
   const x = i % MAP_W;
   const y = Math.floor(i / MAP_W);
   const solid = solidKind(s.solid[i]);
+  const money = (kind: PieceKind) => {
+    const refund = pieceRefundAt(s, kind);
+    return { refund, scrapShort: (pieceRefund(kind).scrap ?? 0) - (refund.scrap ?? 0) };
+  };
   if (solid) {
     const rotatable = PIECES[solid].rotations > 1 && !(solid === 'fence' && fenceMask(s, x, y) !== 0);
-    return { kind: solid, x, y, rotatable, removable: true };
+    return { kind: solid, x, y, rotatable, removable: true, ...money(solid) };
   }
   if (!s.floor[i]) return null;
   // removePieceAt only takes up a bare floor (not under a building, junk, sludge or rubble)
   const removable = s.occ[i] === -1 && (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS);
-  return { kind: 'floor', x, y, rotatable: false, removable };
+  return { kind: 'floor', x, y, rotatable: false, removable, ...money('floor') };
 }
 
 // ---------- the bulldozer ----------

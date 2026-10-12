@@ -94,7 +94,8 @@ function cycles(s: GameState, b: Building, seconds: number, each: () => void = (
 
 describe('the six modules: the owner-approved table', () => {
   it('catalog order, building, price and refund (half, rounded down)', () => {
-    expect(CATALOG_ORDER.slice(6)).toEqual(NEW);
+    // right after the Smelter filter (increment 2's decorations sit between the lamp and the Dock storage)
+    expect(CATALOG_ORDER.slice(CATALOG_ORDER.indexOf('smelterFilter') + 1)).toEqual(NEW);
     const table: Record<string, [BuildingType, Cost, Cost]> = {
       recyclerMagnet: ['recycler', { credits: 40, parts: 15 }, { credits: 20, parts: 7 }],
       recyclerSorter: ['recycler', { credits: 40, parts: 15 }, { credits: 20, parts: 7 }],

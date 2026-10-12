@@ -6,7 +6,7 @@ import { freeHintsLeft, hintPrice } from '../game/hints';
 import { BUILD_ORDER, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, PARTS_RESERVE, SMOG_DANGER, SMOG_LIMIT_SECONDS } from '../game/defs';
 import type { BuildingType, Cost } from '../game/defs';
 import { scrapWaiting } from '../game/economy';
-import { CATALOG_ORDER, MODULES, buildingStats, demolishRefund, installedModules, isModuleKind, isPieceKind, moduleRefund, pieceRefund } from '../game/pieces';
+import { CATALOG_ORDER, MODULES, PIECES, buildingStats, demolishRefund, installedModules, isModuleKind, isPieceKind, moduleRefund } from '../game/pieces';
 import type { CatalogKind, ModuleKind } from '../game/pieces';
 import { dayPhase } from '../game/sim';
 import { day } from '../game/state';
@@ -21,6 +21,7 @@ import { atlasImage, frame } from '../render/iso/atlas';
 import { PAL, makeCanvas } from '../render/sprites';
 import {
   CONSTRUCTION,
+  DECORATIONS,
   MACHINE_MODULES,
   buildingDesc,
   buildingRows,
@@ -49,6 +50,7 @@ import {
 import type { ModuleState, PieceInfo, StatusLine } from './catalog';
 import { esc } from './escape';
 import { PRESS_GUARD_MS } from './pick';
+import { secondPress } from './presses';
 import { airReport, perDayText } from './smog';
 import type { AirRow } from './smog';
 
@@ -200,6 +202,8 @@ export class Hud {
   private slotChangedId = -1; // on which building
   private renderedId = -1; // the building whose panel was drawn last (a piece's panel: -1)
   private catalogKey = '';
+  // when the smog panel last closed (performance.now()): the map takes no purchase in the moments after (session)
+  smogClosedAt = -Infinity;
   private starsKey = '';
   private smogOpen = false; // the smog panel (a click on the smog meter opens and closes it)
   private smogKey = '';
@@ -648,9 +652,11 @@ export class Hud {
     return true;
   }
 
-  // A press (or the controller's A) on anything but the panel or the meter closes it.
-  closeSmogUnless(target: Element | null): void {
-    if (this.smogOpen && !(target && (this.el['smog-panel'].contains(target) || this.el['smog-meter'].contains(target)))) this.closeSmog();
+  // A press (or the controller's A) on anything but the panel or the meter closes it. True when it did: that press
+  // does nothing else (on the map it buys nothing with a tool in hand).
+  closeSmogUnless(target: Element | null): boolean {
+    if (this.smogOpen && !(target && (this.el['smog-panel'].contains(target) || this.el['smog-meter'].contains(target)))) return this.closeSmog();
+    return false;
   }
 
   get smogShown(): boolean {
@@ -658,6 +664,7 @@ export class Hud {
   }
 
   private showSmog(): void {
+    if (!this.smogOpen && !this.el['smog-panel'].hidden) this.smogClosedAt = performance.now();
     this.el['smog-panel'].hidden = !this.smogOpen;
     this.el['smog-meter'].setAttribute('aria-expanded', String(this.smogOpen));
     this.el['smog-meter'].classList.toggle('active', this.smogOpen);
@@ -725,6 +732,13 @@ export class Hud {
     this.renderCatalog(s, active, opening);
   }
 
+  // An item or Done pressed redraws the panel for the new tool (the tool box above the list comes or goes, the list
+  // moves): the second press of a double press there (double click, double tap, A A: soon after and close to the press
+  // before, src/ui/presses.ts) would land on another item or on Done. It does nothing.
+  private catalogSettled(): boolean {
+    return !secondPress();
+  }
+
   // What can be had right now, written into the list in place: the greyed-out items and why.
   private markCatalog(s: GameState): void {
     const panel = this.el['catalog-panel'];
@@ -768,6 +782,9 @@ export class Hud {
         <h4 class="cat-section">${t('cat.construction')}</h4>
         <p class="cat-note">${t('insp.decoration')}</p>
         <div class="cat-list">${CONSTRUCTION.map(item).join('')}</div>
+        <h4 class="cat-section">${t('cat.decorations')}</h4>
+        <p class="cat-note">${t('insp.decoration')}</p>
+        <div class="cat-list">${DECORATIONS.map(item).join('')}</div>
         <h4 class="cat-section">${t('cat.modules')}</h4>
         <div class="cat-list">${MACHINE_MODULES.map(item).join('')}</div>
       </div>`;
@@ -789,12 +806,15 @@ export class Hud {
     });
     for (const btn of panel.querySelectorAll<HTMLElement>('[data-item]')) {
       btn.addEventListener('click', () => {
+        if (!this.catalogSettled()) return;
         audio.play('click');
         this.handlers.onPick(btn.dataset.item as CatalogKind);
       });
     }
+    // (Rotate tapped twice turns twice: the panel does not move under it)
     panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotate());
     panel.querySelector('[data-done]')?.addEventListener('click', () => {
+      if (!this.catalogSettled()) return;
       audio.play('click');
       this.handlers.onPick(null);
     });
@@ -843,6 +863,8 @@ export class Hud {
         this.inspectorKey = key;
         this.renderPiece(piece, view.selectedPiece);
       }
+      // what Remove gives back follows the storage in place (the sculpture's scrap: only as far as there is room)
+      this.markPieceRefund(piece);
       return;
     }
     if (!b) return;
@@ -1105,7 +1127,9 @@ export class Hud {
       </div>`;
   }
 
-  // A selected fence, gate, lamp or floor: what it is, that it is only for looks, Rotate and Remove.
+  // A selected piece (floor, fence, gate, lamp or decoration): what it is, that it is only for looks, Rotate and
+  // Remove with what it really gives back (markPieceRefund keeps that up to date), then what it is like. The buttons
+  // come before the description, so on a short window (1024x640) they are in sight without scrolling the panel.
   private renderPiece(info: PieceInfo, i: number): void {
     const panel = this.el.inspector;
     this.renderedId = -1;
@@ -1115,19 +1139,35 @@ export class Hud {
       <div class="insp-head">
         <span class="tool-plate cat-plate"><img src="${catalogPicture(info.kind)}" alt="" /></span>
         <div>
-          <p class="tag">${t('cat.construction')}</p>
+          <p class="tag">${t(PIECES[info.kind].decoration ? 'cat.decorations' : 'cat.construction')}</p>
           <h3>${esc(catalogName(info.kind))}</h3>
         </div>
         <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
       </div>
       <p class="insp-status piece-note">${t('insp.decoration')}</p>
-      <p class="insp-desc">${esc(catalogEffect(info.kind))}</p>
       <div class="insp-actions">
         ${info.rotatable ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
-        ${info.removable ? `<button type="button" class="btn" data-remove-piece>${t('insp.remove', { refund: costText(pieceRefund(info.kind)) })}</button>` : ''}
-      </div>`;
+        ${info.removable ? `<button type="button" class="btn" data-remove-piece></button>` : ''}
+      </div>
+      <p class="insp-warn" data-scrap-room hidden></p>
+      <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;
+    this.markPieceRefund(info);
     panel.querySelector('[data-close]')!.addEventListener('click', () => this.handlers.onCloseInspector());
     panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotatePiece(i));
     panel.querySelector('[data-remove-piece]')?.addEventListener('click', () => this.handlers.onRemovePiece(i));
+  }
+
+  // The Remove button says what removing the piece gives back right now (pieceRefundAt, which is what is paid), and a
+  // line under the text says how much of the sculpture's scrap storage has no room for.
+  private markPieceRefund(info: PieceInfo): void {
+    const panel = this.el.inspector;
+    const btn = panel.querySelector<HTMLElement>('[data-remove-piece]');
+    const label = t('insp.remove', { refund: costText(info.refund) });
+    if (btn && btn.textContent !== label) btn.textContent = label;
+    const room = panel.querySelector<HTMLElement>('[data-scrap-room]');
+    if (!room) return;
+    const text = info.scrapShort > 0 ? t('insp.scrapRoom', { n: info.refund.scrap ?? 0, max: (info.refund.scrap ?? 0) + info.scrapShort }) : '';
+    if (room.textContent !== text) room.textContent = text;
+    room.hidden = !text;
   }
 }

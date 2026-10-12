@@ -761,7 +761,7 @@ export const it: Dict = {
   'insp.decoration': "Decorazione: nessun effetto sull'economia",
   'msg.rowPartial': "Posati {n} su {total}: le altre caselle erano occupate o fuori budget.",
   'extras.controls.5': "<kbd>O</kbd>: oggetti e moduli · <kbd>R</kbd>: ruota (<kbd>Shift</kbd>+<kbd>R</kbd>: al contrario) · trascina col tasto sinistro: una fila di pavimento o recinzione",
-  'extras.controls.pad3': "<kbd>Y</kbd> ruota anche recinzioni, cancelli e lampioni mentre li posi.",
+  'extras.controls.pad3': "<kbd>Y</kbd> ruota anche l'oggetto che stai posando (recinzione, cancello, lampione, panchina…).",
 
   // ---------- added in 0.7, increment 2: readable smog ----------
   'hud.smog.more': "Clicca o tocca per vedere da dove viene e dove va.",
@@ -779,4 +779,26 @@ export const it: Dict = {
   'smog.power': "Energia al {n}%: industria e Purificatori lavorano più piano.",
   'smog.limit': "Se resta sopra il {limit}% per {seconds} secondi, la città è perduta.",
   'smog.countdown': "Sopra il {limit}%: la città è perduta tra {n}s!",
+
+  // ---------- added in 0.7, increment 2 (G2): decorations ----------
+  'cat.decorations': "Decorazioni",
+  'pc.bench': "Panchina",
+  'pc.bench.effect': "Telaio di tubi di recupero e assi di legno; ruota in 4 direzioni",
+  'pc.planter': "Fioriera",
+  'pc.planter.effect': "Tulipani o girasoli: li sceglie la casella",
+  'pc.sign': "Insegna al neon",
+  'pc.sign.effect': "Muso di bot, frecce del riciclo o cuore (lo sceglie la casella); accesa di notte",
+  'pc.pergola': "Pergola",
+  'pc.pergola.effect': "Glicine rampicante su un telaio d'acciaio; ruota in 2 versi",
+  'pc.cathouse': "Casetta di Miso",
+  'pc.cathouse.effect': "Cuccia con cuscino per il gatto; Miso non cambia abitudini",
+  'pc.sculpture': "Scultura di rottami",
+  'pc.sculpture.effect': "Robot saldato con i rottami in eccesso; i rottami tornano solo se il magazzino ha spazio",
+  'place.bench': "C'è una panchina: rimuovila prima",
+  'place.planter': "C'è una fioriera: rimuovila prima",
+  'place.sign': "C'è un'insegna al neon: rimuovila prima",
+  'place.pergola': "C'è una pergola: rimuovila prima",
+  'place.cathouse': "C'è la casetta di Miso: rimuovila prima",
+  'place.sculpture': "C'è una scultura di rottami: rimuovila prima",
+  'insp.scrapRoom': "Il magazzino ha spazio per {n} dei {max} rottami: il resto non viene restituito.",
 };

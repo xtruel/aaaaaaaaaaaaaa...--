@@ -760,7 +760,7 @@ export const pt: Dict = {
   'insp.decoration': 'Decoração: sem efeito na economia',
   'msg.rowPartial': 'Colocados {n} de {total}: os outros quadrados estavam ocupados ou faltou dinheiro.',
   'extras.controls.5': '<kbd>O</kbd>: objetos e módulos · <kbd>R</kbd>: rodar (<kbd>Shift</kbd>+<kbd>R</kbd>: ao contrário) · arrastar com o botão esquerdo: uma fila de piso ou vedação',
-  'extras.controls.pad3': '<kbd>Y</kbd> também roda uma vedação, um portão ou um candeeiro enquanto o colocas.',
+  'extras.controls.pad3': '<kbd>Y</kbd> também roda a peça que tens na mão enquanto a colocas (vedação, portão, candeeiro, banco…).',
 
   // ---------- added in 0.7, increment 2: readable smog ----------
   'hud.smog.more': 'Clica ou toca para ver de onde vem e para onde vai.',
@@ -778,4 +778,26 @@ export const pt: Dict = {
   'smog.power': 'Energia a {n}%: a indústria e os Purificadores trabalham mais devagar.',
   'smog.limit': 'Acima de {limit}% durante {seconds} segundos, a cidade está perdida.',
   'smog.countdown': 'Acima de {limit}%: a cidade perde-se em {n}s!',
+
+  // ---------- added in 0.7, increment 2 (G2): decorations ----------
+  'cat.decorations': 'Decorações',
+  'pc.bench': 'Banco',
+  'pc.bench.effect': 'Estrutura de canos de sucata e ripas de madeira; roda em 4 direções',
+  'pc.planter': 'Floreira',
+  'pc.planter.effect': 'Túlipas ou girassóis: a casa escolhe',
+  'pc.sign': 'Letreiro de néon',
+  'pc.sign.effect': 'Cara de bot, setas de reciclagem ou coração (a casa escolhe); acende à noite',
+  'pc.pergola': 'Pérgula',
+  'pc.pergola.effect': 'Glicínia a trepar por uma estrutura de aço; roda em 2 sentidos',
+  'pc.cathouse': 'Casota do Miso',
+  'pc.cathouse.effect': 'Casota com almofada para o gato; o Miso não muda de hábitos',
+  'pc.sculpture': 'Escultura de sucata',
+  'pc.sculpture.effect': 'Um robô soldado com a sucata a mais; a sucata só volta se o armazenamento tiver espaço',
+  'place.bench': 'Há aqui um banco: remove-o primeiro',
+  'place.planter': 'Há aqui uma floreira: remove-a primeiro',
+  'place.sign': 'Há aqui um letreiro de néon: remove-o primeiro',
+  'place.pergola': 'Há aqui uma pérgula: remove-a primeiro',
+  'place.cathouse': 'Está aqui a casota do Miso: remove-a primeiro',
+  'place.sculpture': 'Há aqui uma escultura de sucata: remove-a primeiro',
+  'insp.scrapRoom': 'O armazenamento tem espaço para {n} das {max} de sucata: o resto não é devolvido.',
 };

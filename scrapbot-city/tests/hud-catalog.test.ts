@@ -125,6 +125,12 @@ describe('catalog panel', () => {
       'fence',
       'gate',
       'lamp',
+      'bench',
+      'planter',
+      'sign',
+      'pergola',
+      'cathouse',
+      'sculpture',
       'dockStorage',
       'smelterFilter',
       'recyclerMagnet',
@@ -135,9 +141,10 @@ describe('catalog panel', () => {
       'purifierNozzle',
     ]);
     expect(panel.textContent).toContain('Construction');
+    expect(panel.textContent).toContain('Decorations');
     expect(panel.textContent).toContain('Machine modules');
     // no Dock yet: the module says why it cannot be had
-    const dock = items[4];
+    const dock = items.find((b) => b.dataset.item === 'dockStorage')!;
     expect(dock.classList.contains('cant')).toBe(true);
     expect(dock.querySelector('.cat-reason')!.textContent).toBe('Only on a finished Bot Dock');
     expect(dock.textContent).toContain('80 → 180');

@@ -1,5 +1,51 @@
 # Changelog
 
+## In lavorazione — incremento 2, gruppo G2: le sei decorazioni del brief
+
+- **Sei decorazioni nuove** nel pannello «Oggetti e moduli», in una sezione **Decorazioni** insieme al lampione (tra
+  Costruzioni e Moduli macchina); ogni voce mostra icona, nome, costo (anche in rottami), effetto, «1 per casella» e,
+  se non si può comprare, cosa manca. Oggetti solidi da una casella come il lampione: su terreno o erba, anche sopra il
+  pavimento, mai su edifici, spazzatura, melma, macerie o un altro oggetto (con il motivo in parole: «C'è una
+  panchina: rimuovila prima»); la spazzatura non ci cade mai sopra, i cittadini ci girano attorno, i bot ci volano sopra.
+  - **Panchina**: 6 crediti, rimborso 3; 4 direzioni.
+  - **Fioriera**: 5 crediti, rimborso 2; tulipani o girasoli, scelti dalla casella.
+  - **Insegna al neon**: 15 crediti + 4 pezzi, rimborso 7 + 2; 4 direzioni; muso di bot, frecce del riciclo o cuore
+    (scelti dalla casella); di notte si accende.
+  - **Pergola**: 12 crediti, rimborso 6; 2 orientamenti; glicine rampicante.
+  - **Casetta di Miso**: 10 crediti, rimborso 5; 4 direzioni; cuscino e orma sul tetto; Miso non cambia abitudini.
+  - **Scultura di rottami**: 10 crediti + 20 rottami, rimborso 5 crediti + 10 rottami; 4 direzioni; di notte gli occhi
+    si accendono quando guarda verso la camera. I rottami tornano **solo fin dove il deposito ha spazio** in quel
+    momento: il pulsante «Rimuovi» del pannello dice la cifra vera (aggiornata mentre i bot riempiono il deposito, con
+    una riga quando una parte non può tornare) e la rimozione paga esattamente quella, ruspa compresa.
+- Si ruotano come il lampione (`R`, `Shift`+rotella, il pulsante «⟳ Ruota», `Y` sul controller), prima di posarle o dal
+  loro pannello; l'anteprima mostra già direzione e aspetto (fiori, simbolo) che avranno. Il pannello di una decorazione
+  selezionata dice «Decorazioni», «Decorazione: nessun effetto sull'economia», «Ruota» se ruota e «Rimuovi (+rimborso)»
+  (i pulsanti prima della descrizione, così su una finestra bassa restano in vista).
+- **Si clicca quello che si vede**: un lampione o una decorazione davanti a un edificio prende il clic sui propri pixel
+  (selezione, ruspa, evidenziazione); prima metà di un'insegna davanti al Quartier Generale selezionava l'edificio.
+  Recinzioni e cancelli restano «trasparenti» al clic come nell'incremento 1.
+- **Le luci notturne restano dietro gli edifici**: un'insegna, un lampione, un cancello o una scultura nascosti dietro
+  un edificio non brillano più attraverso di esso (prima, di notte, un cuore al neon dietro il Quartier Generale
+  compariva sul suo tetto); le luci in vista e quelle davanti agli edifici restano come prima, e un cortile pieno di
+  lampioni costa da disegnare quanto prima.
+- **Nessun effetto su economia, felicità, smog, allineamento, stelle o achievement**: una città con decine di
+  decorazioni gioca byte per byte come la stessa città senza (test con il pilota automatico). Salvataggi: codici 4
+  panchina … 9 scultura, in coda a recinzione 1, cancello 2, lampione 3; i salvataggi vecchi si caricano come prima.
+- **Comodità di costruzione** (brief §3), per tutti i pezzi del catalogo, con mouse, touch e controller: il costo è in
+  vista prima di comprare, annullare è gratis, una posa paga una volta, dopo la posa lo strumento resta in mano.
+  Corretto: il secondo tocco o clic di un doppio tocco/clic (o `A` `A`) non compra più niente sulla mappa, né a cavallo
+  tra due caselle (prima comprava due pezzi), né dietro una finestra o il pannello dello smog appena chiusi con quel
+  doppio tocco (prima comprava un pezzo); con la ruspa un doppio clic su una recinzione non toglie anche il pavimento
+  sotto; sulla stessa casella il secondo tocco viene rifiutato con il motivo, come prima; un tocco sulla mappa che
+  chiude il pannello dello smog lo chiude e basta; un doppio tocco su una voce del catalogo o su «Fatto» non prende
+  più un'altra voce quando la lista si sposta sotto il dito. Conta come doppio tocco un secondo tocco fino a mezzo
+  secondo dopo il primo (il doppio clic di Windows, come la protezione del pannello degli edifici, più il ritardo di un
+  fotogramma) e vicino: 10 px col mouse e il controller, 24 px col dito, perché i due tocchi di un dito non cadono mai
+  nello stesso punto (prima 350 ms e 10 px per tutti: un doppio tocco lento o un dito spostato di 12 px comprava
+  ancora due pezzi). Un tocco su un'altra casella, o dopo un attimo, funziona come prima.
+- Nessun numero degli edifici originali è cambiato: `npm run balance` (con la stessa sequenza casuale) e `npm run
+  waits` danno le stesse uscite byte per byte.
+
 ## In lavorazione — incremento 2, integrazione (G0 + G1 + temi): correzioni dalla verifica di G1
 
 - **Doppio clic, doppio tocco, A premuto due volte**: fino a 500 ms tra le due pressioni (il tempo di doppio clic

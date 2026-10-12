@@ -763,7 +763,7 @@ export const es: Dict = {
   'insp.decoration': 'Decoración: sin efecto en la economía',
   'msg.rowPartial': 'Colocadas {n} de {total}: las demás casillas estaban ocupadas o no llegaba el dinero.',
   'extras.controls.5': '<kbd>O</kbd>: objetos y módulos · <kbd>R</kbd>: girar (<kbd>Mayús</kbd>+<kbd>R</kbd>: al revés) · arrastrar con el botón izquierdo: una fila de suelo o valla',
-  'extras.controls.pad3': '<kbd>Y</kbd> también gira una valla, un portón o una farola mientras la colocas.',
+  'extras.controls.pad3': '<kbd>Y</kbd> también gira la pieza que llevas mientras la colocas (valla, portón, farola, banco…).',
 
   // ---------- added in 0.7, increment 2: readable smog ----------
   'hud.smog.more': 'Haz clic o toca para ver de dónde viene y adónde va.',
@@ -781,4 +781,26 @@ export const es: Dict = {
   'smog.power': 'Energía al {n}\u00a0%: la industria y los Purificadores van más lentos.',
   'smog.limit': 'Si pasa del {limit}\u00a0% durante {seconds} segundos, la ciudad está perdida.',
   'smog.countdown': '¡Por encima del {limit}\u00a0%: la ciudad se pierde en {n}\u00a0s!',
+
+  // ---------- added in 0.7, increment 2 (G2): decorations ----------
+  'cat.decorations': 'Decoraciones',
+  'pc.bench': 'Banco',
+  'pc.bench.effect': 'Armazón de tubos de chatarra y listones de madera; gira en 4 direcciones',
+  'pc.planter': 'Jardinera',
+  'pc.planter.effect': 'Tulipanes o girasoles: lo decide la casilla',
+  'pc.sign': 'Letrero de neón',
+  'pc.sign.effect': 'Cara de bot, flechas de reciclaje o corazón (lo decide la casilla); se enciende de noche',
+  'pc.pergola': 'Pérgola',
+  'pc.pergola.effect': 'Glicinia trepando por un armazón de acero; gira en 2 sentidos',
+  'pc.cathouse': 'Casita de Miso',
+  'pc.cathouse.effect': 'Caseta con cojín para el gato; Miso no cambia sus costumbres',
+  'pc.sculpture': 'Escultura de chatarra',
+  'pc.sculpture.effect': 'Un robot soldado con la chatarra sobrante; su chatarra solo vuelve si hay sitio en el almacén',
+  'place.bench': 'Hay un banco: quítalo primero',
+  'place.planter': 'Hay una jardinera: quítala primero',
+  'place.sign': 'Hay un letrero de neón: quítalo primero',
+  'place.pergola': 'Hay una pérgola: quítala primero',
+  'place.cathouse': 'Está la casita de Miso: quítala primero',
+  'place.sculpture': 'Hay una escultura de chatarra: quítala primero',
+  'insp.scrapRoom': 'El almacén tiene sitio para {n} de los {max} de chatarra: el resto no se devuelve.',
 };

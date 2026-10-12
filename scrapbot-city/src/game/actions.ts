@@ -12,8 +12,8 @@ export function setTile(s: GameState, i: number, kind: number, amt = 0): void {
   s.dirtyTiles.push(i);
 }
 
-// Plain ground or grass with no building and no fence, gate or lamp: where junk, sludge, waste and a
-// gifted garden may appear (a floor does not matter).
+// Plain ground or grass with no building and no solid piece (fence, gate, lamp, decoration): where junk, sludge,
+// waste and a gifted garden may appear (a floor does not matter).
 export function isFree(s: GameState, i: number): boolean {
   return (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS) && s.occ[i] === -1 && s.solid[i] === 0;
 }
@@ -60,10 +60,11 @@ export interface PlaceCheck {
   costOnly?: boolean; // the spot is fine, only the price is not
 }
 
-// Why nothing can be built on a tile holding a fence, gate or lamp (solid code as in GameState.solid).
+// Why nothing can be built on a tile holding a solid piece (solid code as in GameState.solid): "A bench is in the
+// way: remove it first" (place.<kind>).
 export function solidReason(code: number): string {
   const kind = solidKind(code);
-  return kind === 'fence' ? t('place.fence') : kind === 'gate' ? t('place.gate') : kind === 'lamp' ? t('place.lamp') : t('place.occupied');
+  return kind ? tk(`place.${kind}`) : t('place.occupied');
 }
 
 export function placeCheck(s: GameState, type: BuildingType, x: number, y: number): PlaceCheck {

@@ -2268,6 +2268,11 @@ select {
   color: var(--muted);
 }
 
+/* a selected piece: its description under the buttons */
+.piece-desc {
+  margin-top: 10px;
+}
+
 /* build dock */
 
 .toolbar {
