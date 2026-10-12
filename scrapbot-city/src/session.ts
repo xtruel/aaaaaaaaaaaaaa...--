@@ -392,6 +392,8 @@ export class GameSession implements PadTarget {
       // instead of with a red "already there" ghost on the building just placed
       if (this.tutorial?.update({ s, cameraMoved: this.cameraMoved, speed: this.speed, hq: this.hqBox() })) this.cancelTool();
     }
+    // what a selected piece's Remove gives back, every frame: what a press on it pays is what it shows then
+    if (this.selectedPiece >= 0) this.hud.refreshPieceRefund(s, this.selectedPiece);
   }
 
   private onFx(fx: FxEvent): void {

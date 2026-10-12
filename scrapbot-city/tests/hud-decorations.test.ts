@@ -217,6 +217,35 @@ describe('the panel of a selected decoration', () => {
     expect(q(panel, '[data-scrap-room]')!.textContent).toBe('Storage has room for 0 of the 10 scrap: the rest is not given back.');
   });
 
+  it('the Remove button follows the storage every frame, not only every 100 ms: a press pays what it shows then', () => {
+    const { s, root, update, hud } = setup();
+    const [p] = freeTiles(s, 1);
+    placePiece(s, 'sculpture', p.x, p.y, 0);
+    const i = p.y * MAP_W + p.x;
+    s.res.scrap = s.derived.storage - 10;
+    update({ selectedPiece: i });
+    const btn = q(root, '[data-remove-piece]')!;
+    expect(btn.textContent).toBe('Remove (+5 credits + 10 scrap)');
+    // a bot unloads 6 scrap in the next frame; the HUD's own update is up to 100 ms away: the frame's refresh
+    // (session.frame, after the city's step) writes the button at once
+    s.res.scrap += 6;
+    hud.refreshPieceRefund(s, i);
+    expect(q(root, '[data-remove-piece]')).toBe(btn);
+    expect(btn.textContent).toBe('Remove (+5 credits + 4 scrap)');
+    // the press then pays exactly that
+    const before = { ...s.res };
+    const paid = removePieceAt(s, p.x, p.y)!;
+    expect(`Remove (+${costText(paid)})`).toBe(btn.textContent);
+    expect([s.res.credits - before.credits, s.res.scrap - before.scrap]).toEqual([5, 4]);
+    // another tile, or the panel showing something else: the refresh writes nothing
+    placePiece(s, 'sculpture', p.x, p.y, 0);
+    update({ selectedPiece: i });
+    const text = btn.isConnected ? btn.textContent : q(root, '[data-remove-piece]')!.textContent;
+    s.res.scrap = 0;
+    hud.refreshPieceRefund(s, i + 1);
+    expect(q(root, '[data-remove-piece]')!.textContent).toBe(text);
+  });
+
   it('in Italian too', async () => {
     const { setLang } = await import('../src/i18n');
     setLang('it');

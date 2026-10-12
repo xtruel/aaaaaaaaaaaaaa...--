@@ -1158,6 +1158,15 @@ export class Hud {
     panel.querySelector('[data-remove-piece]')?.addEventListener('click', () => this.handlers.onRemovePiece(i));
   }
 
+  // Every frame, after the city's step (the session): the Remove button of the selected piece says what removing it
+  // gives back at this moment, so a press on it pays exactly what it shows (removePieceAt pays pieceRefundAt, and the
+  // city only changes inside a frame, never between this and a press). The rest of the panel follows update().
+  refreshPieceRefund(s: GameState, selectedPiece: number): void {
+    if (selectedPiece < 0 || !this.inspectorKey.startsWith(`piece:${selectedPiece}:`)) return;
+    const info = pieceInfo(s, selectedPiece);
+    if (info) this.markPieceRefund(info);
+  }
+
   // The Remove button says what removing the piece gives back right now (pieceRefundAt, which is what is paid), and a
   // line under the text says how much of the sculpture's scrap storage has no room for.
   private markPieceRefund(info: PieceInfo): void {

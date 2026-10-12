@@ -23,6 +23,9 @@
   ruota lo ruota, con uno che non ruota (pavimento, fioriera, un modulo) dice «Fioriera: non si ruota» (anche `R` da
   tastiera). Prima `Y` con la fioriera in mano apriva un consiglio e consumava un consiglio gratis (o, finiti quelli,
   apriva la finestra per pagarlo). Senza oggetti del catalogo in mano `Y` resta il consiglio.
+- **«Rimuovi» paga quello che dice nel momento in cui lo premi**: la cifra del pulsante di un oggetto selezionato si
+  aggiorna a ogni fotogramma (prima ogni 100 ms): se un bot scaricava rottami tra l'aggiornamento e la pressione, la
+  scultura poteva dire «+10 rottami» e renderne 4. Ora la scritta e il pagamento coincidono sempre.
 
 ## In lavorazione — incremento 2, gruppo G2: le sei decorazioni del brief
 
