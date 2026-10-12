@@ -1,6 +1,7 @@
 // Modular building, increments 1 and 2 (docs/MODULAR-INC1.md, docs/MODULAR-INC2.md): the rules for the catalog.
-// Pieces on the map: industrial floor (a surface under everything), fence, gate and lamp (solid objects, one
-// per tile, kept in s.solid and never in s.occ). Modules on buildings, one slot each: extra storage for a Bot Dock,
+// Pieces on the map: industrial floor and concrete base (surfaces under everything, s.floor), fence, gate, lamp,
+// low wall, corner pillar and the decorations (solid objects, one per tile, kept in s.solid and never in s.occ).
+// Decorations bought can be moved to another tile for free (movePiece). Modules on buildings, one slot each: extra storage for a Bot Dock,
 // a filter for a Smelter, a magnet or a sorter for a Recycler, a double arm for a 2PM Factory, a capsule for Bot
 // Pods, tracking panels for a Solar Array, a nozzle for a Purifier. Everything is paid once, when the player
 // confirms; checks and previews cost nothing.
@@ -11,8 +12,8 @@ import { T, TILE } from './defs';
 import type { Cost, Resource } from './defs';
 import { canAfford, computeStorage, costText, pay, solidReason } from './actions';
 import type { PlaceCheck } from './actions';
-import { MODULES, PIECES, buildingStats, installedModules, isModuleKind, isPieceKind, moduleRefund, normRot, pieceRefundAt, solidCode, solidKind } from './piecedefs';
-import type { ModuleKind, PieceKind } from './piecedefs';
+import { MODULES, PIECES, buildingStats, installedModules, isModuleKind, isPieceKind, moduleRefund, normRot, pieceRefundAt, pieceVariety, pieceVarietyAt, solidCode, solidKind, surfaceCode, surfaceKind } from './piecedefs';
+import type { ModuleKind, PieceKind, SolidKind, SurfaceKind } from './piecedefs';
 import { computeDerived } from './sim';
 import { buildingCenter, idx, inBounds } from './state';
 import type { Building, GameState } from './state';
@@ -35,6 +36,16 @@ function tileFx(x: number, y: number): { x: number; y: number } {
 // Can `kind` be placed on tile (x, y)? Same shape as placeCheck: costOnly when only the price is missing.
 // The rotation never changes the answer (any value is accepted and brought into range when placing).
 export function pieceCheck(s: GameState, kind: PieceKind, x: number, y: number, _rot = 0): PlaceCheck {
+  const spot = spotCheck(s, kind, x, y);
+  if (!spot.ok) return spot;
+  const def = PIECES[kind];
+  if (!canAfford(s, def.cost)) return { ok: false, reason: t('place.costs', { cost: costText(def.cost) }), costOnly: true };
+  return { ok: true };
+}
+
+// The tile part of pieceCheck, without the price (a piece being moved costs nothing): inside the map, ground or grass
+// with no building, junk, sludge or rubble; a surface on a tile with none, a solid piece on a tile with none.
+function spotCheck(s: GameState, kind: PieceKind, x: number, y: number): PlaceCheck {
   // own keys only: a stray 'constructor' or 'toString' from the UI is refused, not looked up on Object
   if (!isPieceKind(kind)) return { ok: false, reason: t('place.cannot') };
   const def = PIECES[kind];
@@ -48,12 +59,11 @@ export function pieceCheck(s: GameState, kind: PieceKind, x: number, y: number, 
   // only ground or grass (spec 2): any other tile code, e.g. from a damaged save, is refused
   if (tile !== T.GROUND && tile !== T.GRASS) return { ok: false, reason: t('place.cannot') };
   if (def.layer === 'surface') {
-    // a fence or lamp on the tile does not stop a floor going under it
-    if (s.floor[i]) return { ok: false, reason: t('place.paved') };
+    // a fence or lamp on the tile does not stop a floor going under it; one surface per tile
+    if (s.floor[i]) return { ok: false, reason: t(surfaceKind(s.floor[i]) === 'base' ? 'place.based' : 'place.paved') };
   } else if (s.solid[i] !== 0) {
     return { ok: false, reason: solidReason(s.solid[i]) };
   }
-  if (!canAfford(s, def.cost)) return { ok: false, reason: t('place.costs', { cost: costText(def.cost) }), costOnly: true };
   return { ok: true };
 }
 
@@ -65,20 +75,22 @@ export function placePiece(s: GameState, kind: PieceKind, x: number, y: number, 
   const i = idx(x, y);
   pay(s, def.cost);
   if (def.layer === 'surface') {
-    s.floor[i] = 1;
+    s.floor[i] = surfaceCode(kind as SurfaceKind);
     s.dirtyTiles.push(i);
   } else {
-    s.solid[i] = solidCode(kind as Exclude<PieceKind, 'floor'>);
+    s.solid[i] = solidCode(kind as SolidKind);
     s.rot[i] = normRot(kind, rot);
+    s.variety[i] = 0; // the tile's own look (pieceVariety): what the ghost showed
   }
   s.stats.piecesPlaced++;
   s.fx.push({ kind: 'placed', ...tileFx(x, y) });
   return true;
 }
 
-// Bulldozer on a tile: removes the solid piece (fence, gate, lamp, decoration) if there is one, else the floor (only
-// a bare floor: not under a building, junk, sludge or rubble). Gives back half the price, scrap only as far as the
-// storage has room (pieceRefundAt: what the interface shows); null when there was nothing to remove.
+// Bulldozer on a tile: removes the solid piece (fence, gate, lamp, wall, pillar, decoration) if there is one, else the
+// surface, floor or base (only a bare one: not under a building, junk, sludge or rubble). Gives back half the price,
+// scrap only as far as the storage has room (pieceRefundAt: what the interface shows); null when there was nothing to
+// remove.
 export function removePieceAt(s: GameState, x: number, y: number): Cost | null {
   if (!inBounds(x, y)) return null;
   const i = idx(x, y);
@@ -87,8 +99,9 @@ export function removePieceAt(s: GameState, x: number, y: number): Cost | null {
     kind = solidKind(s.solid[i]);
     s.solid[i] = 0;
     s.rot[i] = 0;
+    s.variety[i] = 0;
   } else if (s.floor[i] && s.occ[i] === -1 && (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS)) {
-    kind = 'floor';
+    kind = surfaceKind(s.floor[i]) ?? 'floor';
     s.floor[i] = 0;
     s.dirtyTiles.push(i);
   }
@@ -99,30 +112,56 @@ export function removePieceAt(s: GameState, x: number, y: number): Cost | null {
   return refund;
 }
 
-// Turns the piece on the tile: a gate or pergola (2 ways), a lamp, bench, sign, Miso's house or sculpture (4
-// directions); a fence only while it stands alone (a joined fence follows its neighbours); a planter not at all.
-// Free. dir -1 turns the other way.
+// Turns the piece on the tile: a gate or pergola (2 ways), a lamp, bench, sign, Miso's house, sculpture or statue (4
+// directions); a fence or a wall only while it stands alone (a joined one follows its neighbours); a planter, pillar,
+// tree or fountain not at all. Free. dir -1 turns the other way.
 export function rotatePieceAt(s: GameState, x: number, y: number, dir: 1 | -1 = 1): boolean {
-  const p = pieceAt(s, x, y);
-  if (!p) return false;
-  const n = PIECES[p.kind].rotations;
-  if (n < 2) return false;
-  if (p.kind === 'fence' && fenceMask(s, x, y) !== 0) return false;
+  if (!turnsAt(s, x, y)) return false;
+  const p = pieceAt(s, x, y)!;
   s.rot[idx(x, y)] = normRot(p.kind, p.rot + dir);
   return true;
 }
 
-function joinsAt(s: GameState, x: number, y: number): boolean {
-  if (!inBounds(x, y)) return false;
-  const kind = solidKind(s.solid[idx(x, y)]);
-  return !!kind && PIECES[kind].joins;
+// Can the piece on the tile turn now? (a fence or wall joined to its neighbours follows them)
+export function turnsAt(s: GameState, x: number, y: number): boolean {
+  const p = pieceAt(s, x, y);
+  if (!p || PIECES[p.kind].rotations < 2) return false;
+  return !((p.kind === 'fence' || p.kind === 'wall') && fenceMask(s, x, y) !== 0);
 }
 
-// Which neighbours of (x, y) are fences or gates: N (y-1) = 1, E (x+1) = 2, S (y+1) = 4, W (x-1) = 8.
-// Works for any tile, so a preview can show how a fence would join before it is placed.
-// 0 = alone: then the fence's own rotation is used (0 = along x, 1 = along y).
+// A gate along x (rotation 0) is joined by the line pieces on its E and W sides, along y (1) by those on N and S: side
+// as in fenceMask, seen from the gate. A fence against the gate's flank does not reach into it.
+export function gateJoins(rot: number, side: number): boolean {
+  return rot & 1 ? side === 1 || side === 4 : side === 2 || side === 8;
+}
+
+// Does the piece on (x, y) join the tile on its side `side` (1 N, 2 E, 4 S, 8 W, seen from the piece)? Fences, walls
+// and pillars join every side; a gate only along its axis; nothing else joins.
+function joinsTowards(s: GameState, x: number, y: number, side: number): boolean {
+  if (!inBounds(x, y)) return false;
+  const i = idx(x, y);
+  const kind = solidKind(s.solid[i]);
+  if (!kind || !PIECES[kind].joins) return false;
+  return kind !== 'gate' || gateJoins(s.rot[i], side);
+}
+
+// Which neighbours of (x, y) a fence, wall or pillar there joins: N (y-1) = 1, E (x+1) = 2, S (y+1) = 4, W (x-1) = 8.
+// They join fences, walls, pillars and the gates that line up with the tile (a gate along x on the E or W side, along
+// y on the N or S side). Works for any tile, so a preview can show how a piece would join before it is placed.
+// 0 = alone: then a fence's or wall's own rotation is used (0 = along x, 1 = along y); a pillar stands bare.
 export function fenceMask(s: GameState, x: number, y: number): number {
-  return (joinsAt(s, x, y - 1) ? 1 : 0) | (joinsAt(s, x + 1, y) ? 2 : 0) | (joinsAt(s, x, y + 1) ? 4 : 0) | (joinsAt(s, x - 1, y) ? 8 : 0);
+  return (joinsTowards(s, x, y - 1, 4) ? 1 : 0) | (joinsTowards(s, x + 1, y, 8) ? 2 : 0) | (joinsTowards(s, x, y + 1, 1) ? 4 : 0) | (joinsTowards(s, x - 1, y, 2) ? 8 : 0);
+}
+
+// Does a dragged row of `kind` carry on over what is already on this tile, neither laying nor skipping it? Over the
+// same piece (a floor row over floors, a base row over bases), and a fence or wall row over the gates and pillars
+// in its line too.
+export function rowCarriesOver(s: GameState, kind: PieceKind, x: number, y: number): boolean {
+  if (!isPieceKind(kind) || !inBounds(x, y)) return false;
+  const i = idx(x, y);
+  if (PIECES[kind].layer === 'surface') return s.floor[i] === surfaceCode(kind as SurfaceKind);
+  const there = solidKind(s.solid[i]);
+  return !!there && (there === kind || (PIECES[kind].joins && (there === 'gate' || there === 'pillar')));
 }
 
 // Tiles of a drag from (x0, y0) to (x1, y1), in order, each once: a straight row, or an L with one corner
@@ -147,7 +186,7 @@ export function dragPath(x0: number, y0: number, x1: number, y1: number, xFirst 
   return out;
 }
 
-// The solid piece on a tile, fence, gate, lamp or decoration (not the floor: see floorAt).
+// The solid piece on a tile, fence, gate, lamp, wall, pillar or decoration (not a surface: see floorAt, surfaceAt).
 export function pieceAt(s: GameState, x: number, y: number): { kind: PieceKind; rot: number } | null {
   if (!inBounds(x, y)) return null;
   const i = idx(x, y);
@@ -155,8 +194,51 @@ export function pieceAt(s: GameState, x: number, y: number): { kind: PieceKind; 
   return kind ? { kind, rot: s.rot[i] } : null;
 }
 
+// Is there a surface (floor or base) on the tile?
 export function floorAt(s: GameState, x: number, y: number): boolean {
   return inBounds(x, y) && s.floor[idx(x, y)] !== 0;
+}
+
+// The surface on a tile: 'floor', 'base' or null.
+export function surfaceAt(s: GameState, x: number, y: number): SurfaceKind | null {
+  return inBounds(x, y) ? surfaceKind(s.floor[idx(x, y)]) : null;
+}
+
+// ---------- moving decorations (docs/MODULAR-INC2.md §3c) ----------
+
+// Only the decorations move (lamp, bench, planter, sign, pergola, Miso's house, sculpture, tree, fountain, statue);
+// constructions, modules and buildings stay where they are.
+export function isMovable(kind: PieceKind | null | undefined): boolean {
+  return isPieceKind(kind) && !!PIECES[kind].decoration;
+}
+
+// Can the decoration on (fromX, fromY) move to (toX, toY)? The rules of pieceCheck for its kind, without the price:
+// a move costs nothing. Not to its own tile (nothing would move).
+export function moveCheck(s: GameState, fromX: number, fromY: number, toX: number, toY: number): PlaceCheck {
+  const p = pieceAt(s, fromX, fromY);
+  if (!p || !isMovable(p.kind)) return { ok: false, reason: t('move.only') };
+  if (fromX === toX && fromY === toY) return { ok: false, reason: t('move.same') };
+  return spotCheck(s, p.kind, toX, toY);
+}
+
+// Moves the decoration on (fromX, fromY) to (toX, toY), all at once or not at all: false, and nothing changed, when
+// moveCheck says no. Nothing is paid or given back and no counter moves (stats.piecesPlaced stays: it was bought
+// once); its rotation and its look (a planter's flowers, a sign's motif, a tree) go with it.
+export function movePiece(s: GameState, fromX: number, fromY: number, toX: number, toY: number): boolean {
+  if (!moveCheck(s, fromX, fromY, toX, toY).ok) return false;
+  const from = idx(fromX, fromY);
+  const to = idx(toX, toY);
+  const kind = solidKind(s.solid[from])!;
+  const look = pieceVarietyAt(s, from);
+  s.solid[to] = s.solid[from];
+  s.rot[to] = s.rot[from];
+  // the look is written down only where the new tile would give another one
+  s.variety[to] = (PIECES[kind].varieties ?? 1) > 1 && look !== pieceVariety(kind, toX, toY) ? look + 1 : 0;
+  s.solid[from] = 0;
+  s.rot[from] = 0;
+  s.variety[from] = 0;
+  s.fx.push({ kind: 'placed', ...tileFx(toX, toY) });
+  return true;
 }
 
 // ---------- modules on buildings ----------

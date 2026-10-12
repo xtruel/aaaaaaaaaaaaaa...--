@@ -8,8 +8,8 @@ import { BUILDINGS, MAP_H, MAP_W, T, TILE } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { costText, placeCheck } from '../game/actions';
 import type { PlaceCheck } from '../game/actions';
-import { MODULES, PIECES, buildingStats, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, pieceCheck, pieceVariety, solidKind } from '../game/pieces';
-import type { CatalogKind, ModuleKind, PieceKind, SolidKind } from '../game/pieces';
+import { MODULES, PIECES, buildingStats, fenceMask, gateJoins, installedModules, isMasked, isModuleKind, isPieceKind, moduleCheck, moveCheck, pieceCheck, pieceVariety, pieceVarietyAt, rowCarriesOver, solidKind, surfaceKind } from '../game/pieces';
+import type { CatalogKind, ModuleKind, SolidKind, SurfaceKind } from '../game/pieces';
 import { airEffect, dayPhase } from '../game/sim';
 import { idx, inBounds } from '../game/state';
 import type { Bot, Building, FxEvent, GameState } from '../game/state';
@@ -66,6 +66,9 @@ export interface ViewState {
   selectedPiece?: number;
   pieceRow?: { x: number; y: number }[] | null;
   pieceLabel?: string | null;
+  // a decoration being moved (docs/MODULAR-INC2.md §3c): its tile index (it stays there, selected, until the move is
+  // made); its ghost, with its own turn and look, follows the pointer with moveCheck's answer. Left out or -1 = none
+  moving?: number;
   // a selection reached behind a building (src/ui/pick.ts): its ground area, tiles [x0, x1) x [y0, y1), and how tall
   // it stands; the buildings in front of it are drawn see-through so it shows. Left out = none
   reveal?: { x0: number; y0: number; x1: number; y1: number; height: number } | null;
@@ -110,11 +113,28 @@ const POOL = [5, 10, 14, 16, 14, 10, 5]; // half-widths of a lamp's light pool, 
 const GAME_LIGHT = { day: '', veil: '16,12,52', dark: 1 };
 
 // Player-built pieces (0.7): how tall the solid ones stand (voxels; draw order, bots fly over them), and their
-// frames: a fence by the mask of its fence/gate neighbours (alone: along x or y by its rotation), a gate by its
+// frames: a fence by the mask of its line neighbours (alone: along x or y by its rotation), a gate by its
 // rotation (0 along x, 1 along y), a lamp by the direction of its arm (0 +x, 1 +y, 2 −x, 3 −y). Increment 2's
-// decorations: bench, sign, Miso's house and sculpture by their direction (as the lamp), the pergola along x or y,
-// the planter's flowers and the sign's motif by the tile (pieceVariety).
-const PIECE_H: Record<SolidKind, number> = { fence: 10, gate: 12, lamp: 22, bench: 11, planter: 20, sign: 26, pergola: 22, cathouse: 15, sculpture: 27 };
+// decorations: bench, sign, Miso's house, sculpture and statue by their direction (as the lamp), the pergola along x
+// or y, the planter's flowers, the sign's motif and the tree by the tile (pieceVariety, or the look a moved one kept),
+// the fountain by the frame of its jet (still with reduced motion). The low wall as the fence, the corner pillar by the
+// mask of its neighbours (stubs towards them).
+const PIECE_H: Record<SolidKind, number> = {
+  fence: 10,
+  gate: 12,
+  lamp: 22,
+  bench: 11,
+  planter: 20,
+  sign: 26,
+  pergola: 22,
+  cathouse: 15,
+  sculpture: 27,
+  wall: 7,
+  pillar: 20,
+  tree: 32,
+  fountain: 23,
+  statue: 30,
+};
 const PIECE_REACH = 64; // no piece's sprite or shadow reaches this far (px) from its tile: farther off-view ones are skipped early
 const FENCE_FRAMES = Array.from({ length: 16 }, (_, mask) => `pc/fence/${mask}`);
 const GATE_FRAMES = ['pc/gate/x', 'pc/gate/y'];
@@ -126,17 +146,35 @@ const SCULPTURE_FRAMES = DIR_FRAMES('sculpture');
 const PLANTER_FRAMES = ['pc/planter/0', 'pc/planter/1'];
 const SIGN_FRAMES = [0, 1, 2].map((motif) => DIR_FRAMES(`sign/${motif}`));
 const PERGOLA_FRAMES = ['pc/pergola/x', 'pc/pergola/y'];
+const WALL_FRAMES = Array.from({ length: 16 }, (_, mask) => `pc/wall/${mask}`);
+const PILLAR_FRAMES = Array.from({ length: 16 }, (_, mask) => `pc/pillar/${mask}`);
+const TREE_FRAMES = ['pc/tree/0', 'pc/tree/1', 'pc/tree/2'];
+const FOUNTAIN_FRAMES = ['pc/fountain/0', 'pc/fountain/1', 'pc/fountain/2', 'pc/fountain/3'];
+const FOUNTAIN_FPS = 6;
+const STATUE_FRAMES = DIR_FRAMES('statue');
 const FLOOR_FRAMES = [0, 1, 2, 3].map((k) => `t/floor/${k}`);
+const BASE_FRAMES = [0, 1, 2, 3].map((k) => `t/base/${k}`);
 // the placed pieces' lights that a building in front of them cuts (drawPieceLights), made when first needed
 let lightLayer: HTMLCanvasElement | null = null;
 const GHOST_OK = 'rgba(198,244,50,0.35)';
 const GHOST_BAD = 'rgba(226,54,75,0.5)';
 
-// (variety: pieceVariety of the tile, for the planter and the sign)
-export function pieceFrameOf(kind: SolidKind, rot: number, mask: number, variety = 0): string {
+// (mask: fenceMask, for the fence, wall and pillar; variety: the planter's, sign's or tree's look; anim: the fountain's
+// frame, 0 still, 1..3 the jet playing)
+export function pieceFrameOf(kind: SolidKind, rot: number, mask: number, variety = 0, anim = 0): string {
   switch (kind) {
     case 'fence':
       return mask ? FENCE_FRAMES[mask] : rot & 1 ? 'pc/fence/y' : 'pc/fence/x';
+    case 'wall':
+      return mask ? WALL_FRAMES[mask & 15] : rot & 1 ? 'pc/wall/y' : 'pc/wall/x';
+    case 'pillar':
+      return PILLAR_FRAMES[mask & 15];
+    case 'tree':
+      return TREE_FRAMES[variety] ?? TREE_FRAMES[0];
+    case 'fountain':
+      return FOUNTAIN_FRAMES[anim & 3];
+    case 'statue':
+      return STATUE_FRAMES[rot & 3];
     case 'gate':
       return GATE_FRAMES[rot & 1];
     case 'pergola':
@@ -156,12 +194,14 @@ export function pieceFrameOf(kind: SolidKind, rot: number, mask: number, variety
   }
 }
 
-// Which of the four plates a floor tile shows: fixed per tile, so a laid floor looks like its preview.
-function floorFrameOf(tx: number, ty: number): string {
-  return FLOOR_FRAMES[Math.floor(hash2(tx, ty, 47) * 4)];
+// Which of the four plates a floor (or slabs a concrete base) tile shows: fixed per tile, so a laid surface looks like
+// its preview.
+function floorFrameOf(tx: number, ty: number, kind: SurfaceKind = 'floor'): string {
+  return (kind === 'base' ? BASE_FRAMES : FLOOR_FRAMES)[Math.floor(hash2(tx, ty, 47) * 4)];
 }
 
-// A floor shows unless something covers it: a building standing on it, or junk, sludge or rubble on the tile.
+// A surface (floor or base) shows unless something covers it: a building standing on it, or junk, sludge or rubble on
+// the tile.
 function floorShown(s: GameState, i: number): boolean {
   return s.floor[i] !== 0 && s.occ[i] === -1 && (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS);
 }
@@ -436,6 +476,8 @@ export class Renderer {
   private ghosts: Ghost[] = [];
   private ghostJoin = new Set<number>();
   private ghostRow = new Set<number>(); // every ghost of a fence or gate row: the refused ones join each other
+  private ghostGate = -1; // the ghosts are gates: their rotation (they join only along their axis); -1 otherwise
+  private moveGhost: { kind: SolidKind; rot: number; variety: number } | null = null; // the decoration being moved
   private ghostSeen = new Set<number>();
   private modulePreview: ModulePreview | null = null;
   private reduced = false; // reduced motion, this frame
@@ -643,22 +685,26 @@ export class Renderer {
     return { left: (top.X - TILE - this.cam.x) * z, top: (top.Y - this.cam.y) * z, right: (top.X + TILE - this.cam.x) * z, bottom: (top.Y + TILE - this.cam.y) * z };
   }
 
-  // The frame of the solid piece on a tile. A fence joins its fence and gate neighbours, and the ghosts of the ones
-  // being laid next to it; a planter or a sign shows the look its tile gives it.
+  // The frame of the solid piece on a tile. A fence, wall or pillar joins its line neighbours (fenceMask), and the
+  // ghosts of the ones being laid next to it; a planter, sign or tree shows its look; a fountain plays its jet.
   private pieceFrameName(s: GameState, tx: number, ty: number, i: number): string {
     const kind = solidKind(s.solid[i]) ?? 'fence';
-    if (kind !== 'fence') return pieceFrameOf(kind, s.rot[i], 0, pieceVariety(kind, tx, ty));
-    return pieceFrameOf(kind, s.rot[i], this.joinMask(s, tx, ty, this.ghostJoin));
+    if (isMasked(kind)) return pieceFrameOf(kind, s.rot[i], this.joinMask(s, tx, ty, this.ghostJoin));
+    if (kind === 'fountain') return pieceFrameOf(kind, 0, 0, 0, this.reduced ? 0 : 1 + (Math.floor(this.clock * FOUNTAIN_FPS + tx * 0.37 + ty * 0.61) % 3));
+    return pieceFrameOf(kind, s.rot[i], 0, pieceVarietyAt(s, i));
   }
 
-  // fenceMask, plus the ghosts in `g` (tile indexes) next to the tile
+  // fenceMask, plus the ghosts in `g` (tile indexes) next to the tile; a gate's ghost only along its axis
   private joinMask(s: GameState, tx: number, ty: number, g: Set<number>): number {
     let m = fenceMask(s, tx, ty);
     if (g.size) {
-      if (ty > 0 && g.has(idx(tx, ty - 1))) m |= 1;
-      if (tx < MAP_W - 1 && g.has(idx(tx + 1, ty))) m |= 2;
-      if (ty < MAP_H - 1 && g.has(idx(tx, ty + 1))) m |= 4;
-      if (tx > 0 && g.has(idx(tx - 1, ty))) m |= 8;
+      const a = this.ghostGate;
+      // (side: the side of the ghost that faces the tile, as gateJoins takes it)
+      const joins = (side: number) => a < 0 || gateJoins(a, side);
+      if (ty > 0 && g.has(idx(tx, ty - 1)) && joins(4)) m |= 1;
+      if (tx < MAP_W - 1 && g.has(idx(tx + 1, ty)) && joins(8)) m |= 2;
+      if (ty < MAP_H - 1 && g.has(idx(tx, ty + 1)) && joins(1)) m |= 4;
+      if (tx > 0 && g.has(idx(tx - 1, ty)) && joins(2)) m |= 8;
     }
     return m;
   }
@@ -840,9 +886,9 @@ export class Renderer {
       this.blitT(`t/ground/${n < 0.38 ? 0 : n < 0.62 ? 1 : 2}/0`, tx, ty);
     }
     this.blitT(this.groundFrame(s, tx, ty), tx, ty);
-    // industrial floor laid by the player; the tile is repainted (s.dirtyTiles) when a building goes up on it or
-    // is demolished, and when junk lands on it or is collected
-    if (inside && floorShown(s, idx(tx, ty))) this.blitT(floorFrameOf(tx, ty), tx, ty);
+    // industrial floor or concrete base laid by the player; the tile is repainted (s.dirtyTiles) when a building goes
+    // up on it or is demolished, and when junk lands on it or is collected
+    if (inside && floorShown(s, idx(tx, ty))) this.blitT(floorFrameOf(tx, ty, surfaceKind(s.floor[idx(tx, ty)]) ?? 'floor'), tx, ty);
   }
 
   private paintProp(s: GameState, tx: number, ty: number): void {
@@ -1074,6 +1120,7 @@ export class Renderer {
     this.updateParticles(dt, camX, camY, simRunning);
     if (view.hover && view.build) this.drawPlacement(s, view, camX, camY, img);
     else if (view.piece) this.drawPiecePreview(s, view, camX, camY, img);
+    else if (this.moveGhost) this.drawMovePreview(camX, camY, img);
     this.drawSelection(s, view, camX, camY);
 
     this.drawLighting(s, camX, camY, img);
@@ -1121,6 +1168,23 @@ export class Renderer {
   }
 
   private updateFocus(view: ViewState): void {
+    const mg = this.moveGhost;
+    if (mg && this.ghosts.length) {
+      // a decoration being moved: the buildings in front of its ghost turn see-through, as for one being bought
+      const g = this.ghosts[0];
+      const height = PIECE_H[mg.kind];
+      this.focus = {
+        x0: g.x * TILE,
+        x1: (g.x + 1) * TILE,
+        y0: g.y * TILE,
+        y1: (g.y + 1) * TILE,
+        sx0: (g.x - (g.y + 1)) * TILE,
+        sx1: (g.x + 1 - g.y) * TILE,
+        sy0: ((g.x + g.y) * TILE) / 2 - height,
+        sy1: ((g.x + 1 + g.y + 1) * TILE) / 2,
+      };
+      return;
+    }
     const r = view.reveal;
     // (the bulldozer over the map shows through to the tile under the pointer instead, below; off the map, on the
     // panel that demolishes what it selected behind another building, that one stays shown)
@@ -1151,7 +1215,7 @@ export class Renderer {
         y1 = Math.max(y1, g.y + 1);
       }
       const kind = view.piece.kind;
-      const height = kind === 'floor' ? 4 : PIECE_H[kind];
+      const height = PIECES[kind].layer === 'surface' ? 4 : PIECE_H[kind as SolidKind];
       this.focus = {
         x0: x0 * TILE,
         x1: x1 * TILE,
@@ -1634,7 +1698,7 @@ export class Renderer {
     const selected = view.selectedId >= 0 ? s.buildings.find((b) => b.id === view.selectedId) : undefined;
     // the radius the sim cleans: 8 tiles with the Purifier's nozzle
     if (selected && BUILDINGS[selected.type].cleanRadius) this.drawRadius(selected.x, selected.y, selected.type, camX, camY, buildingStats(selected).cleanRadius, view.reducedMotion);
-    if (view.piece?.kind === 'floor') this.drawFloorGhosts(camX, camY);
+    if (isPieceKind(view.piece?.kind) && PIECES[view.piece.kind].layer === 'surface') this.drawFloorGhosts(camX, camY, view.piece.kind as SurfaceKind);
     const h = view.hover;
     // a catalog tool shows its own preview (drawPiecePreview)
     if (!h || view.build || view.piece) return;
@@ -1656,13 +1720,13 @@ export class Renderer {
     this.outlineFootprint(h.x, h.y, 1, 1, view.bulldoze ? PAL.red : 'rgba(236,232,246,0.6)', camX, camY);
   }
 
-  // Floors being laid lie on the ground under everything that stands: drawn with the ground marks. A refused tile
-  // only turns red, so what is in the way (junk, a floor already there) stays in view.
-  private drawFloorGhosts(camX: number, camY: number): void {
+  // Floors or bases being laid lie on the ground under everything that stands: drawn with the ground marks. A refused
+  // tile only turns red, so what is in the way (junk, a floor already there) stays in view.
+  private drawFloorGhosts(camX: number, camY: number, kind: SurfaceKind): void {
     const img = atlasImage();
     const ctx = this.ctx;
     for (const g of this.ghosts) {
-      const f = frame(floorFrameOf(g.x, g.y));
+      const f = frame(floorFrameOf(g.x, g.y, kind));
       if (f && img && g.ok) {
         const top = tileTop(g.x, g.y);
         ctx.globalAlpha = 0.8;
@@ -2075,7 +2139,13 @@ export class Renderer {
     this.ghosts.length = 0;
     this.ghostJoin.clear();
     this.ghostRow.clear();
+    this.ghostGate = -1;
+    this.moveGhost = null;
     this.modulePreview = null;
+    if ((view.moving ?? -1) >= 0 && !view.build && !view.piece) {
+      this.planMove(s, view, view.moving!);
+      return;
+    }
     const tool = view.piece;
     if (!tool || view.build) return;
     if (isModuleKind(tool.kind)) {
@@ -2096,12 +2166,9 @@ export class Renderer {
       seen.add(key);
       const inside = inBounds(p.x, p.y);
       const i = inside ? idx(p.x, p.y) : -1;
-      // a dragged row passing over the same piece already there (a fence row: over a gate too) just carries on: no
-      // ghost on it
-      if (dragged && inside) {
-        const there = solidKind(s.solid[i]);
-        if (kind === 'floor' ? s.floor[i] !== 0 : there === kind || (kind === 'fence' && there === 'gate')) continue;
-      }
+      // a dragged row passing over the same piece already there (a fence or wall row: over a gate or pillar too)
+      // just carries on: no ghost on it
+      if (dragged && inside && rowCarriesOver(s, kind, p.x, p.y)) continue;
       let check = pieceCheck(s, kind, p.x, p.y, tool.rot);
       // each tile of a row is paid when it is laid: past what the money covers, the ghosts say so
       if (check.ok && !affords(s.res, def.cost, laid + 1)) check = { ok: false, reason: t('place.costs', { cost: costText(def.cost) }), costOnly: true };
@@ -2112,6 +2179,39 @@ export class Renderer {
         if (check.ok) this.ghostJoin.add(i);
       }
     }
+    if (kind === 'gate') this.ghostGate = tool.rot & 1;
+  }
+
+  // A decoration being moved: its ghost on the pointer's tile, with the turn and the look it has, green where it can go
+  // (moveCheck: the rules of pieceCheck, no price), red with the reason where not. None on its own tile (it is there).
+  private planMove(s: GameState, view: ViewState, from: number): void {
+    const kind = solidKind(s.solid[from]);
+    const h = view.hover;
+    if (!kind || !h) return;
+    this.moveGhost = { kind, rot: s.rot[from], variety: pieceVarietyAt(s, from) };
+    const fx = from % MAP_W;
+    const fy = (from - fx) / MAP_W;
+    if (h.x === fx && h.y === fy) return;
+    const check = moveCheck(s, fx, fy, h.x, h.y);
+    this.ghosts.push({ x: h.x, y: h.y, ok: check.ok, reason: check.reason });
+  }
+
+  // The ghost of the decoration being moved, and why it cannot go there when it cannot.
+  private drawMovePreview(camX: number, camY: number, img: HTMLImageElement): void {
+    const m = this.moveGhost;
+    const g = this.ghosts[0];
+    if (!m || !g) return;
+    this.fillFootprint(g.x, g.y, 1, 1, g.ok ? GHOST_OK : GHOST_BAD, camX, camY);
+    this.outlineFootprint(g.x, g.y, 1, 1, g.ok ? PAL.lime : PAL.red, camX, camY);
+    const f = frame(pieceFrameOf(m.kind, m.rot, 0, m.variety));
+    const top = tileTop(g.x, g.y);
+    if (f) {
+      const ctx = this.ctx;
+      ctx.globalAlpha = g.ok ? 0.75 : 0.45;
+      ctx.drawImage(img, f.x, f.y, f.w, f.h, top.X - f.ax - camX, top.Y - f.ay - camY, f.w, f.h);
+      ctx.globalAlpha = 1;
+    }
+    if (!g.ok && g.reason) this.addLabel(g.reason, top.X - camX, top.Y - (f ? f.ay : 0) - 12 - camY, PAL.red);
   }
 
   // The building under the pointer for a module tool: the one whose pixels are hovered, else the one on the tile.
@@ -2151,13 +2251,14 @@ export class Renderer {
     if (!isPieceKind(tool.kind) || !this.ghosts.length) return;
     const kind = tool.kind;
     const ctx = this.ctx;
-    if (kind !== 'floor') {
+    const surface = PIECES[kind].layer === 'surface';
+    if (!surface) {
       for (const g of this.ghosts) this.fillFootprint(g.x, g.y, 1, 1, g.ok ? GHOST_OK : GHOST_BAD, camX, camY);
       // back to front, so the nearer ghosts of a row cover the farther ones
       const order = this.ghosts.slice().sort((a, b) => a.x + a.y - (b.x + b.y));
       for (const g of order) {
         this.outlineFootprint(g.x, g.y, 1, 1, g.ok ? PAL.lime : PAL.red, camX, camY);
-        const f = frame(this.ghostFrameName(s, kind, tool.rot, g));
+        const f = frame(this.ghostFrameName(s, kind as SolidKind, tool.rot, g));
         if (!f) continue;
         const top = tileTop(g.x, g.y);
         ctx.globalAlpha = g.ok ? 0.75 : 0.45;
@@ -2172,7 +2273,7 @@ export class Renderer {
     const bad = at.ok ? this.ghosts.find((g) => !g.ok) : at;
     const label = at.ok && view.pieceLabel ? { g: at, text: view.pieceLabel } : bad?.reason ? { g: bad, text: bad.reason } : null;
     if (!label) return;
-    const f = kind === 'floor' ? undefined : frame(this.ghostFrameName(s, kind, tool.rot, label.g));
+    const f = surface ? undefined : frame(this.ghostFrameName(s, kind as SolidKind, tool.rot, label.g));
     const top = tileTop(label.g.x, label.g.y);
     this.addLabel(label.text, top.X - camX, top.Y - (f ? f.ay : 0) - 12 - camY, label.g.ok ? PAL.lime : PAL.red);
   }
@@ -2253,11 +2354,13 @@ export class Renderer {
     ctx.drawImage(lightLayer, 0, 0, w, h, x0 - camX, y0 - camY, w, h);
   }
 
-  // The frame of a ghost: a fence joins the real fences and gates around it and the ghosts of its row that will be
-  // laid, exactly as it will look (a refused one joins the whole row, so the row still reads as one); alone, it lies
-  // along its rotation. The other pieces follow the tool's rotation; a planter or a sign shows its tile's look.
-  private ghostFrameName(s: GameState, kind: Exclude<PieceKind, 'floor'>, rot: number, g: Ghost): string {
-    if (kind !== 'fence' || !inBounds(g.x, g.y)) return pieceFrameOf(kind, rot, 0, pieceVariety(kind, g.x, g.y));
+  // The frame of a ghost: a fence, wall or pillar joins the real line pieces around it and the ghosts of its row that
+  // will be laid, exactly as it will look (a refused one joins the whole row, so the row still reads as one); alone, a
+  // fence or wall lies along its rotation. The other pieces follow the tool's rotation; a planter, sign or tree shows
+  // its tile's look; a fountain shows its jet as it will play.
+  private ghostFrameName(s: GameState, kind: SolidKind, rot: number, g: Ghost): string {
+    if (kind === 'fountain') return pieceFrameOf(kind, 0, 0, 0, this.reduced ? 0 : 1 + (Math.floor(this.clock * FOUNTAIN_FPS) % 3));
+    if (!isMasked(kind) || !inBounds(g.x, g.y)) return pieceFrameOf(kind, rot, 0, pieceVariety(kind, g.x, g.y));
     return pieceFrameOf(kind, rot, this.joinMask(s, g.x, g.y, g.ok ? this.ghostJoin : this.ghostRow));
   }
 

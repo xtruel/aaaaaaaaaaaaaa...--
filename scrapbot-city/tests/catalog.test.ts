@@ -82,8 +82,8 @@ function row3(s: GameState): { x: number; y: number }[] {
 
 describe('catalog wording', () => {
   it('lists the construction pieces, the decorations, then the machine modules, each with a name, effect and limit', () => {
-    expect(CONSTRUCTION).toEqual(['floor', 'fence', 'gate']);
-    expect(DECORATIONS).toEqual(['lamp', 'bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture']);
+    expect(CONSTRUCTION).toEqual(['floor', 'fence', 'gate', 'base', 'wall', 'pillar']);
+    expect(DECORATIONS).toEqual(['lamp', 'bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture', 'tree', 'fountain', 'statue']);
     expect(MACHINE_MODULES).toEqual(['dockStorage', 'smelterFilter', 'recyclerMagnet', 'recyclerSorter', 'factoryArm', 'podsCapsule', 'solarTracker', 'purifierNozzle']);
     // every module has its name (the "slot taken by" reason uses it)
     for (const kind of MACHINE_MODULES) expect(catalogName(kind), kind).not.toMatch(/^mod\./);

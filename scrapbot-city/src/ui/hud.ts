@@ -70,6 +70,8 @@ export interface HudHandlers {
   onInstall(id: number, kind: ModuleKind): void;
   onRemoveModule(id: number, kind: ModuleKind): void;
   onRotatePiece(i: number): void;
+  onMovePiece(i: number): void; // start moving the selected decoration (the next press on the map says where)
+  onEndMove(): void; // Done while moving: it stays where it was
   onRemovePiece(i: number): void;
 }
 
@@ -81,7 +83,8 @@ export interface HudView {
   goalCard: boolean; // false while the tutorial talks, so there is one card to read at a time
   piece: { kind: CatalogKind; rot: number } | null; // the catalog tool in hand
   catalog: boolean; // the Objects & modules panel is open (it takes the building panel's place)
-  selectedPiece: number; // tile index of the selected fence, gate, lamp or floor; -1 none
+  selectedPiece: number; // tile index of the selected fence, gate, lamp, wall, pillar, decoration or surface; -1 none
+  moving?: number; // the selected decoration is being moved (its tile index); -1 or left out: no
 }
 
 // The cause of a building's state: its words, with an icon so it never reads by colour alone.
@@ -859,10 +862,11 @@ export class Hud {
     }
     panel.hidden = false;
     if (piece) {
-      const key = `piece:${view.selectedPiece}:${piece.kind}:${piece.rotatable}:${piece.removable}`;
+      const moving = (view.moving ?? -1) >= 0 && view.moving === view.selectedPiece;
+      const key = `piece:${view.selectedPiece}:${piece.kind}:${piece.rotatable}:${piece.removable}:${moving ? `move|${padMode()}` : ''}`;
       if (key !== this.inspectorKey) {
         this.inspectorKey = key;
-        this.renderPiece(piece, view.selectedPiece);
+        this.renderPiece(piece, view.selectedPiece, moving);
       }
       // what Remove gives back follows the storage in place (the sculpture's scrap: only as far as there is room)
       this.markPieceRefund(piece);
@@ -1128,15 +1132,17 @@ export class Hud {
       </div>`;
   }
 
-  // A selected piece (floor, fence, gate, lamp or decoration): what it is, that it is only for looks, Rotate and
-  // Remove with what it really gives back (markPieceRefund keeps that up to date), then what it is like. The buttons
-  // come before the description, so on a short window (1024x640) they are in sight without scrolling the panel.
-  private renderPiece(info: PieceInfo, i: number): void {
+  // A selected piece (floor, base, fence, gate, lamp, wall, pillar or decoration): what it is, that it is only for
+  // looks, Rotate, Move (a decoration) and Remove with what it really gives back (markPieceRefund keeps that up to
+  // date), then what it is like. The buttons come before the description, so on a short window (1024x640) they are in
+  // sight without scrolling the panel. While it is being moved: what to do (in controller buttons when a pad is in use)
+  // and Done, which leaves it where it is; no Remove (nothing to spend or get back during a move).
+  private renderPiece(info: PieceInfo, i: number, moving = false): void {
     const panel = this.el.inspector;
     this.renderedId = -1;
     panel.scrollTop = 0;
     panel.style.setProperty('--path', 'var(--muted)');
-    panel.innerHTML = `
+    const head = `
       <div class="insp-head">
         <span class="tool-plate cat-plate"><img src="${catalogPicture(info.kind)}" alt="" /></span>
         <div>
@@ -1144,17 +1150,40 @@ export class Hud {
           <h3>${esc(catalogName(info.kind))}</h3>
         </div>
         <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
+      </div>`;
+    if (moving) {
+      panel.innerHTML = `${head}
+      <div class="cat-tool move-tool">
+        <p class="cat-help"><b>${esc(t('insp.move'))}</b> · ${padMode() ? t('move.helpPad') : esc(t('move.help'))}</p>
+        <div class="cat-tool-btns"><button type="button" class="btn" data-move-done>${t('common.done')}</button></div>
       </div>
+      <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;
+    } else {
+      panel.innerHTML = `${head}
       <p class="insp-status piece-note">${t('insp.decoration')}</p>
       <div class="insp-actions">
         ${info.rotatable ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
+        ${info.movable ? `<button type="button" class="btn" data-move-piece>${t('insp.move')}</button>` : ''}
         ${info.removable ? `<button type="button" class="btn" data-remove-piece></button>` : ''}
       </div>
       <p class="insp-warn" data-scrap-room hidden></p>
       <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;
+    }
     this.markPieceRefund(info);
     panel.querySelector('[data-close]')!.addEventListener('click', () => this.handlers.onCloseInspector());
     panel.querySelector('[data-rotate]')?.addEventListener('click', () => this.handlers.onRotatePiece(i));
+    // Move and Done take each other's place: the second press of a double press on one would land on the other
+    // (src/ui/presses.ts). It does nothing.
+    panel.querySelector('[data-move-piece]')?.addEventListener('click', () => {
+      if (!this.catalogSettled()) return;
+      audio.play('click');
+      this.handlers.onMovePiece(i);
+    });
+    panel.querySelector('[data-move-done]')?.addEventListener('click', () => {
+      if (!this.catalogSettled()) return;
+      audio.play('click');
+      this.handlers.onEndMove();
+    });
     panel.querySelector('[data-remove-piece]')?.addEventListener('click', () => this.handlers.onRemovePiece(i));
   }
 

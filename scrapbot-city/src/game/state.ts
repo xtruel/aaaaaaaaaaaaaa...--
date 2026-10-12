@@ -1,6 +1,6 @@
 import { BUILDINGS, DAY_LENGTH, DEFAULT_MODS, MAP_H, MAP_W, SMOG_DANGER, T, TILE } from './defs';
 import type { BuildingType, CityMods, Resource } from './defs';
-import { modulesFor, normRot, solidKind } from './piecedefs';
+import { PIECES, modulesFor, normRot, pieceVariety, solidKind, surfaceKind } from './piecedefs';
 import type { ModuleKind } from './piecedefs';
 import { generateMap } from './world';
 
@@ -111,7 +111,7 @@ export interface Stats {
   industrialBuilt: number;
   catPets: number;
   partsMade: number;
-  piecesPlaced: number; // catalog pieces bought (floors, fences, gates, lamps, decorations)
+  piecesPlaced: number; // catalog pieces bought (floors, fences, gates, lamps, decorations; a move is not a purchase)
   modulesInstalled: number;
 }
 
@@ -140,9 +140,12 @@ export interface GameState {
   amount: Uint16Array; // junk per tile
   occ: Int32Array; // building id per tile or -1 (derived, not saved)
   claims: Uint8Array; // bots heading to each junk tile (derived, not saved)
-  floor: Uint8Array; // industrial floor per tile: 0 none, 1 floor (stays under buildings, solids and junk)
-  solid: Uint8Array; // solid piece per tile: 0 none, 1 fence, 2 gate, 3 lamp, 4 bench, 5 planter, 6 sign, 7 pergola, 8 cathouse, 9 sculpture (never on a building's tiles)
+  floor: Uint8Array; // surface per tile: 0 none, 1 industrial floor, 2 concrete base (stays under buildings, solids and junk)
+  solid: Uint8Array; // solid piece per tile: 0 none, 1 fence, 2 gate, 3 lamp, 4 bench, 5 planter, 6 sign, 7 pergola, 8 cathouse, 9 sculpture, 10 wall, 11 pillar, 12 tree, 13 fountain, 14 statue (never on a building's tiles)
   rot: Uint8Array; // rotation of the solid piece on each tile (0..3)
+  // the look a moved planter, sign or tree brought along, plus 1 (0: the tile's own, pieceVariety): only where the two
+  // differ (a decoration moved keeps its flowers, motif or tree)
+  variety: Uint8Array;
   buildings: Building[];
   nextId: number;
   bots: Bot[];
@@ -246,6 +249,7 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     floor: new Uint8Array(MAP_W * MAP_H),
     solid: new Uint8Array(MAP_W * MAP_H),
     rot: new Uint8Array(MAP_W * MAP_H),
+    variety: new Uint8Array(MAP_W * MAP_H),
     buildings: [],
     nextId: 1,
     bots: [],
@@ -346,17 +350,22 @@ export function pushMessage(s: GameState, text: string, tone: MessageTone = 'inf
 // ---------- save / load ----------
 
 // Everything except the map arrays (stored compactly) and runtime-only data.
-// Pieces (0.7) are stored sparsely: `floors` lists the floored tile indexes, `solids` the [index, kind, rot]
-// of every solid piece (kind as in GameState.solid, codes 1-9). Both are optional: 0.6 saves have neither.
-type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' | 'solid' | 'rot' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages'> & {
+// Pieces (0.7) are stored sparsely: `floors` lists the tile indexes with the industrial floor, `solids` the
+// [index, kind, rot] of every solid piece (kind as in GameState.solid, codes 1-14). Both are optional: 0.6 saves have
+// neither. Increment 2 (G3) adds two optional fields, written only when there is something in them, so a city
+// without these pieces saves as before: `surfaces`, the [index, code] of the other surfaces (2 = concrete base), and
+// `varieties`, the [index, kind, look] of a moved planter, sign or tree whose look is not its tile's own.
+type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' | 'solid' | 'rot' | 'variety' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages'> & {
   tiles: string;
   amount: number[];
   floors?: number[];
   solids?: [number, number, number][];
+  surfaces?: [number, number][];
+  varieties?: [number, number, number][];
 };
 
 export function serialize(s: GameState): string {
-  const { tiles, amount, occ: _occ, claims: _claims, floor, solid, rot, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
+  const { tiles, amount, occ: _occ, claims: _claims, floor, solid, rot, variety, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
   // Bots are not saved: what they carry is unloaded in the save, as if they reached a drop-off now. It goes into
   // storage as far as it fits (and counts as collected, once: the bots in the saved city are gone); the rest is
   // written as scrapPending, which the loaded city unloads when there is room. Nothing is lost or made up.
@@ -368,11 +377,17 @@ export function serialize(s: GameState): string {
   const scrapPending = (rest.scrapPending || 0) + carried - fit;
   const floors: number[] = [];
   const solids: [number, number, number][] = [];
+  const surfaces: [number, number][] = [];
+  const varieties: [number, number, number][] = [];
   for (let i = 0; i < floor.length; i++) {
-    if (floor[i]) floors.push(i);
+    if (floor[i] === 1) floors.push(i);
+    else if (floor[i]) surfaces.push([i, floor[i]]);
     if (solid[i]) solids.push([i, solid[i], rot[i]]);
+    if (solid[i] && variety[i]) varieties.push([i, solid[i], variety[i] - 1]);
   }
   const data: SaveData = { ...rest, res, stats, scrapPending, tiles: Array.from(tiles).join(''), amount: Array.from(amount), floors, solids };
+  if (surfaces.length) data.surfaces = surfaces;
+  if (varieties.length) data.varieties = varieties;
   return JSON.stringify(data);
 }
 
@@ -386,10 +401,10 @@ export function deserialize(json: string): GameState {
   // Start from a fresh city so fields added in newer versions get sane defaults.
   const base = createGame({ seed: 1 });
   const spireDone = d.spireDone ?? d.buildings.some((b) => b.type === 'spire' && b.built >= 1);
-  const { floors, solids, ...saved } = d;
+  const { floors, solids, surfaces, varieties, ...saved } = d;
   const s: GameState = {
     ...base,
-    ...(saved as Omit<SaveData, 'tiles' | 'amount' | 'floors' | 'solids'>),
+    ...(saved as Omit<SaveData, 'tiles' | 'amount' | 'floors' | 'solids' | 'surfaces' | 'varieties'>),
     version: SAVE_VERSION,
     mods: { ...DEFAULT_MODS, ...(d.mods ?? {}) },
     stats: { ...base.stats, maxPollution: d.pollution ?? 0, ...(d.stats ?? {}) },
@@ -406,6 +421,7 @@ export function deserialize(json: string): GameState {
     floor: new Uint8Array(size),
     solid: new Uint8Array(size),
     rot: new Uint8Array(size),
+    variety: new Uint8Array(size),
     buildings: [],
     bots: [],
     derived: emptyDerived(),
@@ -426,6 +442,14 @@ export function deserialize(json: string): GameState {
   s.nextId = Math.max(d.nextId, ...s.buildings.map((b) => b.id + 1));
   const valid = (i: unknown): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < size;
   if (Array.isArray(floors)) for (const i of floors) if (valid(i)) s.floor[i] = 1;
+  // one surface per tile: a tile already in `floors` keeps its floor
+  if (Array.isArray(surfaces)) {
+    for (const entry of surfaces) {
+      if (!Array.isArray(entry)) continue;
+      const [i, code] = entry;
+      if (valid(i) && !s.floor[i] && Number.isInteger(code) && surfaceKind(code)) s.floor[i] = code;
+    }
+  }
   if (Array.isArray(solids)) {
     for (const entry of solids) {
       if (!Array.isArray(entry)) continue;
@@ -435,6 +459,17 @@ export function deserialize(json: string): GameState {
       if (!valid(i) || !kind || s.occ[i] !== -1 || (s.tiles[i] !== T.GROUND && s.tiles[i] !== T.GRASS)) continue;
       s.solid[i] = Number(code);
       s.rot[i] = normRot(kind, Number(r));
+    }
+  }
+  // a moved decoration's look, only for the same piece on that tile, in range, and not the tile's own anyway
+  if (Array.isArray(varieties)) {
+    for (const entry of varieties) {
+      if (!Array.isArray(entry)) continue;
+      const [i, code, v] = entry;
+      const kind = valid(i) && s.solid[i] === code ? solidKind(s.solid[i]) : null;
+      if (!kind || !Number.isInteger(v) || v < 0 || v >= (PIECES[kind].varieties ?? 1)) continue;
+      const x = i % MAP_W;
+      if (v !== pieceVariety(kind, x, (i - x) / MAP_W)) s.variety[i] = v + 1;
     }
   }
   return s;

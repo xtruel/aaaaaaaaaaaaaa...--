@@ -1,17 +1,36 @@
 // Modular building, increments 1 and 2: static data for the pieces (floor, fence, gate, lamp) and the machine
 // modules (Dock storage and Smelter filter; magnet, sorter, double arm, capsule, tracker and nozzle), plus the pure
 // helpers that the sim, the saves and the actions need.
-// Increment 2 (G2) adds six decorations: bench, planter, neon sign, pergola, Miso's house, scrap sculpture.
+// Increment 2 (G2) adds six decorations: bench, planter, neon sign, pergola, Miso's house, scrap sculpture; G3 three
+// constructions (concrete base, low wall, corner pillar) and three decorations (tree, fountain, statue of USA-9).
 // The rules that change a city (buying, removing, rotating) live in pieces.ts, which re-exports all of this:
 // the UI and the renderer import from './pieces'. This file only depends on defs.ts and world.ts (which only
 // depends on defs.ts), so state.ts, actions.ts and sim.ts can use it without import cycles.
-import { BUILDINGS } from './defs';
+import { BUILDINGS, MAP_W } from './defs';
 import type { BuildingType, Cost, Resource } from './defs';
 import type { GameState } from './state';
 import { hash2 } from './world';
 
-export type PieceKind = 'floor' | 'fence' | 'gate' | 'lamp' | 'bench' | 'planter' | 'sign' | 'pergola' | 'cathouse' | 'sculpture';
-export type SolidKind = Exclude<PieceKind, 'floor'>;
+export type PieceKind =
+  | 'floor'
+  | 'fence'
+  | 'gate'
+  | 'lamp'
+  | 'bench'
+  | 'planter'
+  | 'sign'
+  | 'pergola'
+  | 'cathouse'
+  | 'sculpture'
+  | 'base'
+  | 'wall'
+  | 'pillar'
+  | 'tree'
+  | 'fountain'
+  | 'statue';
+// surfaces lie on the ground under everything (s.floor); the other pieces stand on their tile (s.solid)
+export type SurfaceKind = 'floor' | 'base';
+export type SolidKind = Exclude<PieceKind, SurfaceKind>;
 export type ModuleKind =
   | 'dockStorage'
   | 'smelterFilter'
@@ -28,9 +47,9 @@ export interface PieceDef {
   layer: 'surface' | 'solid';
   cost: Cost;
   rotations: 1 | 2 | 4;
-  joins: boolean; // part of a fence line: fences next to it connect to it (fence, gate)
+  joins: boolean; // part of a line: fences and walls next to it connect to it (fence, wall, pillar; a gate only along its axis)
   decoration?: true; // in the catalog's Decorations (the lamp and the increment-2 decorations); else Construction
-  varieties?: number; // looks chosen by the tile (planter flowers, sign motif): see pieceVariety
+  varieties?: number; // looks chosen by the tile (planter flowers, sign motif, tree): see pieceVariety
 }
 
 export interface ModuleDef {
@@ -64,6 +83,15 @@ export const PIECES: Record<PieceKind, PieceDef> = {
   pergola: { kind: 'pergola', layer: 'solid', cost: { credits: 12 }, rotations: 2, joins: false, decoration: true },
   cathouse: { kind: 'cathouse', layer: 'solid', cost: { credits: 10 }, rotations: 4, joins: false, decoration: true },
   sculpture: { kind: 'sculpture', layer: 'solid', cost: { credits: 10, scrap: 20 }, rotations: 4, joins: false, decoration: true },
+  // increment 2, G3 (docs/MODULAR-INC2.md §3b). The concrete base is a surface like the floor (buildings go on it, it
+  // comes back when they go); the low wall joins like the fence (its scrap back only as far as storage has room); the
+  // corner pillar takes the fences and walls around it. Tree, fountain and statue: decorations, no effect at all.
+  base: { kind: 'base', layer: 'surface', cost: { credits: 4 }, rotations: 1, joins: false },
+  wall: { kind: 'wall', layer: 'solid', cost: { credits: 2, scrap: 4 }, rotations: 2, joins: true },
+  pillar: { kind: 'pillar', layer: 'solid', cost: { credits: 6 }, rotations: 1, joins: true },
+  tree: { kind: 'tree', layer: 'solid', cost: { credits: 8 }, rotations: 1, joins: false, decoration: true, varieties: 3 },
+  fountain: { kind: 'fountain', layer: 'solid', cost: { credits: 25, parts: 5 }, rotations: 1, joins: false, decoration: true },
+  statue: { kind: 'statue', layer: 'solid', cost: { credits: 20, parts: 10 }, rotations: 4, joins: false, decoration: true },
 };
 
 export const MODULES: Record<ModuleKind, ModuleDef> = {
@@ -97,6 +125,12 @@ export const CATALOG_ORDER: CatalogKind[] = [
   'pergola',
   'cathouse',
   'sculpture',
+  'base',
+  'wall',
+  'pillar',
+  'tree',
+  'fountain',
+  'statue',
   'dockStorage',
   'smelterFilter',
   'recyclerMagnet',
@@ -108,8 +142,8 @@ export const CATALOG_ORDER: CatalogKind[] = [
 ];
 
 // Codes stored in GameState.solid and in saves (0 = nothing). Saved games keep these numbers: only append
-// (docs/MODULAR-INC2.md §3: 4 bench ... 9 sculpture; 10..14 are taken by increment 2's G3 pieces).
-const SOLID_CODES: readonly (SolidKind | null)[] = [null, 'fence', 'gate', 'lamp', 'bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture'];
+// (docs/MODULAR-INC2.md §3: 4 bench ... 9 sculpture, 10 wall, 11 pillar, 12 tree, 13 fountain, 14 statue).
+const SOLID_CODES: readonly (SolidKind | null)[] = [null, 'fence', 'gate', 'lamp', 'bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture', 'wall', 'pillar', 'tree', 'fountain', 'statue'];
 
 export function solidCode(kind: SolidKind): number {
   return SOLID_CODES.indexOf(kind);
@@ -117,6 +151,27 @@ export function solidCode(kind: SolidKind): number {
 
 export function solidKind(code: number): SolidKind | null {
   return SOLID_CODES[code] ?? null;
+}
+
+// Codes stored in GameState.floor (0 = bare ground): 1 industrial floor, 2 concrete base. Append only. Saves keep
+// `floors` for code 1 (as 0.7.0-alpha.1 wrote it) and list the others in `surfaces`.
+const SURFACE_CODES: readonly (SurfaceKind | null)[] = [null, 'floor', 'base'];
+
+export function surfaceCode(kind: SurfaceKind): number {
+  return SURFACE_CODES.indexOf(kind);
+}
+
+export function surfaceKind(code: number): SurfaceKind | null {
+  return SURFACE_CODES[code] ?? null;
+}
+
+export function isSurfaceKind(kind: unknown): kind is SurfaceKind {
+  return isPieceKind(kind) && PIECES[kind].layer === 'surface';
+}
+
+// Fence, wall and pillar are drawn by the mask of the line pieces around them (fenceMask); a gate by its rotation.
+export function isMasked(kind: PieceKind): boolean {
+  return kind === 'fence' || kind === 'wall' || kind === 'pillar';
 }
 
 export function isPieceKind(v: unknown): v is PieceKind {
@@ -135,13 +190,25 @@ export function normRot(kind: PieceKind, rot: number): number {
 }
 
 // Which look a piece with varieties has on tile (x, y): the planter's flowers (0 tulips, 1 sunflowers), the sign's
-// motif (0 bot face, 1 recycle arrows, 2 heart). Fixed by the tile, so the ghost shows what will stand there and a
-// save needs nothing more; 0 for the other pieces.
-const VARIETY_SALT: Partial<Record<PieceKind, number>> = { planter: 53, sign: 59 };
+// motif (0 bot face, 1 recycle arrows, 2 heart), the tree (0 palm, 1 cypress, 2 red maple). Fixed by the tile, so the
+// ghost shows what will stand there and a save needs nothing more; 0 for the other pieces.
+const VARIETY_SALT: Partial<Record<PieceKind, number>> = { planter: 53, sign: 59, tree: 67 };
 
 export function pieceVariety(kind: PieceKind, x: number, y: number): number {
   const n = PIECES[kind]?.varieties ?? 1;
   return n > 1 ? Math.min(n - 1, Math.floor(hash2(x, y, VARIETY_SALT[kind] ?? 61) * n)) : 0;
+}
+
+// The look of the solid piece on tile index i: the one it brought along when it was moved there (s.variety holds it
+// plus 1, only where it differs from the tile's own), else the tile's (pieceVariety). 0 for a piece without varieties.
+export function pieceVarietyAt(s: GameState, i: number): number {
+  const kind = solidKind(s.solid[i]);
+  if (!kind) return 0;
+  const n = PIECES[kind].varieties ?? 1;
+  const own = s.variety[i];
+  if (n > 1 && own > 0 && own <= n) return own - 1;
+  const x = i % MAP_W;
+  return pieceVariety(kind, x, (i - x) / MAP_W);
 }
 
 // True when a solid piece (fence, gate, lamp or decoration) stands on tile index i (citizens walk around it, junk
@@ -159,12 +226,13 @@ function half(cost: Cost): Cost {
 }
 
 // What removing a piece gives back at most: half its price, rounded down (floor 1, fence 2, gate 6, lamp 5 + 1 part,
-// bench 3, planter 2, sign 7 + 2 parts, pergola 6, Miso's house 5, sculpture 5 + 10 scrap). The catalog's figure.
+// bench 3, planter 2, sign 7 + 2 parts, pergola 6, Miso's house 5, sculpture 5 + 10 scrap; base 2, wall 1 + 2 scrap,
+// pillar 3, tree 4, fountain 12 + 2 parts, statue 10 + 5 parts). The catalog's figure.
 export function pieceRefund(kind: PieceKind): Cost {
   return half(PIECES[kind].cost);
 }
 
-// What removing a piece of `kind` really gives back in this city now: pieceRefund, with the scrap (the sculpture's)
+// What removing a piece of `kind` really gives back in this city now: pieceRefund, with the scrap (the sculpture's, a wall's)
 // no more than the room left in storage. removePieceAt pays exactly this and the interface shows exactly this.
 export function pieceRefundAt(s: GameState, kind: PieceKind): Cost {
   const out = pieceRefund(kind);

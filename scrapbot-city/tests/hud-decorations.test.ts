@@ -79,8 +79,8 @@ describe('catalog: the Decorations section', () => {
     expect(heads).toEqual(['Construction', 'Decorations', 'Machine modules']);
     const lists = [...panel.querySelectorAll('.cat-list')].map((l) => [...l.querySelectorAll<HTMLElement>('[data-item]')].map((b) => b.dataset.item));
     expect(lists).toEqual([
-      ['floor', 'fence', 'gate'],
-      ['lamp', ...DECOS],
+      ['floor', 'fence', 'gate', 'base', 'wall', 'pillar'],
+      ['lamp', ...DECOS, 'tree', 'fountain', 'statue'],
       ['dockStorage', 'smelterFilter', 'recyclerMagnet', 'recyclerSorter', 'factoryArm', 'podsCapsule', 'solarTracker', 'purifierNozzle'],
     ]);
     // the note under the section: decorations do nothing to the economy

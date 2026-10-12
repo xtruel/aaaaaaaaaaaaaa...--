@@ -120,9 +120,12 @@ function wealth(s: GameState): Record<Resource, number> {
 
 describe('catalog data (the owner-approved table)', () => {
   it('has the six items of increment 1 with the agreed prices, refunds and effects (increment 2 adds to them)', () => {
-    // increment 2's decorations come after the lamp (tests/decorations.test.ts), its modules after the Smelter filter
-    // (tests/modules.test.ts); the first six stay as they were, in that order
-    expect(CATALOG_ORDER.filter((k) => !PIECES[k as PieceKind]?.decoration || k === 'lamp').slice(0, 6)).toEqual(['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter']);
+    // increment 2's decorations and G3's pieces come after the lamp (tests/decorations.test.ts,
+    // tests/constructions.test.ts), its modules after the Smelter filter (tests/modules.test.ts); the first six stay as
+    // they were, in that order
+    const inc1 = ['floor', 'fence', 'gate', 'lamp', 'dockStorage', 'smelterFilter'];
+    expect(CATALOG_ORDER.slice(0, 4)).toEqual(inc1.slice(0, 4));
+    expect(CATALOG_ORDER.filter((k) => inc1.includes(k))).toEqual(inc1);
     expect(PIECES.floor).toMatchObject({ layer: 'surface', cost: { credits: 3 }, rotations: 1 });
     expect(PIECES.fence).toMatchObject({ layer: 'solid', cost: { credits: 4 }, rotations: 2, joins: true });
     expect(PIECES.gate).toMatchObject({ layer: 'solid', cost: { credits: 12 }, rotations: 2 });

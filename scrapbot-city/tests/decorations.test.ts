@@ -109,7 +109,8 @@ describe('the six decorations (owner-approved table)', () => {
     }
     // the lamp is a decoration too; floor, fence and gate are constructions
     expect(ALL.filter((k) => PIECES[k].decoration)).toEqual(['lamp', ...DECOS]);
-    expect(DECORATIONS).toEqual(['lamp', ...DECOS]);
+    // (G3's tree, fountain and statue follow them: tests/constructions.test.ts)
+    expect(DECORATIONS.slice(0, 7)).toEqual(['lamp', ...DECOS]);
     expect(CATALOG_ORDER.slice(0, 10)).toEqual(ALL);
     // nobody's numbers in the increment-1 table changed
     expect(PIECES.lamp).toMatchObject({ cost: { credits: 10, parts: 2 }, rotations: 4 });
@@ -118,7 +119,8 @@ describe('the six decorations (owner-approved table)', () => {
 
   it('saves them with the codes 4 bench .. 9 sculpture, after fence 1, gate 2, lamp 3 (append-only)', () => {
     expect(SOLIDS.map(solidCode)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 255].map(solidKind)).toEqual([null, ...SOLIDS, null, null]);
+    // (10..14 are G3's wall, pillar, tree, fountain and statue: tests/constructions.test.ts)
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 255].map(solidKind)).toEqual([null, ...SOLIDS, null, null]);
   });
 });
 
@@ -144,7 +146,7 @@ describe('placing decorations', () => {
       expect(pieceCheck(s, k, at(rubble).x, at(rubble).y), k).toEqual({ ok: false, reason: t('place.rubble') });
     }
     // one per tile: anything else on it says what is in the way, in its own words
-    const names: Record<SolidKind, string> = {
+    const names: Partial<Record<SolidKind, string>> = {
       fence: 'A fence',
       gate: 'A gate',
       lamp: 'A lamp post',

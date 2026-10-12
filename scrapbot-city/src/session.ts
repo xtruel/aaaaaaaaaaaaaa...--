@@ -8,7 +8,7 @@ import { BUILDINGS, BUILD_ORDER, MAP_H, MAP_W, T, TILE } from './game/defs';
 import type { BuildingType } from './game/defs';
 import { freeHintsLeft, hintPrice, suggest } from './game/hints';
 import type { Hint } from './game/hints';
-import { dragPath, floorAt, installModule, isModuleKind, isPieceKind, moduleCheck, normRot, pieceAt, pieceCheck, placePiece, removeModule, removePieceAt, rotatePieceAt } from './game/pieces';
+import { dragPath, installModule, isModuleKind, isMovable, isPieceKind, moduleCheck, moveCheck, movePiece, normRot, pieceAt, pieceCheck, placePiece, removeModule, removePieceAt, rotatePieceAt, rowCarriesOver } from './game/pieces';
 import type { CatalogKind, ModuleKind } from './game/pieces';
 import { advance, computeDerived, dayPhase } from './game/sim';
 import { canAutosave, day, idx, inBounds, pushMessage } from './game/state';
@@ -98,7 +98,10 @@ export class GameSession implements PadTarget {
   private piece: { kind: CatalogKind; rot: number } | null = null;
   private pieceRot: Partial<Record<CatalogKind, number>> = {};
   private catalog = false;
-  private selectedPiece = -1; // tile index of the selected piece (fence, gate, lamp, decoration) or floor
+  private selectedPiece = -1; // tile index of the selected piece (fence, gate, lamp, wall, pillar, decoration) or surface
+  // the selected decoration is being moved (its tile index, the same as selectedPiece; -1 none): the next press on
+  // the map says where it goes (docs/MODULAR-INC2.md §3c)
+  private moving = -1;
   private row: Row | null = null;
   private rotAcc = 0; // Shift+wheel, added up like the zoom
   private selectedId = -1;
@@ -167,6 +170,7 @@ export class GameSession implements PadTarget {
         onCloseInspector: () => {
           this.selectedId = -1;
           this.selectedPiece = -1;
+          this.moving = -1;
         },
         onHint: () => this.askHint(),
         onRegion: () => openTrade(this.s, () => this.autosave()),
@@ -179,6 +183,8 @@ export class GameSession implements PadTarget {
           if (b) removeModule(this.s, kind, b);
         },
         onRotatePiece: (i) => this.rotatePiece(i, 1),
+        onMovePiece: (i) => this.startMove(i),
+        onEndMove: () => this.endMove(),
         onRemovePiece: (i) => {
           // only the piece still selected: the second click of a double click, on the button before the panel
           // follows, must not take up the floor under a lamp just removed
@@ -349,6 +355,8 @@ export class GameSession implements PadTarget {
     this.updateRow();
     // a piece taken up meanwhile (bulldozer, a removal elsewhere) is no longer selected
     if (this.selectedPiece >= 0 && !pieceInfo(s, this.selectedPiece)) this.selectedPiece = -1;
+    // a move lasts while its decoration is the selection and is still there
+    if (this.moving >= 0 && (this.moving !== this.selectedPiece || !isMovable(pieceAt(s, this.moving % MAP_W, Math.floor(this.moving / MAP_W))?.kind))) this.moving = -1;
     // behind a dialog the world is paused and blurred: paint it once and let the GPU rest
     const hold = modal && this.held;
     this.held = modal;
@@ -366,6 +374,7 @@ export class GameSession implements PadTarget {
           reducedMotion: this.settings.reducedMotion,
           piece: this.piece,
           selectedPiece: this.selectedPiece,
+          moving: this.moving,
           // a row dragged over a panel or the toolbar is not laid there: its ghosts go until it is back on the map
           pieceRow: this.row && this.row.tiles.length > 1 && this.pointer.inside ? this.row.tiles : null,
           pieceLabel: this.pieceLabel(),
@@ -389,6 +398,7 @@ export class GameSession implements PadTarget {
         piece: this.piece,
         catalog: this.catalog,
         selectedPiece: this.selectedPiece,
+        moving: this.moving,
       });
       // a tutorial step done by placing a building puts the build tool away, so the next step starts clean
       // instead of with a red "already there" ghost on the building just placed
@@ -468,7 +478,7 @@ export class GameSession implements PadTarget {
     this.dozeTile = -1;
     this.dozeLabel = null;
     if (!this.pointer.inside || (this.drag && this.drag.moved)) {
-      this.hover = this.pointer.inside && (this.build || this.piece) ? this.hover : null;
+      this.hover = this.pointer.inside && (this.build || this.piece || this.moving >= 0) ? this.hover : null;
       this.hoverId = -1;
       return;
     }
@@ -482,8 +492,9 @@ export class GameSession implements PadTarget {
       this.dozeLabel = dozeLabel(this.s, target);
       return;
     }
-    // with a building or a piece in hand the ghost is what counts; a module goes on the building pointed at
-    const placing = this.build || (this.piece && !isModuleKind(this.piece.kind));
+    // with a building or a piece in hand (or a decoration being moved) the ghost is what counts; a module goes on the
+    // building pointed at
+    const placing = this.build || (this.piece && !isModuleKind(this.piece.kind)) || this.moving >= 0;
     this.hoverId = placing ? -1 : this.renderer.pickBuilding(this.pointer.x, this.pointer.y);
   }
 
@@ -681,7 +692,7 @@ export class GameSession implements PadTarget {
       // and costs nothing, a building is not placed out of sight)
       if (d.button === 0 && !this.onMap(e.clientX, e.clientY)) return;
       // a left-button drag with no tool in hand is not a click (it used to move the map; now it does nothing)
-      if (d.far && !this.build && !this.bulldoze && !this.piece) return;
+      if (d.far && !this.build && !this.bulldoze && !this.piece && this.moving < 0) return;
       this.pointer = { x: e.clientX, y: e.clientY, inside: true };
       // a press that closed the smog panel only closed it
       if (d.closedPanel) return;
@@ -825,10 +836,14 @@ export class GameSession implements PadTarget {
   private click(sx: number, sy: number): void {
     const s = this.s;
     if (s.outcome) return;
-    // with a tool in hand this press buys, demolishes or clears: only when it is meant
-    if ((this.piece || this.build || this.bulldoze) && !this.meantPress(sx, sy)) return;
+    // with a tool in hand this press buys, demolishes, clears or moves: only when it is meant
+    if ((this.piece || this.build || this.bulldoze || this.moving >= 0) && !this.meantPress(sx, sy)) return;
     if (this.piece) {
       this.usePiece(sx, sy);
+      return;
+    }
+    if (this.moving >= 0) {
+      this.useMove(sx, sy);
       return;
     }
     const tile = this.renderer.screenToTile(sx, sy);
@@ -916,7 +931,7 @@ export class GameSession implements PadTarget {
   }
 
   private toolKey(): string {
-    return this.build ? `b:${this.build}` : this.bulldoze ? 'doze' : this.piece ? `p:${this.piece.kind}` : '';
+    return this.build ? `b:${this.build}` : this.bulldoze ? 'doze' : this.piece ? `p:${this.piece.kind}` : this.moving >= 0 ? `m:${this.moving}` : '';
   }
 
   // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
@@ -981,6 +996,7 @@ export class GameSession implements PadTarget {
     this.row = null;
     this.selectedId = -1;
     this.selectedPiece = -1;
+    this.moving = -1;
     this.build = this.build === type ? null : type;
   }
 
@@ -988,6 +1004,7 @@ export class GameSession implements PadTarget {
     this.build = null;
     this.piece = null;
     this.row = null;
+    this.moving = -1;
     this.bulldoze = !this.bulldoze;
   }
 
@@ -995,8 +1012,14 @@ export class GameSession implements PadTarget {
     return !!this.build || this.bulldoze || !!this.piece || this.selectedId >= 0 || this.selectedPiece >= 0;
   }
 
-  // Esc, right click, B: put the tool away and drop the selection. Nothing is paid for a ghost.
+  // Esc, right click, B: put the tool away and drop the selection. Nothing is paid for a ghost. A move being made
+  // ends first, on its own: the decoration stays where it was, still selected (the next Esc drops it).
   private cancelTool(): void {
+    if (this.moving >= 0) {
+      this.endMove();
+      if (this.drag?.button === 0 && this.drag.pointerType === 'mouse') this.drag = null;
+      return;
+    }
     this.build = null;
     this.bulldoze = false;
     this.piece = null;
@@ -1012,13 +1035,56 @@ export class GameSession implements PadTarget {
   private selectBuilding(id: number): void {
     this.selectedId = id;
     this.selectedPiece = -1;
+    this.moving = -1;
     if (id >= 0) this.closeCatalog();
   }
 
   private selectPiece(i: number): void {
     this.selectedId = -1;
     this.selectedPiece = i;
+    this.moving = -1;
     this.closeCatalog();
+  }
+
+  // ---------- moving a decoration (docs/MODULAR-INC2.md §3c) ----------
+
+  // "Move" on the panel of the selected decoration: the next press on the map says where it goes. No tool in hand
+  // meanwhile; nothing is paid.
+  private startMove(i: number): void {
+    if (i !== this.selectedPiece || !pieceInfo(this.s, i)?.movable) return;
+    this.build = null;
+    this.bulldoze = false;
+    this.piece = null;
+    this.row = null;
+    this.moving = i;
+  }
+
+  // Done, Esc, the right button, B: the move ends and the decoration stays where it was (still selected).
+  private endMove(): void {
+    this.moving = -1;
+  }
+
+  // A press on the map while moving: on a tile where the decoration can go, it moves there (free; its turn and look go
+  // with it) and stays selected there; on its own tile the move ends with nothing changed; anywhere else it is refused
+  // with the reason and the move goes on.
+  private useMove(sx: number, sy: number): void {
+    const s = this.s;
+    const from = this.moving;
+    const fx = from % MAP_W;
+    const fy = Math.floor(from / MAP_W);
+    const tile = this.renderer.screenToTile(sx, sy);
+    if (tile.x === fx && tile.y === fy) {
+      this.endMove();
+      return;
+    }
+    const check = moveCheck(s, fx, fy, tile.x, tile.y);
+    if (!check.ok || !movePiece(s, fx, fy, tile.x, tile.y)) {
+      this.refuse(check.reason);
+      return;
+    }
+    this.moving = -1;
+    this.selectedPiece = idx(tile.x, tile.y);
+    this.revealed = null;
   }
 
   // ---------- Objects & modules ----------
@@ -1053,6 +1119,7 @@ export class GameSession implements PadTarget {
     this.bulldoze = false;
     this.selectedId = -1;
     this.selectedPiece = -1;
+    this.moving = -1;
     this.catalog = true;
     this.piece = { kind, rot: this.pieceRot[kind] ?? 0 };
   }
@@ -1076,18 +1143,14 @@ export class GameSession implements PadTarget {
 
   // A dragged row: each tile is a purchase of its own, made in order; a tile that is taken, or that the money
   // no longer covers, is skipped and costs nothing. A row carries on over the same piece already there (a fence
-  // row over its fences and gates, as the map shows it, with no ghost): those tiles are neither laid nor skipped.
+  // or wall row over its fences or walls and the gates and pillars in its line, as the map shows it, with no ghost):
+  // those tiles are neither laid nor skipped.
   private layRow(tiles: { x: number; y: number }[]): void {
     const s = this.s;
     const p = this.piece;
     if (!p || !isPieceKind(p.kind)) return;
     const kind = p.kind;
-    const there = (q: { x: number; y: number }) => {
-      if (kind === 'floor') return floorAt(s, q.x, q.y);
-      const k = pieceAt(s, q.x, q.y)?.kind;
-      return k === kind || (kind === 'fence' && k === 'gate');
-    };
-    const todo = tiles.filter((q) => !there(q));
+    const todo = tiles.filter((q) => !rowCarriesOver(s, kind, q.x, q.y));
     if (!todo.length) return;
     let laid = 0;
     for (const tile of todo) if (placePiece(s, kind, tile.x, tile.y, p.rot)) laid++;
@@ -1112,10 +1175,19 @@ export class GameSession implements PadTarget {
     return isRotatable(this.piece?.kind) || !!pieceInfo(this.s, this.selectedPiece)?.rotatable;
   }
 
+  // While a decoration is being moved, R, Shift+wheel and the pad's Y turn it where it stands (free, as its panel's
+  // Rotate before Move), or say it does not turn: never a hint (Y).
+  private rotateMoving(dir: 1 | -1, say: boolean): void {
+    const info = pieceInfo(this.s, this.moving);
+    if (info?.rotatable) this.rotatePiece(this.moving, dir);
+    else if (say && info) pushMessage(this.s, t('cat.noTurn', { name: catalogName(info.kind) }), 'info');
+  }
+
   // R, Shift+wheel: turns the piece in hand (fence, gate, lamp, a decoration with directions), else the selected one.
   // (R with a piece in hand that does not turn says so; the wheel does not, it would say it at every notch.)
   private rotate(dir: 1 | -1, say = false): void {
-    if (say && this.piece) this.rotateOrSay(dir);
+    if (this.moving >= 0) this.rotateMoving(dir, say);
+    else if (say && this.piece) this.rotateOrSay(dir);
     else if (!this.rotateTool(dir) && this.selectedPiece >= 0) this.rotatePiece(this.selectedPiece, dir);
   }
 
@@ -1248,7 +1320,7 @@ export class GameSession implements PadTarget {
       btn?.focus({ preventScroll: true });
     }
     this.padCursor.hidden = false;
-    this.padCursor.classList.toggle('building', !!this.build || this.bulldoze || !!this.piece);
+    this.padCursor.classList.toggle('building', !!this.build || this.bulldoze || !!this.piece || this.moving >= 0);
     this.padCursor.style.transform = `translate(${Math.round(c.x)}px, ${Math.round(c.y)}px)`;
 
     const p = f.pressed;
@@ -1272,7 +1344,8 @@ export class GameSession implements PadTarget {
     // does not turn (the floor, the planter, a module) it says so, and never asks USA-9 for a hint (that can use up a
     // free hint or cost credits); with no catalog item in hand it asks for a hint
     if (p.has('y')) {
-      if (turnKey(this.piece?.kind) === 'hint') this.askHint();
+      if (this.moving >= 0) this.rotateMoving(1, true);
+      else if (turnKey(this.piece?.kind) === 'hint') this.askHint();
       else this.rotateOrSay(1);
     }
     if (p.has('lb') || p.has('rb')) {

@@ -6,7 +6,7 @@ import { BUILDINGS, MAP_W, T } from '../game/defs';
 import type { BuildingType, Cost, Resource } from '../game/defs';
 import { citizensLost, effectiveStats, statusInfo } from '../game/economy';
 import type { EffectiveStats, StatusCause } from '../game/economy';
-import { CATALOG_ORDER, MODULES, PIECES, buildingStats, buildingStatsWith, fenceMask, installedModules, isModuleKind, isPieceKind, moduleCheck, moduleNeeds, pieceRefund, pieceRefundAt, solidKind } from '../game/pieces';
+import { CATALOG_ORDER, MODULES, PIECES, buildingStats, buildingStatsWith, installedModules, isModuleKind, isMovable, isPieceKind, moduleCheck, moduleNeeds, pieceRefund, pieceRefundAt, solidKind, surfaceKind, turnsAt } from '../game/pieces';
 import type { BuildingStats, CatalogKind, ModuleKind, PieceKind } from '../game/pieces';
 import { CLEAN_EVERY, energyEffect } from '../game/sim';
 import { idx, inBounds } from '../game/state';
@@ -15,8 +15,8 @@ import { t, tk } from '../i18n';
 import type { Key } from '../i18n';
 import { buildingBehind } from './pick';
 
-// The catalog's sections: Construction (floor, fence, gate), Decorations (the lamp and increment 2's six) and
-// Machine modules, each in catalog order.
+// The catalog's sections: Construction (floor, fence, gate, base, wall, pillar), Decorations (the lamp, increment 2's
+// six, tree, fountain and statue) and Machine modules, each in catalog order.
 export const CONSTRUCTION = CATALOG_ORDER.filter((k): k is PieceKind => isPieceKind(k) && !PIECES[k].decoration);
 export const DECORATIONS = CATALOG_ORDER.filter((k): k is PieceKind => isPieceKind(k) && !!PIECES[k].decoration);
 export const MACHINE_MODULES = CATALOG_ORDER.filter(isModuleKind);
@@ -42,9 +42,9 @@ export function turnKey(kind: CatalogKind | null | undefined): 'turn' | 'noTurn'
   return isRotatable(kind) ? 'turn' : 'noTurn';
 }
 
-// Floors and fences can be laid in a row with a mouse drag.
+// Floors, bases, fences and walls can be laid in a row with a mouse drag.
 export function isRowKind(kind: CatalogKind | null | undefined): boolean {
-  return kind === 'floor' || kind === 'fence';
+  return kind === 'floor' || kind === 'fence' || kind === 'base' || kind === 'wall';
 }
 
 // The part of a price the city cannot pay yet.
@@ -461,13 +461,14 @@ export interface PieceInfo {
   kind: PieceKind;
   x: number;
   y: number;
-  rotatable: boolean; // gate, lamp, a fence that stands alone, the decorations with directions
+  rotatable: boolean; // gate, lamp, a fence or wall that stands alone, the decorations with directions
   removable: boolean;
+  movable: boolean; // a decoration (it can be moved to another tile for free); constructions stay
   refund: Cost; // what Remove gives back now: pieceRefundAt, which removePieceAt pays
   scrapShort: number; // scrap of the refund that storage has no room for (the sculpture's), 0 when it all fits
 }
 
-// The solid piece on tile index i, else its floor: what the panel of a selected piece shows.
+// The solid piece on tile index i, else its surface (floor or base): what the panel of a selected piece shows.
 export function pieceInfo(s: GameState, i: number): PieceInfo | null {
   if (i < 0 || i >= s.solid.length) return null;
   const x = i % MAP_W;
@@ -477,14 +478,12 @@ export function pieceInfo(s: GameState, i: number): PieceInfo | null {
     const refund = pieceRefundAt(s, kind);
     return { refund, scrapShort: (pieceRefund(kind).scrap ?? 0) - (refund.scrap ?? 0) };
   };
-  if (solid) {
-    const rotatable = PIECES[solid].rotations > 1 && !(solid === 'fence' && fenceMask(s, x, y) !== 0);
-    return { kind: solid, x, y, rotatable, removable: true, ...money(solid) };
-  }
-  if (!s.floor[i]) return null;
-  // removePieceAt only takes up a bare floor (not under a building, junk, sludge or rubble)
+  if (solid) return { kind: solid, x, y, rotatable: turnsAt(s, x, y), removable: true, movable: isMovable(solid), ...money(solid) };
+  const surface = surfaceKind(s.floor[i]);
+  if (!surface) return null;
+  // removePieceAt only takes up a bare surface (not under a building, junk, sludge or rubble)
   const removable = s.occ[i] === -1 && (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS);
-  return { kind: 'floor', x, y, rotatable: false, removable, ...money('floor') };
+  return { kind: surface, x, y, rotatable: false, removable, movable: false, ...money(surface) };
 }
 
 // ---------- the bulldozer ----------
