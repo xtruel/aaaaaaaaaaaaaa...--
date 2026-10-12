@@ -59,6 +59,23 @@ describe('stored profile', () => {
     expect(stored().discovered).toEqual(['wall', 'base']);
   });
 
+  it('a version-1 text of another shape (a list or a maximum it cannot read) is backed up before the first write', () => {
+    for (const odd of ['{"version":1,"discovered":"bench"}', '{"version":1,"discovered":["bench"],"best":{"pop":"12"}}', '{"version":1,"discovered":[["bench"]]}']) {
+      localStorage.clear();
+      localStorage.setItem(KEY, odd);
+      recordProfile({ discovered: ['planter'], best: { scrapCollected: 350 } });
+      // the text as it was, kept aside; the profile written over it keeps the project it named
+      expect(localStorage.getItem('scrapbot:backup:projects:v1')).toBe(odd);
+      expect(stored().discovered).toEqual(['bench', 'planter']);
+    }
+    // a good version-1 profile is written over in place, with no backup
+    localStorage.clear();
+    localStorage.setItem(KEY, '{"version":1,"discovered":["bench"]}');
+    recordProfile({ discovered: ['planter'] });
+    expect(backups()).toEqual([]);
+    expect(stored()).toEqual({ version: 1, discovered: ['bench', 'planter'], best: {} });
+  });
+
   it('a profile of another version is backed up before the first write, its unknown data kept', () => {
     const v2 = JSON.stringify({ version: 2, discovered: ['bench', 'jetpack'], best: { pop: 70 }, seasons: [1] });
     localStorage.setItem(KEY, v2);

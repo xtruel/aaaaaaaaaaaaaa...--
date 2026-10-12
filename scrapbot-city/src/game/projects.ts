@@ -198,8 +198,9 @@ export function emptyProfile(): ProjectsProfile {
 const goodNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
 // Reads the stored text without ever losing what it holds: a damaged text still gives back every project id that can
-// be found in it (ids appear only in the discovered list); a text of another version gives what it has in the known
-// shape (the caller keeps a copy before writing over either: see src/profile.ts).
+// be found in it (ids appear only in the discovered list); a version-1 text of another shape (a list that is not a list
+// of ids, a maximum that is not a number) is damaged too and gives what it has; a text of another version gives what it
+// has in the known shape (the caller keeps a copy before writing over any of these: see src/profile.ts).
 export function parseProfile(raw: string | null): ParsedProfile {
   if (raw === null || raw === '') return { profile: emptyProfile(), status: 'empty', version: 0 };
   let data: unknown;
@@ -214,13 +215,22 @@ export function parseProfile(raw: string | null): ParsedProfile {
   }
   const d = data as Record<string, unknown>;
   const version = typeof d.version === 'number' && Number.isInteger(d.version) && d.version > 0 ? d.version : 0;
-  const discovered = Array.isArray(d.discovered) ? [...new Set(d.discovered.filter((k): k is string => typeof k === 'string'))] : [];
+  // the shape this version writes: a list of ids, and a number (0 or more) per measure; either may be missing
+  const listOk = d.discovered === undefined || (Array.isArray(d.discovered) && d.discovered.every((k) => typeof k === 'string'));
+  const bestOk = d.best === undefined || (!!d.best && typeof d.best === 'object' && !Array.isArray(d.best) && Object.values(d.best).every(goodNumber));
+  const found = Array.isArray(d.discovered) ? d.discovered.filter((k): k is string => typeof k === 'string') : [];
+  // a list in another shape ("bench", [["bench"]]): the project ids written in it are kept
+  if (!listOk) found.push(...PROJECT_KINDS.filter((k) => (JSON.stringify(d.discovered) ?? '').includes(`"${k}"`)));
+  const discovered = [...new Set(found)];
   const best: Record<string, number> = {};
   if (d.best && typeof d.best === 'object' && !Array.isArray(d.best)) {
     for (const [k, v] of Object.entries(d.best as Record<string, unknown>)) if (goodNumber(v)) best[k] = v;
   }
   const profile: ProjectsProfile = { ...d, version: PROFILE_VERSION, discovered, best };
-  return { profile, status: version === PROFILE_VERSION ? 'ok' : 'otherVersion', version };
+  // a version-1 text this version would not write as it is (a list or a value it cannot read) is damaged: like a text
+  // that cannot be read, it is copied aside before the first write over it (src/profile.ts), so nothing in it is lost
+  const status: ProfileStatus = version !== PROFILE_VERSION ? 'otherVersion' : listOk && bestOk ? 'ok' : 'damaged';
+  return { profile, status, version };
 }
 
 // The profile with more found and higher maxima: a union of the projects (never fewer) and, for each measure, the

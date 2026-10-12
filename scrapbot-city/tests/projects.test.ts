@@ -375,12 +375,26 @@ describe('old saves: what their data proves, nothing invented', () => {
 describe('the profile data: { version: 1, discovered, best }', () => {
   it('reads an empty, a good, a damaged and another version without losing anything it holds', () => {
     expect(parseProfile(null)).toEqual({ profile: emptyProfile(), status: 'empty', version: 0 });
-    const good = parseProfile(JSON.stringify({ version: 1, discovered: ['bench', 'tree', 'bench'], best: { pop: 22, built: 7.5, bad: -3, worse: 'x' } }));
+    const good = parseProfile(JSON.stringify({ version: 1, discovered: ['bench', 'tree', 'bench'], best: { pop: 22, built: 7.5 } }));
     expect(good.status).toBe('ok');
     expect(good.profile.discovered).toEqual(['bench', 'tree']);
     expect(good.profile.best).toEqual({ pop: 22, built: 7.5 });
     expect([...profileUnlocked(good.profile)]).toEqual(['bench', 'tree']);
     expect(profileBest(good.profile, 'built')).toBe(7);
+    // the spec's own shape, without maxima, is a good profile too
+    expect(parseProfile('{"version":1,"discovered":["bench"]}').status).toBe('ok');
+    // version 1 but values this version never writes: damaged (so it is copied aside before a write), what it has kept
+    const odd = parseProfile(JSON.stringify({ version: 1, discovered: ['bench'], best: { pop: 22, bad: -3, worse: 'x' } }));
+    expect(odd.status).toBe('damaged');
+    expect(odd.version).toBe(1);
+    expect(odd.profile.best).toEqual({ pop: 22 });
+    const single = parseProfile('{"version":1,"discovered":"bench"}');
+    expect(single.status).toBe('damaged');
+    expect(single.profile.discovered).toEqual(['bench']);
+    const nested = parseProfile('{"version":1,"discovered":[["tree"],"bench",7]}');
+    expect(nested.status).toBe('damaged');
+    expect(nested.profile.discovered.sort()).toEqual(['bench', 'tree']);
+    expect(parseProfile('{"version":1,"discovered":["bench"],"best":[3]}').status).toBe('damaged');
     // cut short (a crash mid-write): every project id in it survives
     const cut = parseProfile('{"version":1,"discovered":["bench","planter","wa');
     expect(cut.status).toBe('damaged');
