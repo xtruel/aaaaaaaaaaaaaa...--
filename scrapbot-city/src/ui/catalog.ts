@@ -34,6 +34,14 @@ export function isRotatable(kind: CatalogKind | null | undefined): boolean {
   return isPieceKind(kind) && PIECES[kind].rotations > 1;
 }
 
+// What the controller's Y (and R) does with `kind` in hand: turn it, say it does not turn, or, with no catalog item
+// in hand, ask USA-9 for a hint (Y only). Never a hint with a catalog item in hand: a hint can use up a free one or
+// cost credits.
+export function turnKey(kind: CatalogKind | null | undefined): 'turn' | 'noTurn' | 'hint' {
+  if (!kind) return 'hint';
+  return isRotatable(kind) ? 'turn' : 'noTurn';
+}
+
 // Floors and fences can be laid in a row with a mouse drag.
 export function isRowKind(kind: CatalogKind | null | undefined): boolean {
   return kind === 'floor' || kind === 'fence';

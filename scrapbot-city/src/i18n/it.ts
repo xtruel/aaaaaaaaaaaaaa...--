@@ -684,6 +684,7 @@ export const it: Dict = {
   'cat.missing': "Mancano {cost}",
   'cat.limitTile': "1 per casella",
   'cat.rotate': "Ruota",
+  'cat.noTurn': '{name}: non si ruota',
   'cat.help.place': "Clicca o tocca una casella per posarlo.",
   'cat.help.row': "Clicca o tocca una casella, oppure trascina col mouse per fare una fila.",
   'cat.help.module': "Clicca o tocca un edificio «{building}» completato per installarlo.",

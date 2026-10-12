@@ -686,6 +686,7 @@ export const es: Dict = {
   'cat.missing': 'Faltan {cost}',
   'cat.limitTile': '1 por casilla',
   'cat.rotate': 'Girar',
+  'cat.noTurn': '{name}: no se puede girar',
   'cat.help.place': 'Haz clic o toca una casilla para colocarlo.',
   'cat.help.row': 'Haz clic o toca una casilla, o arrastra con el ratón para hacer una fila.',
   'cat.help.module': 'Haz clic o toca un edificio terminado de tipo {building} para instalarlo.',

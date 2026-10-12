@@ -683,6 +683,7 @@ export const fr: Dict = {
   'cat.missing': "Il manque {cost}",
   'cat.limitTile': "1 par case",
   'cat.rotate': "Tourner",
+  'cat.noTurn': '{name} : ne se tourne pas',
   'cat.help.place': "Clique ou touche une case pour poser l'objet.",
   'cat.help.row': "Clique ou touche une case, ou fais glisser la souris pour une rangée.",
   'cat.help.module': "Clique ou touche un bâtiment terminé du type {building} pour installer le module.",

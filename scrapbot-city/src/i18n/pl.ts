@@ -686,6 +686,7 @@ export const pl: Dict = {
   'cat.missing': 'Brakuje: {cost}',
   'cat.limitTile': '1 na pole',
   'cat.rotate': 'Obróć',
+  'cat.noTurn': '{name}: nie da się obrócić',
   'cat.help.place': 'Kliknij lub dotknij pola, aby postawić obiekt.',
   'cat.help.row': 'Kliknij lub dotknij pola albo przeciągnij myszą, aby ułożyć rząd.',
   'cat.help.module': 'Kliknij lub dotknij ukończonego budynku „{building}”, aby zamontować moduł.',

@@ -684,6 +684,7 @@ export const en = {
   'cat.missing': 'Missing {cost}',
   'cat.limitTile': '1 per tile',
   'cat.rotate': 'Rotate',
+  'cat.noTurn': '{name}: does not turn',
   'cat.help.place': 'Click or tap a tile to place it.',
   'cat.help.row': 'Click or tap a tile, or drag with the mouse for a row.',
   'cat.help.module': 'Click or tap a finished {building} to install it.',

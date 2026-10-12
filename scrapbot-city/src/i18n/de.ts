@@ -683,6 +683,7 @@ export const de: Dict = {
   'cat.missing': 'Es fehlen {cost}',
   'cat.limitTile': '1 pro Feld',
   'cat.rotate': 'Drehen',
+  'cat.noTurn': '{name}: lässt sich nicht drehen',
   'cat.help.place': 'Klicke oder tippe auf ein Feld, um es zu setzen.',
   'cat.help.row': 'Klicke oder tippe auf ein Feld oder ziehe mit der Maus eine Reihe.',
   'cat.help.module': 'Klicke oder tippe auf ein fertiges Gebäude vom Typ {building}, um das Modul einzubauen.',

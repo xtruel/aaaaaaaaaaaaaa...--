@@ -683,6 +683,7 @@ export const pt: Dict = {
   'cat.missing': 'Faltam {cost}',
   'cat.limitTile': '1 por quadrado',
   'cat.rotate': 'Rodar',
+  'cat.noTurn': '{name}: não se pode rodar',
   'cat.help.place': 'Clica ou toca num quadrado para o colocar.',
   'cat.help.row': 'Clica ou toca num quadrado, ou arrasta com o rato para fazer uma fila.',
   'cat.help.module': 'Clica ou toca num edifício concluído do tipo {building} para o instalar.',

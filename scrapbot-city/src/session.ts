@@ -24,7 +24,7 @@ import type { ViewState } from './render/renderer';
 import { buildingArt } from './render/iso/atlas';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
-import { dozeTarget, isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo } from './ui/catalog';
+import { catalogName, dozeTarget, isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo, turnKey } from './ui/catalog';
 import type { DozeTarget } from './ui/catalog';
 import { pickAt } from './ui/pick';
 import type { LastPick, PickResult } from './ui/pick';
@@ -779,7 +779,7 @@ export class GameSession implements PadTarget {
         this.toggleCatalog();
         break;
       case 'KeyR':
-        this.rotate(e.shiftKey ? -1 : 1);
+        this.rotate(e.shiftKey ? -1 : 1, true);
         break;
       case 'Space':
         e.preventDefault();
@@ -1106,8 +1106,18 @@ export class GameSession implements PadTarget {
   }
 
   // R, Shift+wheel: turns the piece in hand (fence, gate, lamp, a decoration with directions), else the selected one.
-  private rotate(dir: 1 | -1): void {
-    if (!this.rotateTool(dir) && this.selectedPiece >= 0) this.rotatePiece(this.selectedPiece, dir);
+  // (R with a piece in hand that does not turn says so; the wheel does not, it would say it at every notch.)
+  private rotate(dir: 1 | -1, say = false): void {
+    if (say && this.piece) this.rotateOrSay(dir);
+    else if (!this.rotateTool(dir) && this.selectedPiece >= 0) this.rotatePiece(this.selectedPiece, dir);
+  }
+
+  // The catalog item in hand turns, or a short line says it does not ("Planter: does not turn").
+  private rotateOrSay(dir: 1 | -1): void {
+    const p = this.piece;
+    if (!p) return;
+    if (turnKey(p.kind) === 'turn') this.rotateTool(dir);
+    else pushMessage(this.s, t('cat.noTurn', { name: catalogName(p.kind) }), 'info');
   }
 
   private rotateTool(dir: 1 | -1): boolean {
@@ -1251,8 +1261,13 @@ export class GameSession implements PadTarget {
       else if (this.catalog) this.closeCatalog();
     }
     if (p.has('x')) this.toggleBulldoze();
-    // Y turns the piece in hand (fence, gate, lamp, a decoration with directions); otherwise it asks USA-9 for a hint
-    if (p.has('y') && !this.rotateTool(1)) this.askHint();
+    // Y turns the piece in hand (fence, gate, lamp, a decoration with directions); with a catalog item in hand that
+    // does not turn (the floor, the planter, a module) it says so, and never asks USA-9 for a hint (that can use up a
+    // free hint or cost credits); with no catalog item in hand it asks for a hint
+    if (p.has('y')) {
+      if (turnKey(this.piece?.kind) === 'hint') this.askHint();
+      else this.rotateOrSay(1);
+    }
     if (p.has('lb') || p.has('rb')) {
       const dir = p.has('rb') ? 1 : -1;
       const n = BUILD_ORDER.length;

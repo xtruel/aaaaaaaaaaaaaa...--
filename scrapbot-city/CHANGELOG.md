@@ -19,6 +19,10 @@
   a zoom 2 sempre 6 su 6; un doppio tocco continua a non comprare mai due volte. Con la ruspa un doppio clic
   sull'edificio già selezionato non dà il messaggio (non cambia niente). Un tocco sulla mappa che chiude il pannello
   dello smog non conta come «la stessa casella»: il secondo tocco di quel doppio tocco non compra.
+- **`Y` sul controller con un oggetto del catalogo in mano non chiede mai un consiglio a USA-9**: con un pezzo che
+  ruota lo ruota, con uno che non ruota (pavimento, fioriera, un modulo) dice «Fioriera: non si ruota» (anche `R` da
+  tastiera). Prima `Y` con la fioriera in mano apriva un consiglio e consumava un consiglio gratis (o, finiti quelli,
+  apriva la finestra per pagarlo). Senza oggetti del catalogo in mano `Y` resta il consiglio.
 
 ## In lavorazione — incremento 2, gruppo G2: le sei decorazioni del brief
 

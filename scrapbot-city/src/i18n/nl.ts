@@ -683,6 +683,7 @@ export const nl: Dict = {
   'cat.missing': 'Je mist {cost}',
   'cat.limitTile': '1 per vakje',
   'cat.rotate': 'Draaien',
+  'cat.noTurn': '{name}: kan niet draaien',
   'cat.help.place': 'Klik of tik op een vakje om het neer te zetten.',
   'cat.help.row': 'Klik of tik op een vakje, of sleep met de muis voor een rij.',
   'cat.help.module': 'Klik of tik op een voltooid gebouw van het type {building} om de module te installeren.',

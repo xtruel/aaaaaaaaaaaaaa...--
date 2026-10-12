@@ -6,11 +6,12 @@ import { placeBuilding, placeCheck } from '../src/game/actions';
 import { MAP_H, MAP_W, T } from '../src/game/defs';
 import type { BuildingType } from '../src/game/defs';
 import { installModule, placePiece } from '../src/game/pieces';
+import { CATALOG_ORDER } from '../src/game/pieces';
 import type { CatalogKind } from '../src/game/pieces';
 import { computeDerived } from '../src/game/sim';
 import { createGame, idx } from '../src/game/state';
 import type { Building, GameState } from '../src/game/state';
-import { t } from '../src/i18n';
+import { setLang, t } from '../src/i18n';
 import {
   CONSTRUCTION,
   DECORATIONS,
@@ -30,6 +31,7 @@ import {
   pieceInfo,
   scrapLost,
   shortfall,
+  turnKey,
 } from '../src/ui/catalog';
 
 function city(): GameState {
@@ -262,5 +264,28 @@ describe('bulldozer target', () => {
     s.tiles[idx(c.x, c.y)] = T.JUNK;
     expect(dozeTarget(s, c.x, c.y, -1, none)).toEqual({ kind: 'nothing', i: idx(c.x, c.y) });
     expect(dozeTarget(s, -3, 4, -1, none)).toEqual({ kind: 'nothing', i: -1 });
+  });
+});
+
+describe('the controller\'s Y with a catalog item in hand', () => {
+  it('turns what turns, says the rest does not turn, and never asks USA-9 for a hint (free or paid)', () => {
+    for (const kind of CATALOG_ORDER) {
+      const y = turnKey(kind);
+      expect(y, kind).not.toBe('hint');
+      expect(y, kind).toBe(isRotatable(kind) ? 'turn' : 'noTurn');
+    }
+    expect(['planter', 'floor', 'dockStorage', 'purifierNozzle'].map((k) => turnKey(k as CatalogKind))).toEqual(['noTurn', 'noTurn', 'noTurn', 'noTurn']);
+    expect(['bench', 'lamp', 'pergola', 'fence'].map((k) => turnKey(k as CatalogKind))).toEqual(['turn', 'turn', 'turn', 'turn']);
+    // with nothing from the catalog in hand Y is USA-9's hint, as before
+    expect(turnKey(null)).toBe('hint');
+    // the line it says, in every language
+    for (const lang of ['en', 'it', 'de', 'fr', 'es', 'pt', 'pl', 'nl'] as const) {
+      setLang(lang);
+      const line = t('cat.noTurn', { name: catalogName('planter') });
+      expect(line, lang).toContain(catalogName('planter'));
+      expect(line, lang).not.toMatch(/cat\.|\{/);
+    }
+    setLang('en');
+    expect(t('cat.noTurn', { name: catalogName('planter') })).toBe('Planter: does not turn');
   });
 });
