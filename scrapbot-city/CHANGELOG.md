@@ -65,6 +65,12 @@
   a zoom 2 sempre 6 su 6; un doppio tocco continua a non comprare mai due volte. Con la ruspa un doppio clic
   sull'edificio già selezionato non dà il messaggio (non cambia niente). Un tocco sulla mappa che chiude il pannello
   dello smog non conta come «la stessa casella»: il secondo tocco di quel doppio tocco non compra.
+- **Un doppio clic che scivola oltre il bordo di una casella non posa una fila di due**: con il pavimento o la recinzione
+  in mano, se il secondo clic di un doppio clic si spostava di pochi pixel sulla casella vicina prima del rilascio,
+  diventava una fila di due caselle e comprava un secondo pezzo (anche in G2). Ora quella pressione conta come il
+  secondo clic che è: sulla casella del primo può solo essere rifiutata, con il motivo («Qui c'è già il pavimento»),
+  sulla casella vicina dice «Troppo presto dopo la pressione di prima». Una fila trascinata davvero (oltre
+  12 px) si posa come prima, anche subito dopo un clic; una pressione a sé, dopo 600 ms, pure.
 - **`Y` sul controller con un oggetto del catalogo in mano non chiede mai un consiglio a USA-9**: con un pezzo che
   ruota lo ruota, con uno che non ruota (pavimento, fioriera, un modulo) dice «Fioriera: non si ruota» (anche `R` da
   tastiera). Prima `Y` con la fioriera in mano apriva un consiglio e consumava un consiglio gratis (o, finiti quelli,

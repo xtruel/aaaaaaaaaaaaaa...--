@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DOUBLE_DIST, DOUBLE_DIST_TOUCH, DOUBLE_PRESS_MS, PRESS_GUARD_MS, forgetPresses, guarded, isDouble, lastPresses, mapPress, markOffMap, markSecond, notePress, secondPress } from '../src/ui/presses';
+import { DOUBLE_DIST, DOUBLE_DIST_TOUCH, DOUBLE_PRESS_MS, PRESS_GUARD_MS, forgetPresses, guarded, isDouble, lastPresses, mapPress, markOffMap, markSecond, notePress, rowLaid, secondPress } from '../src/ui/presses';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -157,6 +157,23 @@ describe('presses', () => {
     forgetPresses();
     expect(onMap({ t: 1000, x: 300, y: 400, tile: '10,5', tool: 'p:lamp' })).toBe('meant');
     expect(onMap({ t: 1200, x: 300, y: 400, tile: '10,5', tool: 'doze', bulldozer: true })).toBe('meant');
+  });
+
+  it('a double click whose second press slips across a tile edge lays no row of two; a row dragged out does', () => {
+    // floor or fence in hand, the mouse: the first click lays a floor on 10,5; the second press, 200 ms later on the same
+    // spot, slips 6 px onto 11,5 before the release (a row of two tiles, 10,5 and 11,5)
+    forgetPresses();
+    notePress({ t: 1000, x: 300, y: 400, cam: 'c', tile: '10,5', tool: 'p:floor' });
+    notePress({ t: 1200, x: 300, y: 400, cam: 'c', tile: '10,5', tool: 'p:floor' });
+    const [before, start] = lastPresses();
+    expect(rowLaid(before, start, false)).toBe(false); // that press: on 10,5 it can only be refused
+    // dragged out farther than a click's slip (12 px): a row, even right after a click
+    expect(rowLaid(before, start, true)).toBe(true);
+    // a press of its own (650 ms after the click), or one where the click was not: a row
+    expect(rowLaid(before, { ...start, t: 1650 }, false)).toBe(true);
+    expect(rowLaid(before, { ...start, x: 330, tile: '11,5' }, false)).toBe(true);
+    // the press began on the next tile, close to the click (a double click straddling the edge): not a row either
+    expect(rowLaid(before, { ...start, x: 306, tile: '11,5' }, false)).toBe(false);
   });
 
   it('a press that only closed the smog panel used no tile: the second press of that double press buys nothing', () => {
