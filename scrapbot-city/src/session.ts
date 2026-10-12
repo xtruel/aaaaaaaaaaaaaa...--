@@ -24,7 +24,7 @@ import type { ViewState } from './render/renderer';
 import { buildingArt } from './render/iso/atlas';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
-import { catalogName, dozeTarget, isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo, turnKey } from './ui/catalog';
+import { catalogName, dozeLabel, dozeTarget, isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo, turnKey } from './ui/catalog';
 import type { DozeTarget } from './ui/catalog';
 import { pickAt } from './ui/pick';
 import type { LastPick, PickResult } from './ui/pick';
@@ -107,6 +107,7 @@ export class GameSession implements PadTarget {
   private hover: { x: number; y: number } | null = null;
   private hoverId = -1; // building under the pointer (its visible pixels)
   private dozeTile = -1; // with the bulldozer: the tile its click acts on when that is not a building (-1 none)
+  private dozeLabel: string | null = null; // with the bulldozer over a piece or floor it takes up: what it gives back
   private pointer = { x: -1, y: -1, inside: false };
   private keys = new Set<string>();
   private drag: Drag | null = null;
@@ -361,6 +362,7 @@ export class GameSession implements PadTarget {
           selectedId: this.selectedId,
           hoverId: this.hoverId,
           dozeTile: this.dozeTile,
+          dozeLabel: this.dozeLabel,
           reducedMotion: this.settings.reducedMotion,
           piece: this.piece,
           selectedPiece: this.selectedPiece,
@@ -464,6 +466,7 @@ export class GameSession implements PadTarget {
 
   private updateHover(): void {
     this.dozeTile = -1;
+    this.dozeLabel = null;
     if (!this.pointer.inside || (this.drag && this.drag.moved)) {
       this.hover = this.pointer.inside && (this.build || this.piece) ? this.hover : null;
       this.hoverId = -1;
@@ -475,6 +478,8 @@ export class GameSession implements PadTarget {
       const target = this.dozeTarget(this.pointer.x, this.pointer.y);
       this.hoverId = target.kind === 'building' ? target.id : -1;
       if (target.kind !== 'building') this.dozeTile = target.i;
+      // a piece or floor it takes up: its real refund on the map, as the panel's Remove says
+      this.dozeLabel = dozeLabel(this.s, target);
       return;
     }
     // with a building or a piece in hand the ghost is what counts; a module goes on the building pointed at

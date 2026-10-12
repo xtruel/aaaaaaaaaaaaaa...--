@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { placeBuilding, placeCheck } from '../src/game/actions';
 import { MAP_H, MAP_W, T } from '../src/game/defs';
 import type { BuildingType } from '../src/game/defs';
-import { installModule, placePiece } from '../src/game/pieces';
+import { installModule, placePiece, removePieceAt } from '../src/game/pieces';
 import { CATALOG_ORDER } from '../src/game/pieces';
 import type { CatalogKind } from '../src/game/pieces';
 import { computeDerived } from '../src/game/sim';
@@ -21,6 +21,7 @@ import {
   catalogName,
   catalogState,
   demolishStorageDrop,
+  dozeLabel,
   dozeTarget,
   installState,
   isRotatable,
@@ -287,5 +288,33 @@ describe('the controller\'s Y with a catalog item in hand', () => {
     }
     setLang('en');
     expect(t('cat.noTurn', { name: catalogName('planter') })).toBe('Planter: does not turn');
+  });
+});
+
+describe('the bulldozer over a piece or floor', () => {
+  it('shows what taking it up gives back now (the sculpture\'s scrap only as far as storage has room), as Remove pays', () => {
+    const s = city();
+    const none = () => -1;
+    const [a, b, c] = freeTiles(s);
+    s.res.scrap = 50;
+    expect(placePiece(s, 'sculpture', a.x, a.y, 0)).toBe(true);
+    expect(placePiece(s, 'fence', b.x, b.y, 0)).toBe(true);
+    expect(placePiece(s, 'floor', c.x, c.y, 0)).toBe(true);
+    computeDerived(s);
+    const at = (p: { x: number; y: number }) => dozeTarget(s, p.x, p.y, -1, none);
+    expect(dozeLabel(s, at(b))).toBe('Remove (+2 credits)');
+    expect(dozeLabel(s, at(c))).toBe('Remove (+1 credit)');
+    s.res.scrap = 0;
+    expect(dozeLabel(s, at(a))).toBe('Remove (+5 credits + 10 scrap)');
+    // storage nearly full: room for 4 of the 10 scrap, and that is what the click pays
+    s.res.scrap = s.derived.storage - 4;
+    expect(dozeLabel(s, at(a))).toBe('Remove (+5 credits + 4 scrap)');
+    const before = { ...s.res };
+    expect(removePieceAt(s, a.x, a.y)).toEqual({ credits: 5, scrap: 4 });
+    expect([s.res.credits - before.credits, s.res.scrap - before.scrap]).toEqual([5, 4]);
+    // a building, rubble, bare ground: no refund to show
+    expect(dozeLabel(s, { kind: 'building', id: s.buildings[0].id })).toBeNull();
+    expect(dozeLabel(s, at(a))).toBeNull();
+    expect(dozeLabel(s, { kind: 'rubble', i: idx(a.x, a.y) })).toBeNull();
   });
 });

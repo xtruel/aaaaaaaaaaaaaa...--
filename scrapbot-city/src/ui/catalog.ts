@@ -514,3 +514,12 @@ export function dozeTarget(s: GameState, tx: number, ty: number, picked: number,
   if (s.occ[ground] !== -1) return { kind: 'building', id: s.occ[ground] };
   return { kind: pieceInfo(s, ground)?.removable ? 'piece' : 'nothing', i: ground };
 }
+
+// What the bulldozer shows above the piece or floor its click would take up: what removing it gives back right now
+// (pieceRefundAt: the sculpture's scrap only as far as storage has room, as removePieceAt pays), in the words of the
+// panel's Remove: "Remove (+5 credits + 4 scrap)". Null for a building, rubble, nothing, or a floor it cannot take up.
+export function dozeLabel(s: GameState, target: DozeTarget): string | null {
+  if (target.kind !== 'piece') return null;
+  const info = pieceInfo(s, target.i);
+  return info?.removable ? t('insp.remove', { refund: costText(info.refund) }) : null;
+}

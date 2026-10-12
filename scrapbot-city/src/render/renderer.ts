@@ -55,6 +55,9 @@ export interface ViewState {
   // with the bulldozer: the tile its click acts on when that is not a building (rubble, a fence, gate, lamp or floor,
   // bare ground; -1 or left out = none): outlined, and a fence, gate or lamp there lights up instead of a building
   dozeTile?: number;
+  // with the bulldozer over a piece or floor it takes up: what removing it gives back ("Remove (+5 credits + 4
+  // scrap)"), shown above it; left out = none
+  dozeLabel?: string | null;
   reducedMotion: boolean;
   // modular building: the catalog tool, the selected fence/gate/lamp/floor (tile index, -1 none), the tiles of a row
   // being dragged, and the text the interface wants next to the ghost (a module's effect; shown while the piece or
@@ -1638,7 +1641,15 @@ export class Renderer {
     if (view.hoverId !== undefined && view.hoverId >= 0) return; // the building itself gets highlighted
     const doze = view.bulldoze ? (view.dozeTile ?? -1) : -1;
     if (doze >= 0) {
-      this.outlineFootprint(doze % MAP_W, Math.floor(doze / MAP_W), 1, 1, PAL.red, camX, camY);
+      const tx = doze % MAP_W;
+      const ty = Math.floor(doze / MAP_W);
+      this.outlineFootprint(tx, ty, 1, 1, PAL.red, camX, camY);
+      // what taking it up gives back, above the piece (or the floor), as a module's effect is shown
+      if (view.dozeLabel) {
+        const f = s.solid[doze] !== 0 ? frame(this.pieceFrameName(s, tx, ty, doze)) : undefined;
+        const top = tileTop(tx, ty);
+        this.addLabel(view.dozeLabel, top.X - camX, top.Y - (f ? f.ay : 0) - 12 - camY, PAL.lime);
+      }
       return;
     }
     if (!inBounds(h.x, h.y)) return;

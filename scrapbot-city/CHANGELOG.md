@@ -26,6 +26,10 @@
 - **«Rimuovi» paga quello che dice nel momento in cui lo premi**: la cifra del pulsante di un oggetto selezionato si
   aggiorna a ogni fotogramma (prima ogni 100 ms): se un bot scaricava rottami tra l'aggiornamento e la pressione, la
   scultura poteva dire «+10 rottami» e renderne 4. Ora la scritta e il pagamento coincidono sempre.
+- **La ruspa dice prima cosa rende**: sopra un oggetto o un pavimento che toglierebbe, la mappa mostra «Rimuovi (+5
+  crediti + 4 rottami)», la cifra vera (i rottami della scultura solo fin dove il deposito ha spazio), come fa
+  l'effetto di un modulo; il clic paga esattamente quella. Col mouse e col cursore del controller; col dito, che non
+  ha un «sopra», la cifra resta nel pannello dell'oggetto e nella scritta che sale dopo la rimozione.
 
 ## In lavorazione — incremento 2, gruppo G2: le sei decorazioni del brief
 
