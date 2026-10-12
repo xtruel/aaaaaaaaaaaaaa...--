@@ -20,9 +20,9 @@
 - **Profilo dei progetti**: chiave `projects` (`{ version: 1, discovered: [...], best: {...} }`), nei file del gioco
   desktop come i salvataggi (Steam Cloud). `best` tiene per ogni traguardo il massimo raggiunto **in una** città:
   ricaricare la stessa città non somma niente, città diverse non si sommano. Il profilo cresce soltanto (i progetti si
-  uniscono, i massimi salgono); un testo danneggiato o di un'altra versione viene copiato a parte
-  (`backup:projects:v…`) prima di essere riscritto, e i progetti che contiene si conservano. I progetti non stanno
-  mai nel salvataggio della città.
+  uniscono, i massimi salgono); un testo danneggiato (anche uno «versione 1» con un elenco o un massimo che non si
+  legge) o di un'altra versione viene copiato a parte (`backup:projects:v…`) prima di essere riscritto, e i progetti
+  che contiene si conservano. I progetti non stanno mai nel salvataggio della città.
 - **Il catalogo «Oggetti e moduli»**: tre categorie (Costruzioni, Decorazioni, Moduli) e tre filtri (Tutti,
   Disponibili, Da scoprire, ciascuno con il suo numero), ricordati finché si gioca la città. Ogni voce dice il suo stato
   con una parola e un'icona: «Da scoprire» con il traguardo e il progresso («120 / 400 in questa città · massimo 260»,
@@ -35,7 +35,8 @@
   spento; poi «Installabile», «Installato», «Slot occupato» (con il modulo che lo occupa), «Non ora» (con il motivo).
 - **Notifica «Nuovo progetto: Panchina» con «Apri»**: apre il catalogo su quella voce, evidenziata, senza prendere né
   comprare niente; più progetti insieme fanno una notifica sola («Nuovi progetti (3)»). Sta sotto la barra in alto o
-  sopra la barra degli edifici, dove non copre il fumetto del tutorial, i pannelli, la scheda dell'obiettivo né il punto
+  sopra la barra degli edifici, dove non copre il fumetto del tutorial (anche quando il fumetto si sposta al passo
+  dopo), i pannelli, la scheda dell'obiettivo né il punto
   del mouse, del cursore del controller o dell'ultimo tocco sulla mappa; mentre compare lascia passare i colpi alla
   mappa e «Apri» non prende il secondo colpo di un doppio clic. Un numerino sul pulsante «Oggetti e moduli» (nessun
   pulsante nuovo) conta i progetti che il catalogo non ha ancora mostrato.
