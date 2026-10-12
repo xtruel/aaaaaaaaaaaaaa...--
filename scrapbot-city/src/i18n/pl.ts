@@ -255,6 +255,7 @@ export const pl: Dict = {
   'place.gate': 'Stoi tu brama: najpierw ją usuń',
   'place.lamp': 'Stoi tu latarnia: najpierw ją usuń',
   'place.paved': 'Tu już jest posadzka',
+  'place.double': 'Za szybko po poprzednim naciśnięciu: naciśnij jeszcze raz, jeśli tak miało być',
   'place.modInstalled': 'Już zamontowany',
   'place.modDock': 'Tylko w ukończonym Doku botów',
   'place.modSmelter': 'Tylko w ukończonej Hucie',

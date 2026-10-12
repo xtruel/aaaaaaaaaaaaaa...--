@@ -255,6 +255,7 @@ export const es: Dict = {
   'place.gate': 'Hay un portón: quítalo primero',
   'place.lamp': 'Hay una farola: quítala primero',
   'place.paved': 'Aquí ya hay suelo',
+  'place.double': 'Demasiado rápido tras la pulsación anterior: pulsa otra vez si era a propósito',
   'place.modInstalled': 'Ya instalado',
   'place.modDock': 'Solo en un Muelle de bots terminado',
   'place.modSmelter': 'Solo en una Fundición terminada',

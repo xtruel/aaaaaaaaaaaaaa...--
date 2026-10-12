@@ -252,6 +252,7 @@ export const pt: Dict = {
   'place.gate': 'Há aqui um portão: remove-o primeiro',
   'place.lamp': 'Há aqui um candeeiro: remove-o primeiro',
   'place.paved': 'Já há piso aqui',
+  'place.double': 'Demasiado rápido após o último clique ou toque: carrega outra vez se era essa a ideia',
   'place.modInstalled': 'Já instalado',
   'place.modDock': 'Só numa Doca de Bots concluída',
   'place.modSmelter': 'Só numa Fundição concluída',

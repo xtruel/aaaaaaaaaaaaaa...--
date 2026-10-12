@@ -1,7 +1,7 @@
 // One modal at a time, rendered into #modal-root. Keyboard: Esc closes when allowed.
 import { audio } from '../audio';
 import { t } from '../i18n';
-import { guarded, secondPress } from './presses';
+import { guarded, markSecond, secondPress } from './presses';
 
 export interface ModalAction {
   label: string;
@@ -141,7 +141,10 @@ export function openModal(opts: ModalOptions): HTMLElement {
       b.disabled = !!a.disabled;
       b.innerHTML = `<span>${a.label}</span>${a.hint ? `<small>${a.hint}</small>` : ''}`;
       b.addEventListener('click', (e) => {
-        if (guarded(openedAt) && (e.detail === 0 || secondPress())) return;
+        if (guarded(openedAt) && (e.detail === 0 || secondPress())) {
+          if (e.detail !== 0) markSecond();
+          return;
+        }
         audio.play('click');
         a.onClick();
       });

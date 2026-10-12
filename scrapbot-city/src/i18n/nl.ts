@@ -252,6 +252,7 @@ export const nl: Dict = {
   'place.gate': 'Hier staat een poort: haal hem eerst weg',
   'place.lamp': 'Hier staat een lantaarnpaal: haal hem eerst weg',
   'place.paved': 'Hier ligt al vloer',
+  'place.double': 'Te snel na je vorige tik of klik: druk nog eens als je dat bedoelde',
   'place.modInstalled': 'Al geïnstalleerd',
   'place.modDock': 'Alleen op een Botdock dat af is',
   'place.modSmelter': 'Alleen op een Smelterij die af is',

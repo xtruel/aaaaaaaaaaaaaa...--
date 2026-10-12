@@ -253,6 +253,7 @@ export const it: Dict = {
   'place.gate': "C'è un cancello: rimuovilo prima",
   'place.lamp': "C'è un lampione: rimuovilo prima",
   'place.paved': "Qui c'è già il pavimento",
+  'place.double': 'Troppo presto dopo la pressione di prima: premi di nuovo se era voluto',
   'place.modInstalled': "Già installato",
   'place.modDock': "Solo su un Hangar Bot completato",
   'place.modSmelter': "Solo su una Fonderia completata",

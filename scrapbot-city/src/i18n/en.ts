@@ -251,6 +251,7 @@ export const en = {
   'place.gate': 'A gate is in the way: remove it first',
   'place.lamp': 'A lamp post is in the way: remove it first',
   'place.paved': 'This tile already has a floor',
+  'place.double': 'Too quick after the last press: press again if you meant it',
   'place.modInstalled': 'Already installed',
   'place.modDock': 'Only on a finished Bot Dock',
   'place.modSmelter': 'Only on a finished Smelter',

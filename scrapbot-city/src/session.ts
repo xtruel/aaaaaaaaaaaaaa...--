@@ -32,7 +32,7 @@ import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEv
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
-import { SAME_PRESS_MS, forgetPresses, isDouble, lastPresses, notePress } from './ui/presses';
+import { SAME_PRESS_MS, forgetPresses, lastPresses, mapPress, markOffMap, markSecond, notePress } from './ui/presses';
 import type { ModalAction } from './ui/modal';
 import { Tutorial } from './ui/tutorial';
 import type { Box } from './ui/tutorial';
@@ -585,6 +585,8 @@ export class GameSession implements PadTarget {
         // the HUD closed the smog panel on this very press, just before it reached the map
         closedPanel: performance.now() - this.hud.smogClosedAt < SAME_PRESS_MS,
       };
+      // (it used no tile: a second press of a double press there is not "on the tile the first one used")
+      if (this.drag.closedPanel) markOffMap();
       // with floor or fence in hand the left mouse button drags out a row (a finger still moves the map)
       this.row = null;
       if (e.button === 0 && e.pointerType === 'mouse' && isRowKind(this.piece?.kind) && !isModalOpen()) {
@@ -911,21 +913,30 @@ export class GameSession implements PadTarget {
   }
 
   // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
-  // second press of a double click, double tap or A A, the press at (sx, sy) coming within PRESS_GUARD_MS and
-  // doubleDist px of the one before (isDouble, src/ui/presses.ts) with the map where it was and the same tool in hand
-  // (a click, then the bulldozer taken and a click on the same spot, is two meant presses), when it would do something
-  // the first one did not mean: land on the next tile across an edge (it would buy a second piece), land on the map
-  // behind a dialog or a panel the first press closed, or take up a second layer with the bulldozer (the floor under
-  // the fence just removed). On the tile the first press used, a piece or building tool goes ahead: there it can only
-  // be refused, with the reason.
+  // second press of a double click, double tap or A A (mapPress, src/ui/presses.ts: within PRESS_GUARD_MS and doubleDist
+  // px of the press before, the map where it was, the same tool in hand) when it would do what the first press did not
+  // mean: land on the next tile across an edge (a second piece), on the map behind a dialog or panel the first press
+  // closed, or take up a second layer with the bulldozer (the floor under the fence just removed). On the tile the
+  // first press used, a piece or building tool goes ahead: there it can only be refused, with the reason; so does the
+  // bulldozer on the building it already selected (nothing changes). Any other second press is refused with its reason
+  // on screen ("Too quick after the last press"), as every refusal is, and does not stretch the double press: the next
+  // press is measured from the one before it (markSecond), so quick taps on neighbouring tiles closer than a finger's
+  // reach buy every other one, and one double tap never buys two.
   private meantPress(sx: number, sy: number): boolean {
     const [before, now] = lastPresses();
     const r = this.renderer;
-    const cam = `${r.cam.x},${r.cam.y},${r.zoom}`;
-    const double = before.tool === this.toolKey() && isDouble(before, { t: now.t, x: sx, y: sy, cam, touch: now.touch });
-    if (!double) return true;
     const tile = r.screenToTile(sx, sy);
-    return !this.bulldoze && before.tile !== '' && before.tile === `${tile.x},${tile.y}`;
+    const at = { ...now, x: sx, y: sy, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tool: this.toolKey(), tile: `${tile.x},${tile.y}` };
+    const verdict = mapPress(before, at, this.bulldoze);
+    if (verdict === 'meant') return true;
+    markSecond();
+    if (verdict === 'again') return true;
+    if (this.bulldoze) {
+      const target = this.dozeTarget(sx, sy);
+      if (target.kind === 'building' && target.id === this.selectedId) return true;
+    }
+    this.refuse(t('place.double'));
+    return false;
   }
 
   // The bulldozer clears rubble, takes up a fence, gate, lamp or bare floor (half its price back) and selects a
@@ -1232,6 +1243,7 @@ export class GameSession implements PadTarget {
       const closed = this.hud.closeSmogUnless(el);
       if (overMap) {
         if (!closed) this.click(c.x, c.y);
+        else markOffMap();
       } else (btn ?? el)?.click();
     }
     if (p.has('b') && !this.hud.closeSmog()) {

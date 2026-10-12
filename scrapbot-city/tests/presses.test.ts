@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DOUBLE_DIST, DOUBLE_DIST_TOUCH, DOUBLE_PRESS_MS, PRESS_GUARD_MS, forgetPresses, guarded, isDouble, lastPresses, notePress, secondPress } from '../src/ui/presses';
+import { DOUBLE_DIST, DOUBLE_DIST_TOUCH, DOUBLE_PRESS_MS, PRESS_GUARD_MS, forgetPresses, guarded, isDouble, lastPresses, mapPress, markOffMap, markSecond, notePress, secondPress } from '../src/ui/presses';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -103,5 +103,68 @@ describe('presses', () => {
     now += 120;
     at(140, true);
     expect(secondPress()).toBe(false); // a tap 40 px away: meant
+  });
+
+  // The map with a tool in hand, as the session handles a press there (meantPress): note it, judge it, and a second
+  // press (refused, or let through to be refused on the same tile) is marked so the next press is measured from the
+  // press before it.
+  const onMap = (o: { t: number; x: number; y: number; tile: string; touch?: boolean; tool?: string; bulldozer?: boolean }) => {
+    notePress({ t: o.t, x: o.x, y: o.y, cam: 'c', tile: o.tile, tool: o.tool ?? 'p:bench', touch: o.touch });
+    const [before, now] = lastPresses();
+    const v = mapPress(before, now, !!o.bulldozer);
+    if (v !== 'meant') markSecond();
+    return v;
+  };
+  // six presses on six neighbouring tiles in a row, `gap` ms and `px` screen px apart: how many are meant (buy)
+  const row = (gap: number, px: number, touch: boolean) => {
+    forgetPresses();
+    let n = 0;
+    for (let k = 0; k < 6; k++) if (onMap({ t: 10_000 + k * gap, x: 300 + k * px, y: 400, tile: `${10 + k},5`, touch }) === 'meant') n++;
+    return n;
+  };
+
+  it('taps on neighbouring tiles closer than a finger\'s reach (zoom 1: 17.9 px) are not swallowed in a chain', () => {
+    // zoom 1, a finger: every other tap buys at 300 and 450 ms (the refused one does not stretch the window; it was
+    // 1 of 6 when each tap was measured from the refused one before it), all six from 650 ms
+    expect(row(300, 17.9, true)).toBe(3);
+    expect(row(450, 17.9, true)).toBe(3);
+    expect(row(650, 17.9, true)).toBe(6);
+    // zoom 2 (35.8 px), and the mouse at zoom 1 (17.9 px is more than its 10 px): all six
+    for (const gap of [300, 450, 650]) {
+      expect(row(gap, 35.8, true), `zoom 2, ${gap} ms`).toBe(6);
+      expect(row(gap, 17.9, false), `mouse, ${gap} ms`).toBe(6);
+    }
+  });
+
+  it('a double tap never buys twice: across a tile edge the second is refused, on the same tile it can only be refused', () => {
+    forgetPresses();
+    expect(onMap({ t: 1000, x: 300, y: 400, tile: '10,5', touch: true })).toBe('meant');
+    expect(onMap({ t: 1150, x: 306, y: 400, tile: '11,5', touch: true })).toBe('double');
+    // a third tap close by, still within the first one's double press: refused too
+    expect(onMap({ t: 1300, x: 309, y: 401, tile: '11,5', touch: true })).toBe('double');
+    forgetPresses();
+    expect(onMap({ t: 1000, x: 300, y: 400, tile: '10,5', touch: true })).toBe('meant');
+    expect(onMap({ t: 1200, x: 303, y: 400, tile: '10,5', touch: true })).toBe('again');
+    // a slow double click read late (515 ms), A A at the pad's cursor (no movement): the same
+    forgetPresses();
+    expect(onMap({ t: 1000, x: 300, y: 400, tile: '10,5' })).toBe('meant');
+    expect(onMap({ t: 1515, x: 302, y: 400, tile: '11,5' })).toBe('double');
+    // the bulldozer: never a second layer, not even on the same tile
+    forgetPresses();
+    expect(onMap({ t: 1000, x: 300, y: 400, tile: '10,5', tool: 'doze', bulldozer: true })).toBe('meant');
+    expect(onMap({ t: 1200, x: 300, y: 400, tile: '10,5', tool: 'doze', bulldozer: true })).toBe('double');
+    // another tool in hand between the two presses: two meant presses
+    forgetPresses();
+    expect(onMap({ t: 1000, x: 300, y: 400, tile: '10,5', tool: 'p:lamp' })).toBe('meant');
+    expect(onMap({ t: 1200, x: 300, y: 400, tile: '10,5', tool: 'doze', bulldozer: true })).toBe('meant');
+  });
+
+  it('a press that only closed the smog panel used no tile: the second press of that double press buys nothing', () => {
+    forgetPresses();
+    notePress({ t: 1000, x: 300, y: 400, cam: 'c', tile: '10,5', tool: 'p:bench', touch: true });
+    markOffMap(); // the session: this press closed the smog panel and did nothing else
+    expect(onMap({ t: 1250, x: 302, y: 401, tile: '10,5', touch: true })).toBe('double');
+    // a press of its own, later, buys
+    expect(onMap({ t: 1900, x: 302, y: 401, tile: '10,5', touch: true })).toBe('meant');
   });
 });

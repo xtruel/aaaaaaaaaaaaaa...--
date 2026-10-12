@@ -49,7 +49,7 @@ import {
 } from './catalog';
 import type { ModuleState, PieceInfo, StatusLine } from './catalog';
 import { esc } from './escape';
-import { guarded, secondPress } from './presses';
+import { guarded, markSecond, secondPress } from './presses';
 import { airReport, perDayText } from './smog';
 import type { AirRow } from './smog';
 
@@ -735,7 +735,9 @@ export class Hud {
   // moves): the second press of a double press there (double click, double tap, A A: soon after and close to the press
   // before, src/ui/presses.ts) would land on another item or on Done. It does nothing.
   private catalogSettled(): boolean {
-    return !secondPress();
+    if (!secondPress()) return true;
+    markSecond();
+    return false;
   }
 
   // What can be had right now, written into the list in place: the greyed-out items and why.

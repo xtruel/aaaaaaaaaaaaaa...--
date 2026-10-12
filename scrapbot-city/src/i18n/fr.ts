@@ -252,6 +252,7 @@ export const fr: Dict = {
   'place.gate': "Un portail gêne : retire-le d'abord",
   'place.lamp': "Un lampadaire gêne : retire-le d'abord",
   'place.paved': "Il y a déjà un sol ici",
+  'place.double': "Trop rapide après le dernier appui : appuie encore si c'était voulu",
   'place.modInstalled': "Déjà installé",
   'place.modDock': "Seulement sur un Hangar à robots terminé",
   'place.modSmelter': "Seulement sur une Fonderie terminée",

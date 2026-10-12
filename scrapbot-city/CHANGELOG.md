@@ -11,6 +11,14 @@
   secondo colpo non compra più (prima `A` `A` a 450–550 ms, o un secondo clic o tocco che cadeva sul pulsante
   dell'offerta, comprava i pezzi e costruiva; anche nella 0.7.0-alpha.1). Un tasto o `A` non preme un pulsante di una
   finestra nei suoi primi 600 ms (prima 400 ms); una pressione a sé, dopo, risponde come prima.
+- **Tocchi veloci su caselle vicine**: a zoom 1 due caselle vicine distano 17,9 px, meno dei 24 px di un dito, e il
+  secondo tocco era preso per un doppio tocco e rifiutato in silenzio; ogni tocco rifiutato allungava l'attesa, così
+  sei tocchi a 300 o 450 ms ne compravano 1 su 6. Ora un tocco rifiutato lo dice («Troppo presto dopo la pressione di
+  prima: premi di nuovo se era voluto», in tutte le lingue, come gli altri rifiuti) e non allunga l'attesa, che si
+  conta dall'ultima pressione accettata: gli stessi sei tocchi ne comprano 3 su 6 (uno sì e uno no), da 650 ms 6 su 6,
+  a zoom 2 sempre 6 su 6; un doppio tocco continua a non comprare mai due volte. Con la ruspa un doppio clic
+  sull'edificio già selezionato non dà il messaggio (non cambia niente). Un tocco sulla mappa che chiude il pannello
+  dello smog non conta come «la stessa casella»: il secondo tocco di quel doppio tocco non compra.
 
 ## In lavorazione — incremento 2, gruppo G2: le sei decorazioni del brief
 

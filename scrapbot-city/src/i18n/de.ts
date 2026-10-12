@@ -252,6 +252,7 @@ export const de: Dict = {
   'place.gate': 'Hier steht ein Tor: entferne es zuerst',
   'place.lamp': 'Hier steht eine Laterne: entferne sie zuerst',
   'place.paved': 'Hier liegt schon Industrieboden',
+  'place.double': 'Zu schnell nach dem letzten Druck: drück noch mal, wenn du es so wolltest',
   'place.modInstalled': 'Schon eingebaut',
   'place.modDock': 'Nur an einem fertigen Bot-Dock',
   'place.modSmelter': 'Nur an einem fertigen Schmelzofen',
