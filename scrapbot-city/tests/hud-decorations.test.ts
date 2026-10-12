@@ -29,7 +29,12 @@ beforeAll(() => {
   } as unknown as typeof ResizeObserver;
   Element.prototype.scrollIntoView = () => {};
 });
-afterEach(() => vi.restoreAllMocks());
+// (the presses of one test, made on a mocked clock, are not the press before in the next: Remove and Install skip the
+// second press of a double press)
+afterEach(() => {
+  vi.restoreAllMocks();
+  forgetPresses();
+});
 
 const DECOS = ['bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture'] as const;
 

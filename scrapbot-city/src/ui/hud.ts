@@ -737,7 +737,9 @@ export class Hud {
   // An item or Done pressed redraws the panel for the new tool (the tool box above the list comes or goes, the list
   // moves): the second press of a double press there (double click, double tap, A A: soon after and close to the press
   // before, src/ui/presses.ts) would land on another item or on Done. It does nothing. (The same for a decoration's
-  // Move and the Done that takes its place.)
+  // Move and the Done that takes its place, and for the side panel's costly buttons that a press can bring up under
+  // the next one: a piece's Remove, which comes where Done was when a move ends, and a module's Install or a piece's
+  // Remove under a press on the map that selected that building or piece where its panel opens.)
   private catalogSettled(): boolean {
     if (!secondPress()) return true;
     markSecond();
@@ -1047,6 +1049,9 @@ export class Hud {
         // cost the full price for half of it back).
         // (on that building only: another building's Install is not where the confirmation was)
         if (this.slotChangedId === b.id && guarded(this.slotChangedAt)) return;
+        // nor the second press of a double press on the building, on the map where this panel opens: the first press
+        // selected the building and brought the panel up under the second (src/ui/presses.ts)
+        if (!this.catalogSettled()) return;
         // one click, one module: the second click of a double click finds the button greyed out (it comes back
         // with the next update if the module could not go on)
         btn.disabled = true;
@@ -1185,7 +1190,14 @@ export class Hud {
       audio.play('click');
       this.handlers.onEndMove();
     });
-    panel.querySelector('[data-remove-piece]')?.addEventListener('click', () => this.handlers.onRemovePiece(i));
+    // Remove takes up what was bought, for half its price: never on the second press of a double press. That press can
+    // find Remove under it without meaning it: on a decoration with nothing to turn (planter, tree, fountain) Remove
+    // comes where Done was when a move ends, and a piece pressed twice on the map where this panel opens has its
+    // Remove brought up under the second press by the first.
+    panel.querySelector('[data-remove-piece]')?.addEventListener('click', () => {
+      if (!this.catalogSettled()) return;
+      this.handlers.onRemovePiece(i);
+    });
   }
 
   // Every frame, after the city's step (the session): the Remove button of the selected piece says what removing it

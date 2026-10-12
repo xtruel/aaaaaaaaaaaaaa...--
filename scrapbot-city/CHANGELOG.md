@@ -34,6 +34,13 @@
   stesso lo lascia lì. Durante lo spostamento `R`, `Shift`+rotella e `Y` ruotano l'oggetto (con `Y` mai un consiglio).
   Costruzioni (pavimenti, basamenti, recinzioni, muri, pilastri, cancelli), moduli ed edifici non si spostano. Il
   secondo colpo di un doppio clic su «Sposta» non preme «Fatto» che prende il suo posto, e viceversa.
+- **«Rimuovi» e «Installa» non prendono mai il secondo colpo di un doppio clic, doppio tocco o `A` `A`**: su una
+  fioriera, un albero o una fontana (che non si ruotano) «Rimuovi» compare dove era «Fatto» quando lo spostamento
+  finisce, e un doppio colpo su «Fatto» toglieva la decorazione (rimborso a metà): con il touch e il controller ogni
+  volta, col mouse a volte. Lo stesso, già prima di G3 (anche in 600e82d), per un oggetto o un edificio sulla destra
+  della mappa, dove si apre il suo pannello: il primo colpo lo selezionava e apriva il pannello, il secondo cadeva su
+  «Rimuovi» (l'oggetto tolto) o su «Installa» (un Bot Dock comprava il deposito, 30 crediti + 15 pezzi). Ora quel
+  secondo colpo non fa niente; un colpo a sé, dopo, rimuove o installa come prima.
 - **Si clicca quello che si vede**: muri e pilastri come le recinzioni (un clic sopra raggiunge l'edificio dietro);
   albero, fontana e statua prendono il clic sui propri pixel come le altre decorazioni.
 - **Nessun effetto su economia, felicità, smog, allineamento, stelle o achievement**: città del pilota automatico con

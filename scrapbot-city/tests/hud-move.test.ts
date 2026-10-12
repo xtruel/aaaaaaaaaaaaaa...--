@@ -4,6 +4,7 @@
 // really gives back), and the panel while a decoration is being moved (what to do, Done; no Remove), with the guard
 // against the second press of a double press on Move or Done (each takes the other's place).
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { placeBuilding, placeCheck } from '../src/game/actions';
 import { MAP_W, T } from '../src/game/defs';
 import { placePiece } from '../src/game/pieces';
 import type { PieceKind } from '../src/game/pieces';
@@ -31,6 +32,7 @@ beforeAll(() => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  forgetPresses();
   document.body.classList.remove('pad-mode');
 });
 
@@ -204,6 +206,92 @@ describe('the panel of a selected G3 piece', () => {
     press(q(root, '[data-move-piece]')!, 1000, 200);
     expect(calls.filter((c) => c[0] === 'onMovePiece')).toHaveLength(1);
     expect(calls.at(-1)).toEqual(['onEndMove']);
+  });
+
+  it('a planter, tree or fountain: Remove comes where Done was when a move ends; the second press of a double press on Done takes nothing up', () => {
+    const { s, root, calls, update } = setup();
+    let now = 5000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    forgetPresses();
+    const press = (el: HTMLElement, x: number, y: number) => {
+      notePress({ t: now, x, y, cam: '', tile: '' });
+      el.click();
+    };
+    const tiles = freeTiles(s, 6);
+    (['planter', 'tree', 'fountain'] as PieceKind[]).forEach((kind, n) => {
+      const { x, y } = tiles[n * 2];
+      expect(placePiece(s, kind, x, y)).toBe(true);
+      const i = y * MAP_W + x;
+      update({ selectedPiece: i, moving: i });
+      // nothing to turn: the plain panel has Move and Remove, and Remove is the button the move's Done gives way to
+      now += 2000;
+      press(q(root, '[data-move-done]')!, 1100, 260);
+      expect(calls.at(-1)).toEqual(['onEndMove']);
+      update({ selectedPiece: i, moving: -1 });
+      expect(q(root, '[data-inspector] [data-rotate]'), kind).toBeNull();
+      const n0 = calls.length;
+      for (const ms of [80, 300, 590]) {
+        now += ms;
+        press(q(root, '[data-inspector] [data-remove-piece]')!, 1100, 260);
+        expect(calls.length, `${kind}, second press ${ms} ms after Done`).toBe(n0);
+        now -= ms;
+      }
+      // a press of its own takes it up
+      now += 1500;
+      press(q(root, '[data-inspector] [data-remove-piece]')!, 1100, 260);
+      expect(calls.at(-1)).toEqual(['onRemovePiece', i]);
+    });
+  });
+
+  it('a double press on the map where the panel opens: the second press lands on Remove or Install and does nothing', () => {
+    const { s, root, calls, update } = setup();
+    let now = 9000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    forgetPresses();
+    // the first press: on the map (a tile, the map where it is), selecting the piece or the building
+    const onMap = (x: number, y: number) => notePress({ t: now, x, y, cam: '1,2,3', tile: '9,9' });
+    const onPanel = (el: HTMLElement, x: number, y: number, touch = false) => {
+      notePress({ t: now, x, y, cam: '1,2,3', tile: '', touch });
+      el.click();
+    };
+    const [p] = freeTiles(s, 1);
+    expect(placePiece(s, 'lamp', p.x, p.y, 0)).toBe(true);
+    const i = p.y * MAP_W + p.x;
+    // a double click (mouse: the same spot), a double tap (a finger: 15 px off)
+    for (const [dx, touch] of [
+      [0, false],
+      [15, true],
+    ] as const) {
+      now += 2000;
+      onMap(1100, 300);
+      update({ selectedPiece: i });
+      now += 120;
+      onPanel(q(root, '[data-inspector] [data-remove-piece]')!, 1100 + dx, 300, touch);
+      expect(calls.some((c) => c[0] === 'onRemovePiece')).toBe(false);
+    }
+    // a press of its own
+    now += 1000;
+    onPanel(q(root, '[data-inspector] [data-remove-piece]')!, 1100, 300);
+    expect(calls.at(-1)).toEqual(['onRemovePiece', i]);
+    // a finished Bot Dock: Install under the second press of a double tap on the Dock buys nothing
+    const hq = s.buildings[0];
+    let dock = null as ReturnType<typeof placeBuilding>;
+    for (let r = 3; r < 20 && !dock; r++)
+      for (let dy = -r; dy <= r && !dock; dy++)
+        for (let dx = -r; dx <= r && !dock; dx++) if (placeCheck(s, 'dock', hq.x + dx, hq.y + dy).ok) dock = placeBuilding(s, 'dock', hq.x + dx, hq.y + dy);
+    dock!.built = 1;
+    computeDerived(s);
+    now += 2000;
+    onMap(1130, 548);
+    update({ selectedId: dock!.id, selectedPiece: -1 });
+    now += 150;
+    onPanel(q(root, '[data-inspector] [data-install="dockStorage"]')!, 1132, 550, true);
+    expect(calls.some((c) => c[0] === 'onInstall')).toBe(false);
+    // a press of its own installs
+    now += 1000;
+    update({ selectedId: dock!.id, selectedPiece: -1 });
+    onPanel(q(root, '[data-inspector] [data-install="dockStorage"]')!, 1130, 548);
+    expect(calls.at(-1)).toEqual(['onInstall', dock!.id, 'dockStorage']);
   });
 
   it('in Italian too', async () => {
