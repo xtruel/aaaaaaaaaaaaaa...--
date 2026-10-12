@@ -1,5 +1,17 @@
 # Changelog
 
+## In lavorazione — incremento 2, integrazione di G2 (G0 + G1 + temi + G2)
+
+- **Una sola regola per il doppio clic in tutto il gioco** (`src/ui/presses.ts`): un doppio clic, un doppio tocco o
+  `A` premuto due volte durano fino a 500 ms (il doppio clic di Windows), letti con 100 ms di margine (600 ms: il gioco
+  vede una pressione un po' dopo), con il secondo colpo entro 10 px (mouse e controller) o 24 px (dito). La usano la
+  mappa con uno strumento in mano, il catalogo, i pulsanti costosi del pannello dell'edificio, il secondo clic che
+  raggiunge l'edificio nascosto (da 500 ms) e ora anche i pulsanti delle finestre. Corretto: quando il primo colpo,
+  con un edificio in mano e solo i pezzi mancanti, apre l'offerta di 2PM («compra i pezzi mancanti e costruisci»), il
+  secondo colpo non compra più (prima `A` `A` a 450–550 ms, o un secondo clic o tocco che cadeva sul pulsante
+  dell'offerta, comprava i pezzi e costruiva; anche nella 0.7.0-alpha.1). Un tasto o `A` non preme un pulsante di una
+  finestra nei suoi primi 600 ms (prima 400 ms); una pressione a sé, dopo, risponde come prima.
+
 ## In lavorazione — incremento 2, gruppo G2: le sei decorazioni del brief
 
 - **Sei decorazioni nuove** nel pannello «Oggetti e moduli», in una sezione **Decorazioni** insieme al lampione (tra

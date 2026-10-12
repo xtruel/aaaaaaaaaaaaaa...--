@@ -32,7 +32,7 @@ import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEv
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
-import { DOUBLE_PRESS, doubleDist, forgetPresses, lastPresses, notePress } from './ui/presses';
+import { SAME_PRESS_MS, forgetPresses, isDouble, lastPresses, notePress } from './ui/presses';
 import type { ModalAction } from './ui/modal';
 import { Tutorial } from './ui/tutorial';
 import type { Box } from './ui/tutorial';
@@ -583,7 +583,7 @@ export class GameSession implements PadTarget {
         button: e.button,
         pointerType: e.pointerType,
         // the HUD closed the smog panel on this very press, just before it reached the map
-        closedPanel: performance.now() - this.hud.smogClosedAt < 30,
+        closedPanel: performance.now() - this.hud.smogClosedAt < SAME_PRESS_MS,
       };
       // with floor or fence in hand the left mouse button drags out a row (a finger still moves the map)
       this.row = null;
@@ -911,17 +911,18 @@ export class GameSession implements PadTarget {
   }
 
   // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
-  // second press of a double click, double tap or A A, the press at (sx, sy) coming within DOUBLE_PRESS ms and
-  // doubleDist px of the one before with the map where it was and the same tool in hand (a click, then the bulldozer
-  // taken and a click on the same spot, is two meant presses), when it would do something the first one did not mean:
-  // land on the next tile across an edge (it would buy a second piece), land on the map behind a dialog or a panel the
-  // first press closed, or take up a second layer with the bulldozer (the floor under the fence just removed). On the
-  // tile the first press used, a piece or building tool goes ahead: there it can only be refused, with the reason.
+  // second press of a double click, double tap or A A, the press at (sx, sy) coming within PRESS_GUARD_MS and
+  // doubleDist px of the one before (isDouble, src/ui/presses.ts) with the map where it was and the same tool in hand
+  // (a click, then the bulldozer taken and a click on the same spot, is two meant presses), when it would do something
+  // the first one did not mean: land on the next tile across an edge (it would buy a second piece), land on the map
+  // behind a dialog or a panel the first press closed, or take up a second layer with the bulldozer (the floor under
+  // the fence just removed). On the tile the first press used, a piece or building tool goes ahead: there it can only
+  // be refused, with the reason.
   private meantPress(sx: number, sy: number): boolean {
     const [before, now] = lastPresses();
     const r = this.renderer;
     const cam = `${r.cam.x},${r.cam.y},${r.zoom}`;
-    const double = now.t - before.t < DOUBLE_PRESS && cam === before.cam && before.tool === this.toolKey() && Math.hypot(sx - before.x, sy - before.y) < doubleDist(before, now);
+    const double = before.tool === this.toolKey() && isDouble(before, { t: now.t, x: sx, y: sy, cam, touch: now.touch });
     if (!double) return true;
     const tile = r.screenToTile(sx, sy);
     return !this.bulldoze && before.tile !== '' && before.tile === `${tile.x},${tile.y}`;

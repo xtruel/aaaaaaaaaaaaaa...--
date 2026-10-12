@@ -1,6 +1,7 @@
 // One modal at a time, rendered into #modal-root. Keyboard: Esc closes when allowed.
 import { audio } from '../audio';
 import { t } from '../i18n';
+import { guarded, secondPress } from './presses';
 
 export interface ModalAction {
   label: string;
@@ -125,7 +126,10 @@ export function openModal(opts: ModalOptions): HTMLElement {
   else body.append(opts.body);
   dialog.append(body);
 
-  // Keys held when the dialog pops up (Space to pause, Enter) must not pick a story choice by accident.
+  // Keys held when the dialog pops up (Space to pause, Enter, the pad's A) must not pick a story choice by accident,
+  // nor the second press of a double press whose first press opened it (a building tool with only parts missing opens
+  // 2PM's offer to buy them and build: the second click, tap or A must not buy): for PRESS_GUARD_MS
+  // (src/ui/presses.ts) a button takes no key press and no second press of a double press. A press of its own works.
   const openedAt = performance.now();
   if (opts.actions?.length) {
     const actions = document.createElement('div');
@@ -137,7 +141,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
       b.disabled = !!a.disabled;
       b.innerHTML = `<span>${a.label}</span>${a.hint ? `<small>${a.hint}</small>` : ''}`;
       b.addEventListener('click', (e) => {
-        if (e.detail === 0 && performance.now() - openedAt < 400) return;
+        if (guarded(openedAt) && (e.detail === 0 || secondPress())) return;
         audio.play('click');
         a.onClick();
       });
@@ -157,7 +161,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
   setBackgroundInert(true);
   // Focus the dialog itself (Tab reaches the buttons) or its first text field; never pre-select a story choice.
   // With a controller, ordinary dialogs start on their main button so one press of A answers them
-  // (the 400 ms guard above still swallows a press that was meant for the screen behind).
+  // (the guard above still swallows a press that was meant for the screen behind).
   const field = dialog.querySelector<HTMLElement>('input[type="text"], input[type="number"]');
   dialog.tabIndex = -1;
   const pad = document.body.classList.contains('pad-mode') && opts.dismissable !== false;

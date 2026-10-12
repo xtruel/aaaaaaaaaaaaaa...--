@@ -13,7 +13,7 @@ import type { Building, GameState } from '../src/game/state';
 import { setLang } from '../src/i18n';
 import { Hud } from '../src/ui/hud';
 import type { HudHandlers, HudView } from '../src/ui/hud';
-import { DOUBLE_PRESS_MS, PRESS_GUARD_MS } from '../src/ui/pick';
+import { DOUBLE_PRESS_MS, PRESS_GUARD_MS } from '../src/ui/presses';
 
 // jsdom has no canvas, images or audio: the pictures and the sounds are not what is tested here
 vi.mock('../src/render/icons', () => ({ iconUrl: () => '', toolThumb: () => '', portraitUrl: () => '', pathColor: () => 'var(--muted)' }));

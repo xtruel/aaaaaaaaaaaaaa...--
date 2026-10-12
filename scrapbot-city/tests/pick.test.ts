@@ -10,7 +10,8 @@ import { computeDerived } from '../src/game/sim';
 import { createGame, idx } from '../src/game/state';
 import { standsInFront } from '../src/render/iso/depth';
 import { dozeTarget } from '../src/ui/catalog';
-import { DOUBLE_PRESS_MS, buildingBehind, pickAt, pieceBehind } from '../src/ui/pick';
+import { buildingBehind, pickAt, pieceBehind } from '../src/ui/pick';
+import { DOUBLE_PRESS_MS } from '../src/ui/presses';
 
 function spireCity() {
   const s = createGame({ seed: 91, cityName: 'Pick' });

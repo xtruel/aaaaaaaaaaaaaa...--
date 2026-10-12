@@ -5,24 +5,13 @@
 //   to what it shows through them on that tile: dozeTarget (src/ui/catalog.ts) decides, with buildingBehind below;
 // - without it (pickAt), a second click on the selected building, on the same tile, goes to what that building hides
 //   there: the building standing on the tile, else its fence, gate or lamp. The next click picks the front one again.
-// The second click of a double click does not count (it would flick the selection away and back). No DOM here.
+// The second click of a double click does not count (it would flick the selection away and back): the click reaches
+// behind from DOUBLE_PRESS_MS (src/ui/presses.ts, the one place for the game's double-press guards). No DOM here.
 import { BUILDINGS } from '../game/defs';
 import { idx, inBounds } from '../game/state';
 import type { GameState } from '../game/state';
 import { standsInFront } from '../render/iso/depth';
-
-// Two presses this close (ms) are one double press: a double click, a double tap, A pressed twice. 500 ms is Windows'
-// default double-click time. Its second press never counts as a press of its own: here it does not reach behind the
-// building; in the building panel (src/ui/hud.ts) it does not confirm a demolition or a module's removal that came up
-// where the first press was, nor buy back a module just taken off (there with PRESS_GUARD_MS's margin).
-export const DOUBLE_PRESS_MS = 500;
-
-// How long (ms) the building panel's costly buttons ignore a press after the press before: Demolish's and Remove's
-// confirmations after the press that brought them up, Install after a removal. A double press plus a margin, because
-// the game sees a press a little after it happens and not always equally late (the pad is read once a frame, a click
-// can wait for the frame being drawn): two presses 500 ms apart can reach it 510 ms or more apart. A press of its own
-// on a confirmation the player has read comes later than this.
-export const PRESS_GUARD_MS = DOUBLE_PRESS_MS + 100;
+import { DOUBLE_PRESS_MS } from './presses';
 
 function frontCovers(s: GameState, frontId: number, tx: number, ty: number): boolean {
   const b = s.buildings.find((o) => o.id === frontId);
