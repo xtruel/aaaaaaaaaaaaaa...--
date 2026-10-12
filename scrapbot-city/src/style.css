@@ -1906,6 +1906,8 @@ select {
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
+  /* the last row's border in sight at the end of the list */
+  padding-bottom: 3px;
 }
 
 .cat-section {
@@ -2030,6 +2032,444 @@ select {
 
 .cat-meta .cat-reason {
   font-size: inherit;
+}
+
+/* 0.7 (increment 2, G4): the catalog's categories and filters, and each item's state in words with an icon (never by
+   colour alone): a project to discover (its goal and the progress), not now (why), can be bought */
+.cat-nav {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.cat-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.cat-tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 3px 3px;
+  font-family: var(--f-display);
+  font-size: 13px;
+  line-height: 1.1;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(26, 16, 51, 0.7);
+  border-radius: var(--r-s) var(--r-s) 4px 4px;
+}
+
+.cat-tab:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.cat-tab.on {
+  color: var(--ink);
+  background: var(--pink);
+  border-color: var(--ink);
+}
+
+.cat-tab-name {
+  overflow-wrap: anywhere;
+}
+
+.cat-count {
+  font-size: 11px;
+  font-weight: 900;
+  opacity: 0.75;
+}
+
+/* a project found in this city that the catalog has not shown yet is in this tab */
+.cat-tab.fresh::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  background: var(--lime);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+
+.cat-filters {
+  display: flex;
+  gap: 4px;
+}
+
+.cat-filter {
+  flex: 1 1 auto;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--muted);
+  background: transparent;
+  border: 2px solid rgba(185, 173, 223, 0.35);
+  border-radius: 999px;
+}
+
+.cat-filter:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cat-filter.on {
+  color: var(--ink);
+  background: var(--cream);
+  border-color: var(--ink);
+}
+
+.cat-scroll > .cat-note:first-child {
+  margin-top: 6px;
+}
+
+.cat-empty {
+  margin: 10px 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cat-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 5px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.cat-state img {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.cat-state-label {
+  font-family: var(--f-display);
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.cat-state.state-available .cat-state-label {
+  color: var(--lime);
+}
+
+.cat-state.state-cantBuy .cat-state-label {
+  color: var(--red);
+}
+
+.cat-state.state-locked .cat-state-label {
+  color: var(--sky);
+}
+
+.cat-state .cat-reason {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* "1 per tile", "1 per Bot Dock": at the end of the state's line */
+.cat-state .cat-limit {
+  margin-left: auto;
+  font-weight: 400;
+}
+
+/* the tool box's own close button: only where it takes the head's place (a short window) */
+.cat-tool {
+  position: relative;
+}
+
+.cat-tool .cat-tool-x {
+  display: none;
+}
+
+.cat-project {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.cat-goal {
+  font-weight: 900;
+  color: var(--fg);
+}
+
+.cat-progress::before {
+  content: '· ';
+  color: var(--muted);
+}
+
+.cat-progress,
+.proj-progress {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--sky);
+}
+
+.proj-progress {
+  margin: 2px 0 0;
+}
+
+/* a project to discover: the picture dimmed (its words and icon say why) */
+.cat-item[data-state='locked'] .cat-pic img {
+  opacity: 0.4;
+  filter: grayscale(0.6);
+}
+
+.cat-item[data-state='locked'] .cost {
+  opacity: 0.7;
+}
+
+.cat-item.fresh {
+  border-color: var(--lime);
+}
+
+/* Open on a new project's notice: the row it asked for, marked for a moment */
+.cat-item.focus {
+  animation: cat-focus 1.2s ease-out 2;
+}
+
+@keyframes cat-focus {
+  0% {
+    box-shadow: 0 0 0 0 rgba(198, 244, 50, 0.9);
+    background: rgba(198, 244, 50, 0.25);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(198, 244, 50, 0);
+  }
+}
+
+/* a module's project in the building panel: its goal (not a refusal) */
+.cat-reason.is-goal {
+  color: var(--fg);
+  font-weight: 900;
+}
+
+.mod-state.state-locked {
+  color: var(--sky);
+}
+
+.insp-mod .proj-progress + .insp-actions {
+  margin-top: 6px;
+}
+
+/* the badge on the Objects & modules button: projects found that the catalog has not shown yet */
+.tool-badge {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  z-index: 1;
+  min-width: 20px;
+  padding: 0 5px;
+  font-family: var(--f-display);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  color: var(--ink);
+  background: var(--lime);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+}
+
+/* a new project's notice: "New project: Bench" and Open (in the HUD, where it covers nothing in use) */
+.proj-note {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(400px, calc(100% - 16px));
+  padding: 6px 6px 6px 6px;
+  color: var(--ink);
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: var(--r);
+  box-shadow: 0 4px 0 var(--ink);
+  animation: toast-in 0.45s var(--pop);
+  transition: opacity 0.5s;
+}
+
+/* just appeared or grew: presses go through to the map (a placement aimed there is never taken by Open) */
+.proj-note.arming {
+  pointer-events: none;
+}
+
+.proj-note.leaving {
+  opacity: 0;
+}
+
+.proj-note-ico {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  background: var(--sky);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+
+.proj-note-ico img {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+}
+
+.proj-note-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.proj-note-text small {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.proj-note-text b {
+  font-family: var(--f-display);
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.btn.proj-note-open {
+  flex: none;
+  width: auto;
+  padding: 6px 14px;
+  font-size: 16px;
+}
+
+/* A short window (1280x720, 1024x640): the catalog gives its list the room. A little wider (fewer lines per row), a
+   slimmer head; with an item in hand the tool box takes the head's place (with its own close button) and leaves the
+   keys out of its help (Rotate is right under it); tabs, filters and rows tighter. */
+@media (max-height: 760px) {
+  .catalog {
+    width: 400px;
+  }
+
+  .catalog .cat-help-turn {
+    display: none;
+  }
+
+  .catalog .insp-head {
+    padding-block: 4px;
+  }
+
+  .catalog .cat-head .tool-plate {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .catalog .cat-head .tool-plate img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .catalog .cat-head .tag {
+    display: none;
+  }
+
+  .catalog .insp-head h3 {
+    font-size: 17px;
+  }
+
+  .catalog.has-tool .cat-head {
+    display: none;
+  }
+
+  .catalog .cat-tool {
+    margin-top: 6px;
+    padding: 5px 8px 6px;
+  }
+
+  .catalog.has-tool .cat-tool {
+    padding-right: 40px;
+  }
+
+  .catalog.has-tool .cat-tool-x {
+    display: grid;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+
+  /* the help and its buttons side by side */
+  .catalog .cat-tool {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .catalog .cat-help {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .catalog .cat-tool-btns {
+    flex: none;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .catalog .cat-tool-btns .btn {
+    padding: 2px 10px;
+    font-size: 14px;
+  }
+
+  /* one per tile, one per building: the module note says it for the modules, a tile takes one piece anyway */
+  .catalog .cat-state .cat-limit {
+    display: none;
+  }
+
+  .catalog .cat-nav {
+    margin-top: 6px;
+    gap: 4px;
+  }
+
+  .catalog .cat-tab {
+    padding-block: 3px 2px;
+    font-size: 12px;
+  }
+
+  .catalog .cat-filter {
+    padding-block: 1px;
+    font-size: 11px;
+  }
+
+  .catalog .cat-scroll > .cat-note:first-child {
+    margin-top: 4px;
+  }
+
+  .catalog .cat-note {
+    font-size: 11px;
+  }
+
+  .catalog .cat-list {
+    gap: 3px;
+  }
+
+  .catalog .cat-item {
+    padding-block: 2px;
+  }
 }
 
 /* the module slots of a Dock or a Smelter */
@@ -3354,7 +3794,8 @@ input[type='number'] {
 /* in a city the HUD sets --toast-top just below its top bar and smog alarm */
 .toasts {
   position: fixed;
-  top: var(--toast-top, 70px);
+  /* under the top bar and the smog alarm, and under a new project's notice when it is up there */
+  top: max(var(--toast-top, 70px), var(--note-bottom, 0px));
   left: 50%;
   z-index: 50;
   display: flex;

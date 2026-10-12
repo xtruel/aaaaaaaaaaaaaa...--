@@ -10,6 +10,8 @@ import { freeHintsLeft, hintPrice, suggest } from './game/hints';
 import type { Hint } from './game/hints';
 import { dragPath, installModule, isModuleKind, isMovable, isPieceKind, moduleCheck, moveCheck, movePiece, normRot, pieceAt, pieceCheck, placePiece, removeModule, removePieceAt, rotatePieceAt, rowCarriesOver } from './game/pieces';
 import type { CatalogKind, ModuleKind } from './game/pieces';
+import { isLocked, lockedReason } from './game/projects';
+import type { GoalStat, ProjectKind } from './game/projects';
 import { advance, computeDerived, dayPhase } from './game/sim';
 import { canAutosave, day, idx, inBounds, pushMessage } from './game/state';
 import type { Building, FxEvent, GameState } from './game/state';
@@ -22,6 +24,7 @@ import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
 import type { ViewState } from './render/renderer';
 import { buildingArt } from './render/iso/atlas';
+import { ProjectTracker } from './profile';
 import { citySlot, saveGame, setLastPlayed, setTutorialDone, slotMeta, unlockEnding } from './storage';
 import type { Settings, SlotId } from './storage';
 import { catalogName, dozeLabel, dozeTarget, isRotatable, isRowKind, moduleLabel, moduleNeeds, pieceInfo, turnKey } from './ui/catalog';
@@ -143,6 +146,10 @@ export class GameSession implements PadTarget {
   private hudCheckIn = 0; // seconds until the HUD's size is measured again (camera margins)
   private padHover: HTMLElement | null = null;
   private cursor = { x: 0, y: 0 };
+  // the projects to discover (docs/MODULAR-INC2.md §4): fills s.unlocked from the profile, then finds what the city
+  // reaches as it goes (no chance, nothing in the sim changes)
+  private projects: ProjectTracker;
+  private bestOf = (stat: GoalStat) => this.projects.bestOf(stat);
 
   constructor(root: HTMLElement, s: GameState, settings: Settings, handlers: SessionHandlers, fromSlot: SlotId | null = null) {
     this.root = root;
@@ -150,6 +157,8 @@ export class GameSession implements PadTarget {
     this.homeSlot = fromSlot;
     // stats shown by the HUD and used by hints are ready before the first step (paused, intro dialog, pending event)
     computeDerived(s);
+    // the projects the player has discovered, and what this city's data proves (a loaded save, the campaign's Spires)
+    this.projects = new ProjectTracker(s);
     this.settings = settings;
     this.handlers = handlers;
     root.innerHTML = `<canvas class="world" aria-label="${t('hud.map')}"></canvas><div class="hud"></div><div class="pad-cursor" aria-hidden="true" hidden></div>`;
@@ -191,9 +200,11 @@ export class GameSession implements PadTarget {
           // follows, must not take up the floor under a lamp just removed
           if (i === this.selectedPiece && removePieceAt(this.s, i % MAP_W, Math.floor(i / MAP_W))) this.selectedPiece = -1;
         },
+        onOpenProject: (kind) => this.openProject(kind),
       },
       s,
     );
+    this.hud.notifyProjects(this.projects.foundAtStart);
     this.renderer.zoom = window.innerHeight >= 900 ? 3 : 2;
     this.renderer.resize();
     this.renderer.paintAllTerrain(s);
@@ -234,6 +245,7 @@ export class GameSession implements PadTarget {
   }
 
   dispose(): void {
+    this.projects.flush();
     this.alive = false;
     cancelAnimationFrame(this.raf);
     for (const d of this.disposers) d();
@@ -267,6 +279,8 @@ export class GameSession implements PadTarget {
   }
 
   save(): void {
+    // the projects' maxima go with every save (a discovery is written at once)
+    this.projects.flush();
     const slot = this.slot;
     if (!slot || this.s.outcome?.kind === 'smog') return;
     const ok = saveGame(slot, this.s);
@@ -389,6 +403,9 @@ export class GameSession implements PadTarget {
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.1;
+      // projects reached in this city: discovered, written to the profile, announced (nothing else changes)
+      const found = this.projects.check(s);
+      if (found.length) this.hud.notifyProjects(found);
       const goalCard = !this.tutorial || this.tutorial.showsGoal;
       this.hud.update(s, {
         speed: this.speed,
@@ -400,6 +417,8 @@ export class GameSession implements PadTarget {
         catalog: this.catalog,
         selectedPiece: this.selectedPiece,
         moving: this.moving,
+        best: this.bestOf,
+        pointer: this.pointer.x >= 0 && (this.pointer.inside || this.padOn) ? { x: this.pointer.x, y: this.pointer.y } : null,
       });
       // a tutorial step done by placing a building puts the build tool away, so the next step starts clean
       // instead of with a red "already there" ghost on the building just placed
@@ -746,11 +765,15 @@ export class GameSession implements PadTarget {
       if (e.key === 'Meta') this.keys.clear();
     });
     this.listen(window, 'blur', () => this.keys.clear());
-    // closing the tab or window mid-day should not lose the day
-    this.listen(window, 'pagehide', () => this.autosave());
+    // closing the tab or window mid-day should not lose the day (nor the projects' maxima)
+    this.listen(window, 'pagehide', () => {
+      this.projects.flush();
+      this.autosave();
+    });
     // pause while the game is hidden (alt-tab, minimised window), resume when it comes back
     this.listen(document, 'visibilitychange', () => {
       if (document.hidden) {
+        this.projects.flush();
         audio.suspend();
         if (this.speed > 0) {
           this.pausedByHide = true;
@@ -1110,6 +1133,15 @@ export class GameSession implements PadTarget {
     this.selectedPiece = -1;
   }
 
+  // A new project's Open: the catalog opens (or stays open) at that item, in its category; nothing is taken in hand or
+  // bought, and the tool in hand stays.
+  private openProject(kind: CatalogKind): void {
+    this.catalog = true;
+    this.selectedId = -1;
+    this.selectedPiece = -1;
+    this.hud.focusItem(kind);
+  }
+
   // Closing the panel puts its tool away too (the Rotate button a finger needs goes with it).
   private closeCatalog(): void {
     this.catalog = false;
@@ -1123,6 +1155,11 @@ export class GameSession implements PadTarget {
     if (!kind || this.piece?.kind === kind) {
       this.piece = null;
       this.row = null;
+      return;
+    }
+    // a project still to discover is not taken in hand: its goal and the city's progress say why
+    if (isLocked(this.s, kind)) {
+      this.refuse(lockedReason(this.s, kind as ProjectKind));
       return;
     }
     this.build = null;

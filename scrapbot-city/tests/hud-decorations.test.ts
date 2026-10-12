@@ -81,16 +81,23 @@ describe('catalog: the Decorations section', () => {
     const { s, root, update } = setup();
     update({ catalog: true });
     const panel = q(root, '[data-catalog-panel]')!;
-    const heads = [...panel.querySelectorAll('h4.cat-section')].map((h) => h.textContent);
-    expect(heads).toEqual(['Construction', 'Decorations', 'Machine modules']);
-    const lists = [...panel.querySelectorAll('.cat-list')].map((l) => [...l.querySelectorAll<HTMLElement>('[data-item]')].map((b) => b.dataset.item));
+    // three categories (G4), one list at a time, each with its note: constructions and decorations do nothing to
+    // the economy (the Construction note says so of constructions, not "Decoration")
+    const tabs = [...panel.querySelectorAll('[data-cat] .cat-tab-name')].map((h) => h.textContent);
+    expect(tabs).toEqual(['Construction', 'Decorations', 'Modules']);
+    const notes: string[] = [];
+    const lists = ['construction', 'decorations', 'modules'].map((cat) => {
+      q(panel, `[data-cat="${cat}"]`)!.click();
+      notes.push(q(panel, '.cat-note')!.textContent!);
+      return [...panel.querySelectorAll<HTMLElement>('[data-item]')].map((b) => b.dataset.item);
+    });
     expect(lists).toEqual([
       ['floor', 'fence', 'gate', 'base', 'wall', 'pillar'],
       ['lamp', ...DECOS, 'tree', 'fountain', 'statue'],
       ['dockStorage', 'smelterFilter', 'recyclerMagnet', 'recyclerSorter', 'factoryArm', 'podsCapsule', 'solarTracker', 'purifierNozzle'],
     ]);
-    // the note under the section: decorations do nothing to the economy
-    expect(panel.querySelectorAll('.cat-note')[1].textContent).toBe('Decoration: no effect on the economy');
+    expect(notes).toEqual(['Construction: no effect on the economy', 'Decoration: no effect on the economy', 'One module per building, paid by the city it goes in']);
+    q(panel, '[data-cat="decorations"]')!.click();
     const item = (k: string) => q(panel, `[data-item="${k}"]`)!;
     expect(item('bench').querySelector('.cat-name')!.textContent).toBe('Bench');
     expect(item('cathouse').querySelector('.cat-name')!.textContent).toBe("Miso's house");
@@ -123,6 +130,7 @@ describe('catalog: the Decorations section', () => {
     update({ catalog: true });
     const panel = q(root, '[data-catalog-panel]')!;
     const item = (k: string) => q(panel, `[data-item="${k}"]`)!;
+    q(panel, '[data-cat="decorations"]')!.click();
     press(item('bench'), 900, 300);
     // the panel is redrawn for the bench, the list moves: the second press of a double click lands on the planter
     update({ catalog: true, piece: { kind: 'bench', rot: 0 } });
@@ -142,6 +150,7 @@ describe('catalog: the Decorations section', () => {
     press(item('sign'), 950, 200);
     expect(calls.at(-1)).toEqual(['onPick', null]);
     // item, a right click on the map, the same item again within 350 ms: three presses, all meant (scripted play)
+    q(panel, '[data-cat="construction"]')!.click();
     now += 1000;
     press(item('fence'), 900, 250);
     now += 120;

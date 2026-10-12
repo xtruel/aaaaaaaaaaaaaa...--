@@ -79,10 +79,17 @@ describe('catalog: the six G3 pieces', () => {
     const { s, root, update } = setup();
     update({ catalog: true });
     const panel = q(root, '[data-catalog-panel]')!;
-    const lists = [...panel.querySelectorAll('.cat-list')].map((l) => [...l.querySelectorAll<HTMLElement>('[data-item]')].map((b) => b.dataset.item));
-    expect(lists[0]).toEqual(['floor', 'fence', 'gate', 'base', 'wall', 'pillar']);
-    expect(lists[1]).toEqual(['lamp', 'bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture', 'tree', 'fountain', 'statue']);
-    const item = (k: string) => q(panel, `[data-item="${k}"]`)!;
+    // one category at a time (G4): its tab shows its list
+    const list = (cat: string) => {
+      q(panel, `[data-cat="${cat}"]`)!.click();
+      return [...panel.querySelectorAll<HTMLElement>('[data-item]')].map((b) => b.dataset.item);
+    };
+    expect(list('construction')).toEqual(['floor', 'fence', 'gate', 'base', 'wall', 'pillar']);
+    expect(list('decorations')).toEqual(['lamp', 'bench', 'planter', 'sign', 'pergola', 'cathouse', 'sculpture', 'tree', 'fountain', 'statue']);
+    const item = (k: string) => {
+      q(panel, `[data-cat="${['tree', 'fountain', 'statue'].includes(k) ? 'decorations' : 'construction'}"]`)!.click();
+      return q(panel, `[data-item="${k}"]`)!;
+    };
     const want: Record<string, [string, string, string, string]> = {
       base: ['Concrete base', '4', '', ''],
       wall: ['Low wall', '2', '', '4'],
@@ -103,6 +110,7 @@ describe('catalog: the six G3 pieces', () => {
     expect(item('tree').querySelector('.cat-effect')!.textContent).toContain('no effect on smog or happiness');
     // too little scrap for a wall: greyed out with what is missing
     s.res.scrap = 1;
+    item('wall');
     update({ catalog: true });
     expect(item('wall').classList.contains('cant')).toBe(true);
     expect(item('wall').querySelector('.cat-reason')!.textContent).toBe('Missing 3 scrap');

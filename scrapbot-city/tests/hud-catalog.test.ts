@@ -121,7 +121,12 @@ describe('catalog panel', () => {
     expect(panel.hidden).toBe(false);
     expect(q(root, '[data-inspector]')!.hidden).toBe(true);
     expect(q(root, '[data-catalog]')!.classList.contains('active')).toBe(true);
-    const items = [...panel.querySelectorAll<HTMLElement>('[data-item]')];
+    // one category at a time (G4): Construction, Decorations, Modules, each in catalog order
+    const items: HTMLElement[] = [];
+    for (const cat of ['construction', 'decorations', 'modules']) {
+      q(panel, `[data-cat="${cat}"]`)!.click();
+      items.push(...panel.querySelectorAll<HTMLElement>('[data-item]'));
+    }
     expect(items.map((b) => b.dataset.item)).toEqual([
       'floor',
       'fence',
@@ -150,14 +155,16 @@ describe('catalog panel', () => {
     ]);
     expect(panel.textContent).toContain('Construction');
     expect(panel.textContent).toContain('Decorations');
-    expect(panel.textContent).toContain('Machine modules');
-    // no Dock yet: the module says why it cannot be had
-    const dock = items.find((b) => b.dataset.item === 'dockStorage')!;
+    expect(panel.textContent).toContain('Modules');
+    // no Dock yet: the module says why it cannot be had (Modules is the tab on show)
+    const dock = q(panel, '[data-item="dockStorage"]')!;
     expect(dock.classList.contains('cant')).toBe(true);
     expect(dock.querySelector('.cat-reason')!.textContent).toBe('Only on a finished Bot Dock');
     expect(dock.textContent).toContain('80 → 180');
-    expect(items[1].querySelector('.cat-limit')!.textContent).toBe('1 per tile');
-    items[1].click();
+    q(panel, '[data-cat="construction"]')!.click();
+    const fence = q(panel, '[data-item="fence"]')!;
+    expect(fence.querySelector('.cat-limit')!.textContent).toBe('1 per tile');
+    fence.click();
     expect(calls).toEqual([['onPick', 'fence']]);
   });
 
@@ -200,9 +207,11 @@ describe('catalog panel', () => {
     s.res.credits = 5;
     s.res.parts = 0;
     update({ catalog: true });
+    q(root, '[data-cat="decorations"]')!.click();
     const lamp = q(root, '[data-item="lamp"]')!;
     expect(lamp.classList.contains('cant')).toBe(true);
     expect(lamp.querySelector('.cat-reason')!.textContent).toBe('Missing 5 credits + 2 parts');
+    q(root, '[data-cat="construction"]')!.click();
     expect(q(root, '[data-item="fence"]')!.classList.contains('cant')).toBe(false);
   });
 
@@ -211,6 +220,7 @@ describe('catalog panel', () => {
     s.res.credits = 5;
     s.res.parts = 0;
     update({ catalog: true });
+    q(root, '[data-cat="decorations"]')!.click();
     const lamp = q(root, '[data-item="lamp"]')!;
     s.res.credits = 7.5;
     update({ catalog: true });

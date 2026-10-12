@@ -6,8 +6,10 @@ import { freeHintsLeft, hintPrice } from '../game/hints';
 import { BUILD_ORDER, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, PARTS_RESERVE, SMOG_DANGER, SMOG_LIMIT_SECONDS } from '../game/defs';
 import type { BuildingType, Cost } from '../game/defs';
 import { scrapWaiting } from '../game/economy';
-import { CATALOG_ORDER, MODULES, PIECES, buildingStats, demolishRefund, installedModules, isModuleKind, isPieceKind, moduleRefund } from '../game/pieces';
+import { MODULES, PIECES, buildingStats, demolishRefund, installedModules, isModuleKind, isPieceKind, moduleRefund } from '../game/pieces';
 import type { CatalogKind, ModuleKind } from '../game/pieces';
+import { isLocked, isProject } from '../game/projects';
+import type { GoalStat, ProjectKind } from '../game/projects';
 import { dayPhase } from '../game/sim';
 import { day } from '../game/state';
 import type { Building, GameState, Message } from '../game/state';
@@ -20,9 +22,10 @@ import type { IconName } from '../render/icons';
 import { atlasImage, frame } from '../render/iso/atlas';
 import { PAL, makeCanvas } from '../render/sprites';
 import {
-  CONSTRUCTION,
-  DECORATIONS,
-  MACHINE_MODULES,
+  CATEGORIES,
+  FILTERS,
+  ITEM_STATE_ICON,
+  ITEM_STATE_TEXT,
   buildingDesc,
   buildingRows,
   catalogCost,
@@ -30,7 +33,13 @@ import {
   catalogLimit,
   catalogName,
   catalogState,
+  categoryCount,
+  categoryItems,
+  categoryName,
+  categoryNote,
+  categoryOf,
   demolishHousingDrop,
+  filterItems,
   demolishStorageDrop,
   homesLost,
   isRotatable,
@@ -42,14 +51,17 @@ import {
   overtimeLeft,
   pieceInfo,
   powerShortAfter,
+  projectGoal,
+  projectProgress,
   rowLabel,
   scrapLost,
   slotModules,
   statusLine,
 } from './catalog';
-import type { ModuleState, PieceInfo, StatusLine } from './catalog';
+import type { CatalogCategory, CatalogFilter, ModuleState, PieceInfo, StatusLine } from './catalog';
 import { esc } from './escape';
-import { guarded, markSecond, secondPress } from './presses';
+import { isModalOpen } from './modal';
+import { PRESS_GUARD_MS, guarded, markSecond, secondPress } from './presses';
 import { airReport, perDayText } from './smog';
 import type { AirRow } from './smog';
 
@@ -73,6 +85,7 @@ export interface HudHandlers {
   onMovePiece(i: number): void; // start moving the selected decoration (the next press on the map says where)
   onEndMove(): void; // Done while moving: it stays where it was
   onRemovePiece(i: number): void;
+  onOpenProject(kind: CatalogKind): void; // a new project's Open: the catalog opens at that item (nothing is bought)
 }
 
 export interface HudView {
@@ -85,7 +98,14 @@ export interface HudView {
   catalog: boolean; // the Objects & modules panel is open (it takes the building panel's place)
   selectedPiece: number; // tile index of the selected fence, gate, lamp, wall, pillar, decoration or surface; -1 none
   moving?: number; // the selected decoration is being moved (its tile index); -1 or left out: no
+  best?: (stat: GoalStat) => number; // the most reached for a goal's measure in any one city (the projects profile)
+  pointer?: { x: number; y: number } | null; // the mouse or the controller's cursor: a new project's notice keeps off it
 }
+
+// How long a new project's notice stays (seconds while no dialog is open).
+export const NOTICE_SECONDS = 12;
+// At most this many names in the notice; more read "+N".
+const NOTICE_NAMES = 3;
 
 // The cause of a building's state: its words, with an icon so it never reads by colour alone.
 function statusHtml(line: StatusLine): string {
@@ -205,6 +225,19 @@ export class Hud {
   private slotChangedId = -1; // on which building
   private renderedId = -1; // the building whose panel was drawn last (a piece's panel: -1)
   private catalogKey = '';
+  // the catalog's category and filter (kept while the city is played), the tool in hand at its last drawing, the item
+  // a new project's Open asked for (scrolled to and marked at the next drawing), the projects found in this city that
+  // the catalog has not shown yet (a badge on its button, a dot on their tab) and those it is showing now
+  private catCategory: CatalogCategory = 'construction';
+  private catFilter: CatalogFilter = 'all';
+  private catActive: CatalogKind | null = null;
+  private focusKind: CatalogKind | null = null;
+  private fresh = new Set<CatalogKind>();
+  private seen = new Set<CatalogKind>();
+  // a new project's notice: what it announces, seconds left, and when it last appeared or grew (performance.now())
+  private notice: { kinds: ProjectKind[]; left: number; armedAt: number } | null = null;
+  private noticeTick = 0;
+  private best: (stat: GoalStat) => number = () => 0;
   // when the smog panel last closed (performance.now()): the map takes no purchase in the moments after (session)
   smogClosedAt = -Infinity;
   private starsKey = '';
@@ -233,12 +266,14 @@ export class Hud {
     this.smogKey = '';
     this.last = {};
     this.build();
+    this.renderNotice();
   }
 
   dispose(): void {
     this.layout.disconnect();
     document.removeEventListener('pointerdown', this.pressOutside, true);
     document.documentElement.style.removeProperty('--toast-top');
+    document.documentElement.style.removeProperty('--note-bottom');
   }
 
   // The top bar wraps on narrower windows (and when income rates widen its chips), and the build bar is
@@ -331,6 +366,11 @@ export class Hud {
       </aside>
       <aside class="inspector" data-inspector hidden></aside>
       <aside class="inspector catalog" data-catalog-panel aria-label="${esc(t('hud.catalog'))}" hidden></aside>
+      <div class="proj-note" data-project-note role="status" aria-live="polite" hidden>
+        <span class="proj-note-ico"><img src="${iconUrl('discover', 3)}" alt="" /></span>
+        <span class="proj-note-text"><small data-note-title></small><b data-note-names></b></span>
+        <button type="button" class="btn btn-primary proj-note-open" data-project-open>${esc(t('proj.open'))}</button>
+      </div>
       <div class="tooltip" data-tooltip hidden></div>
       <nav class="toolbar" data-toolbar aria-label="${t('hud.build')}"></nav>
     `;
@@ -338,7 +378,7 @@ export class Hud {
       const key = node.closest<HTMLElement>('[data-res]')!.dataset.res!;
       this.el[`${key}:${node.hasAttribute('data-v') ? 'v' : 'cap'}`] = node;
     }
-    for (const name of ['smog-bar', 'smog', 'smog-meter', 'smog-panel', 'smog-level', 'smog-body', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'tooltip', 'toolbar']) {
+    for (const name of ['smog-bar', 'smog', 'smog-meter', 'smog-panel', 'smog-level', 'smog-body', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'project-note', 'tooltip', 'toolbar']) {
       this.el[name] = this.root.querySelector(`[data-${name}]`)!;
     }
     this.el.wait = this.root.querySelector('[data-wait]')!; // "+N waiting" next to the scrap
@@ -361,6 +401,18 @@ export class Hud {
     this.root.querySelector('[data-menu]')!.addEventListener('click', () => {
       audio.play('click');
       this.handlers.onMenu();
+    });
+    // a new project's Open: the catalog at that item, nothing bought. It takes no press while the notice is just
+    // appearing or growing (it lets presses through to the map then, see placeNotice), nor the second press of a
+    // double press
+    this.root.querySelector('[data-project-open]')!.addEventListener('click', () => {
+      const n = this.notice;
+      if (!n || performance.now() - n.armedAt < PRESS_GUARD_MS) return;
+      if (!this.catalogSettled()) return;
+      audio.play('click');
+      this.notice = null;
+      this.renderNotice();
+      this.handlers.onOpenProject(n.kinds[0]);
     });
     this.el['smog-meter'].addEventListener('click', () => {
       audio.play('click');
@@ -434,7 +486,8 @@ export class Hud {
     catalog.innerHTML = `
       <kbd>${keyLabel('KeyO', 'O')}</kbd>
       <span class="tool-plate"><img src="${coneIcon(3)}" alt="" /></span>
-      <span class="tool-text"><span class="tool-name">${esc(t('hud.catalog'))}</span></span>`;
+      <span class="tool-text"><span class="tool-name">${esc(t('hud.catalog'))}</span></span>
+      <span class="tool-badge" data-catalog-badge hidden></span>`;
     catalog.addEventListener('click', () => {
       audio.play('click');
       this.handlers.onCatalog();
@@ -444,6 +497,7 @@ export class Hud {
     tools.innerHTML = `<span class="group-label">${t('hud.group.tools')}</span><div class="group-tools"></div>`;
     tools.querySelector('.group-tools')!.append(doze, catalog);
     toolbar.append(tools);
+    this.updateBadge();
 
     this.layout.disconnect();
     for (const el of this.root.querySelectorAll('.hud-top, .hud-top > *, [data-toolbar], [data-smog-alert]')) this.layout.observe(el);
@@ -538,6 +592,7 @@ export class Hud {
 
   update(s: GameState, view: HudView): void {
     const d = s.derived;
+    this.best = view.best ?? (() => 0);
     this.bump('scrap', Math.floor(s.res.scrap));
     this.bump('parts', Math.floor(s.res.parts));
     this.bump('credits', Math.floor(s.res.credits / 5) * 5);
@@ -643,6 +698,118 @@ export class Hud {
 
     this.updateCatalog(s, view);
     this.updateInspector(s, view);
+    this.updateNotice(view);
+  }
+
+  // ---------- a new project's notice ----------
+
+  // Projects just discovered: "New project: Bench" with Open, which opens the catalog at that item (nothing is bought).
+  // Several at once, or more while it shows, make one notice ("New projects (3)"). They are marked new in the catalog
+  // (a badge on its button, a dot on their tab) until it has shown them.
+  notifyProjects(kinds: readonly ProjectKind[]): void {
+    if (!kinds.length) return;
+    for (const k of kinds) this.fresh.add(k);
+    const list = this.notice ? [...this.notice.kinds, ...kinds.filter((k) => !this.notice!.kinds.includes(k))] : [...kinds];
+    this.notice = { kinds: list, left: NOTICE_SECONDS, armedAt: performance.now() };
+    audio.play('done');
+    this.renderNotice();
+    // (a catalog open now shows the new state of its rows in place, without moving them: markCatalog)
+    this.updateBadge();
+  }
+
+  private renderNotice(): void {
+    const el = this.el['project-note'];
+    if (!el) return;
+    const n = this.notice;
+    el.hidden = !n;
+    if (!n) {
+      document.documentElement.style.setProperty('--note-bottom', '0px');
+      return;
+    }
+    const names = n.kinds.slice(0, NOTICE_NAMES).map((k) => catalogName(k));
+    const more = n.kinds.length - names.length;
+    el.querySelector('[data-note-title]')!.textContent = n.kinds.length === 1 ? t('proj.newOne') : t('proj.newMany', { n: n.kinds.length });
+    el.querySelector('[data-note-names]')!.textContent = `${names.join(', ')}${more > 0 ? ` +${more}` : ''}`;
+    el.setAttribute('aria-label', t('proj.notice', { name: n.kinds.map((k) => catalogName(k)).join(', ') }));
+    el.classList.add('arming');
+  }
+
+  // The notice counts down only while no dialog covers it (an ending, a story event: it is still there after).
+  private updateNotice(view: HudView): void {
+    const now = performance.now();
+    const dt = Math.min(0.5, Math.max(0, (now - this.noticeTick) / 1000));
+    this.noticeTick = now;
+    const n = this.notice;
+    if (!n) return;
+    if (!isModalOpen()) n.left -= dt;
+    if (n.left <= 0) {
+      this.notice = null;
+      this.renderNotice();
+      return;
+    }
+    const el = this.el['project-note'];
+    // just appeared or grew: presses go through it to the map (a placement aimed there is not taken by Open)
+    el.classList.toggle('arming', now - n.armedAt < PRESS_GUARD_MS);
+    el.classList.toggle('leaving', n.left < 0.6);
+    this.placeNotice(view.pointer ?? null);
+  }
+
+  // Where the notice goes: under the top bar, or else above the build bar, wherever it covers none of what the player
+  // is using: the tutorial's bubble, the side panels, the goal card, the smog alarm, the bars, an achievement, and the
+  // spot under the mouse or the controller's cursor (so it never lands under a press about to be made).
+  private placeNotice(pointer: { x: number; y: number } | null): void {
+    const el = this.el['project-note'];
+    const vw = window.innerWidth;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const boxes = (sel: string) =>
+      [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => !e.hidden && e.offsetParent !== null).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
+    const hard = [...boxes('.coach'), ...boxes('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective], [data-smog-alert], .hud-top > *, [data-toolbar], #toasts .toast')];
+    const soft = boxes('[data-feed] .msg');
+    if (pointer && pointer.x >= 0) hard.push(new DOMRect(pointer.x - 40, pointer.y - 40, 80, 80));
+    const overlap = (a: DOMRect, x: number, y: number) => Math.max(0, Math.min(a.right, x + w) - Math.max(a.left, x)) * Math.max(0, Math.min(a.bottom, y + h) - Math.max(a.top, y));
+    const below = parseFloat(this.root.style.getPropertyValue('--below-alarm')) || 80;
+    const dock = this.el.toolbar.getBoundingClientRect().top;
+    const xs = [(vw - w) / 2, 12, vw - w - 12];
+    const spots: { x: number; y: number; top: boolean }[] = [];
+    for (const x of xs) spots.push({ x, y: below, top: true });
+    for (const x of xs) spots.push({ x, y: dock - h - 12, top: false });
+    let best = spots[0];
+    let bestCost = Infinity;
+    spots.forEach((p, i) => {
+      const x = Math.max(8, Math.min(vw - w - 8, p.x));
+      const cost = hard.reduce((c, r) => c + overlap(r, x, p.y) * 100, 0) + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = { ...p, x };
+      }
+    });
+    el.style.left = `${Math.round(best.x)}px`;
+    el.style.top = `${Math.round(best.y)}px`;
+    // achievements come down under it rather than over it
+    document.documentElement.style.setProperty('--note-bottom', best.top ? `${Math.round(best.y + h + 10)}px` : '0px');
+  }
+
+  // The catalog button's badge: how many projects found in this city the catalog has not shown yet.
+  private updateBadge(): void {
+    const badge = this.root.querySelector<HTMLElement>('[data-catalog-badge]');
+    if (!badge) return;
+    const n = this.fresh.size;
+    badge.hidden = n === 0;
+    const text = String(n);
+    if (badge.textContent !== text) badge.textContent = text;
+    const btn = badge.closest<HTMLElement>('[data-catalog]')!;
+    const title = n ? t('cat.badge', { n }) : '';
+    if ((btn.title || '') !== title) btn.title = title;
+  }
+
+  // Open on a new project's notice: the catalog shows that item, in its category, with a filter that includes it,
+  // scrolled into sight and marked for a moment. Nothing is taken in hand or bought.
+  focusItem(kind: CatalogKind): void {
+    this.catCategory = categoryOf(kind);
+    if (!filterItems(this.s, this.catCategory, this.catFilter).includes(kind)) this.catFilter = 'all';
+    this.focusKind = kind;
+    this.catalogKey = '';
   }
 
   // ---------- smog panel ----------
@@ -714,25 +881,41 @@ export class Hud {
 
   // ---------- Objects & modules ----------
 
-  // The catalog panel. Rebuilt only when the tool in hand changes or a controller comes or goes, so a click on
-  // it is never lost to a rebuild: what can be had right now (money comes in with every tax tick, a Dock gets
-  // finished) is written in place.
+  // The catalog panel. Rebuilt only when the tool in hand, the category or the filter changes, or a controller comes or
+  // goes, so a click on it is never lost to a rebuild: what can be had right now (money comes in with every tax tick, a
+  // Dock gets finished, a project is discovered) is written in place, and the rows stay where they are.
   private updateCatalog(s: GameState, view: HudView): void {
     const panel = this.el['catalog-panel'];
     const opening = panel.hidden && view.catalog;
     panel.hidden = !view.catalog;
     if (!view.catalog) {
+      // closed: what it showed is no longer new
+      if (this.seen.size) {
+        for (const k of this.seen) this.fresh.delete(k);
+        this.seen.clear();
+        this.updateBadge();
+      }
       this.catalogKey = '';
+      this.catActive = null;
       return;
     }
     const active = view.piece?.kind ?? null;
-    const key = `${active}|${padMode()}`;
+    // an item taken in hand shows in its own category (the tabs can still be changed while it is held)
+    if (active !== this.catActive) {
+      this.catActive = active;
+      if (active && categoryOf(active) !== this.catCategory) {
+        this.catCategory = categoryOf(active);
+        if (!filterItems(s, this.catCategory, this.catFilter).includes(active)) this.catFilter = 'all';
+      }
+    }
+    const key = `${active}|${padMode()}|${this.catCategory}|${this.catFilter}`;
     if (key === this.catalogKey) {
       this.markCatalog(s);
       return;
     }
+    const sameList = this.catalogKey.split('|').slice(2).join('|') === `${this.catCategory}|${this.catFilter}`;
     this.catalogKey = key;
-    this.renderCatalog(s, active, opening);
+    this.renderCatalog(s, active, opening || !sameList);
   }
 
   // An item or Done pressed redraws the panel for the new tool (the tool box above the list comes or goes, the list
@@ -747,35 +930,83 @@ export class Hud {
     return false;
   }
 
-  // What can be had right now, written into the list in place: the greyed-out items and why.
+  // What can be had right now, written into the list in place: each row's state (its words and its icon), why it cannot
+  // be bought, a project's progress; the tabs' counts and their dot for what is new.
   private markCatalog(s: GameState): void {
     const panel = this.el['catalog-panel'];
-    for (const kind of CATALOG_ORDER) {
-      const btn = panel.querySelector<HTMLElement>(`[data-item="${kind}"]`);
-      const reason = btn?.querySelector<HTMLElement>('.cat-reason');
-      if (!btn || !reason) continue;
+    for (const btn of panel.querySelectorAll<HTMLElement>('[data-item]')) {
+      const kind = btn.dataset.item as CatalogKind;
       const st = catalogState(s, kind);
       btn.classList.toggle('cant', !st.ok);
-      const text = st.ok ? '' : (st.reason ?? '');
+      if (btn.dataset.state !== st.state) {
+        btn.dataset.state = st.state;
+        btn.setAttribute('aria-disabled', String(st.state === 'locked'));
+        const chip = btn.querySelector<HTMLElement>('[data-cat-state]')!;
+        chip.className = `cat-state state-${st.state}`;
+        chip.querySelector('img')!.src = iconUrl(ITEM_STATE_ICON[st.state]);
+        chip.querySelector('.cat-state-label')!.textContent = t(ITEM_STATE_TEXT[st.state]);
+        const goal = btn.querySelector<HTMLElement>('[data-cat-goal]');
+        if (goal) goal.hidden = st.state !== 'locked';
+      }
+      // why not now (a project's goal has its own line, with the progress under it)
+      const reason = btn.querySelector<HTMLElement>('.cat-reason')!;
+      const text = st.state === 'cantBuy' ? (st.reason ?? '') : '';
       if (reason.textContent !== text) reason.textContent = text;
-      reason.hidden = st.ok;
+      reason.hidden = !text;
+      const progress = btn.querySelector<HTMLElement>('[data-cat-progress]');
+      if (progress) {
+        const p = st.state === 'locked' && isProject(kind) ? projectProgress(s, kind, this.best) : '';
+        if (progress.textContent !== p) progress.textContent = p;
+        progress.hidden = !p;
+      }
+      if (this.fresh.has(kind)) this.seen.add(kind);
+    }
+    for (const tab of panel.querySelectorAll<HTMLElement>('[data-cat]')) {
+      const cat = tab.dataset.cat as CatalogCategory;
+      const c = categoryCount(s, cat);
+      const title = t('cat.count', { n: c.found, total: c.total });
+      if (tab.title !== title) tab.title = title;
+      tab.classList.toggle('fresh', categoryItems(cat).some((k) => this.fresh.has(k) && !this.seen.has(k)));
+    }
+    for (const chip of panel.querySelectorAll<HTMLElement>('[data-filter]')) {
+      const count = chip.querySelector<HTMLElement>('[data-filter-count]')!;
+      const text = String(filterItems(s, this.catCategory, chip.dataset.filter as CatalogFilter).length);
+      if (count.textContent !== text) count.textContent = text;
     }
   }
 
-  private renderCatalog(s: GameState, active: CatalogKind | null, opening: boolean): void {
-    const panel = this.el['catalog-panel'];
-    // name and price, what it does, the limit (and why it cannot be had now: markCatalog)
-    const item = (kind: CatalogKind) => `
-        <button type="button" class="cat-item${kind === active ? ' active' : ''}" data-item="${kind}" aria-pressed="${kind === active}">
+  // One row: picture, name and price, its state (words and icon) and why not now; a project's goal and progress; what it
+  // does; the limit. markCatalog fills in what changes.
+  private catalogRow(kind: CatalogKind, active: CatalogKind | null): string {
+    const project = isProject(kind);
+    return `
+        <button type="button" class="cat-item${kind === active ? ' active' : ''}${this.fresh.has(kind) ? ' fresh' : ''}" data-item="${kind}" aria-pressed="${kind === active}">
           <span class="cat-pic"><img src="${catalogPicture(kind)}" alt="" /></span>
           <span class="cat-text">
             <span class="cat-top"><span class="cat-name">${esc(catalogName(kind))}</span><span class="tool-cost">${costChips(catalogCost(kind))}</span></span>
+            <span class="cat-state" data-cat-state><img src="" alt="" /><span class="cat-state-label"></span><span class="cat-reason" hidden></span><span class="cat-limit">${esc(catalogLimit(kind))}</span></span>
+            ${project ? `<span class="cat-project" data-cat-goal hidden><span class="cat-goal">${esc(projectGoal(kind))}</span> <span class="cat-progress" data-cat-progress hidden></span></span>` : ''}
             <span class="cat-effect">${esc(catalogEffect(kind))}</span>
-            <span class="cat-meta"><span class="cat-limit">${esc(catalogLimit(kind))}</span><span class="cat-reason" hidden></span></span>
           </span>
         </button>`;
-    // the list scrolls on small windows: it opens at the top, and a rebuild while open keeps its place
-    const scrolled = opening ? 0 : (panel.querySelector<HTMLElement>('.cat-scroll')?.scrollTop ?? 0);
+  }
+
+  private renderCatalog(s: GameState, active: CatalogKind | null, toTop: boolean): void {
+    const panel = this.el['catalog-panel'];
+    const cat = this.catCategory;
+    const filter = this.catFilter;
+    const items = filterItems(s, cat, filter);
+    // the list scrolls on small windows: it opens at the top (and on another category or filter), and a rebuild while
+    // open keeps its place
+    const scrolled = toTop ? 0 : (panel.querySelector<HTMLElement>('.cat-scroll')?.scrollTop ?? 0);
+    const tab = (c: CatalogCategory) => {
+      const n = categoryCount(s, c);
+      return `<button type="button" role="tab" class="cat-tab${c === cat ? ' on' : ''}" data-cat="${c}" aria-selected="${c === cat}" title="${esc(t('cat.count', { n: n.found, total: n.total }))}"><span class="cat-tab-name">${esc(categoryName(c))}</span></button>`;
+    };
+    // each filter with how many items of the category it shows
+    const chip = (f: CatalogFilter) =>
+      `<button type="button" class="cat-filter${f === filter ? ' on' : ''}" data-filter="${f}" aria-pressed="${f === filter}">${esc(t(`cat.filter.${f}`))} <span class="cat-count" data-filter-count>${filterItems(s, cat, f).length}</span></button>`;
+    const empty = items.length ? '' : `<p class="cat-empty">${esc(t(filter === 'locked' ? 'cat.empty.locked' : 'cat.empty.available'))}</p>`;
     panel.innerHTML = `
       <div class="insp-head cat-head">
         <span class="tool-plate"><img src="${coneIcon(4)}" alt="" /></span>
@@ -786,37 +1017,61 @@ export class Hud {
         <button type="button" class="modal-x" data-close aria-label="${t('common.close')}">×</button>
       </div>
       ${active ? this.toolHelp(active) : ''}
+      <div class="cat-nav">
+        <div class="cat-tabs" role="tablist" aria-label="${esc(t('cat.tabs'))}">${CATEGORIES.map(tab).join('')}</div>
+        <div class="cat-filters" role="group" aria-label="${esc(t('cat.filters'))}">${FILTERS.map(chip).join('')}</div>
+      </div>
       <div class="cat-scroll">
-        <h4 class="cat-section">${t('cat.construction')}</h4>
-        <p class="cat-note">${t('insp.decoration')}</p>
-        <div class="cat-list">${CONSTRUCTION.map(item).join('')}</div>
-        <h4 class="cat-section">${t('cat.decorations')}</h4>
-        <p class="cat-note">${t('insp.decoration')}</p>
-        <div class="cat-list">${DECORATIONS.map(item).join('')}</div>
-        <h4 class="cat-section">${t('cat.modules')}</h4>
-        <div class="cat-list">${MACHINE_MODULES.map(item).join('')}</div>
+        <p class="cat-note">${esc(categoryNote(cat))}</p>
+        <div class="cat-list">${items.map((k) => this.catalogRow(k, active)).join('')}</div>
+        ${empty}
       </div>`;
     this.markCatalog(s);
     const list = panel.querySelector<HTMLElement>('.cat-scroll')!;
     list.scrollTop = scrolled;
     // the item in hand stays in sight when the tool box above the list takes its room: all of it, or from its top
-    // (name and price) when the list is shorter than the item (a short window: a module's effect takes lines)
-    const chosen = panel.querySelector<HTMLElement>('.cat-item.active');
+    // (name and price) when the list is shorter than the item (a short window: a module's effect takes lines); the
+    // item a new project's Open asked for, the same, and marked for a moment
+    const focus = this.focusKind ? panel.querySelector<HTMLElement>(`[data-item="${this.focusKind}"]`) : null;
+    this.focusKind = null;
+    const chosen = focus ?? panel.querySelector<HTMLElement>('.cat-item.active');
     if (chosen) {
       const r = chosen.getBoundingClientRect();
       const l = list.getBoundingClientRect();
       if (r.top < l.top || r.height > l.height) list.scrollTop -= l.top - r.top;
       else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
     }
-    panel.querySelector('[data-close]')!.addEventListener('click', () => {
-      audio.play('click');
-      this.handlers.onCatalog();
-    });
+    focus?.classList.add('focus');
+    // with a tool in hand on a short window the tool box takes the head's place, with a close button of its own
+    panel.classList.toggle('has-tool', !!active);
+    for (const close of panel.querySelectorAll('[data-close]')) {
+      close.addEventListener('click', () => {
+        audio.play('click');
+        this.handlers.onCatalog();
+      });
+    }
     for (const btn of panel.querySelectorAll<HTMLElement>('[data-item]')) {
       btn.addEventListener('click', () => {
         if (!this.catalogSettled()) return;
         audio.play('click');
         this.handlers.onPick(btn.dataset.item as CatalogKind);
+      });
+    }
+    // a category or a filter: the list is drawn again at once, from its top (the tabs and chips do not move)
+    for (const btn of panel.querySelectorAll<HTMLElement>('[data-cat]')) {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.cat === this.catCategory) return;
+        audio.play('click');
+        this.catCategory = btn.dataset.cat as CatalogCategory;
+        this.redrawCatalog();
+      });
+    }
+    for (const btn of panel.querySelectorAll<HTMLElement>('[data-filter]')) {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.filter === this.catFilter) return;
+        audio.play('click');
+        this.catFilter = btn.dataset.filter as CatalogFilter;
+        this.redrawCatalog();
       });
     }
     // (Rotate tapped twice turns twice: the panel does not move under it)
@@ -826,6 +1081,11 @@ export class Hud {
       audio.play('click');
       this.handlers.onPick(null);
     });
+  }
+
+  private redrawCatalog(): void {
+    this.catalogKey = `${this.catActive}|${padMode()}|${this.catCategory}|${this.catFilter}`;
+    this.renderCatalog(this.s, this.catActive, true);
   }
 
   // While a catalog tool is in hand: what to do with it (in controller buttons when a pad is in use), and the
@@ -838,9 +1098,10 @@ export class Hud {
       : pad
         ? t('cat.help.pad')
         : t(isRowKind(kind) ? 'cat.help.row' : 'cat.help.place');
-    const turn = isRotatable(kind) ? ` ${pad ? t('cat.help.rotatePad') : localizeKeys(t('cat.help.rotate'))}` : '';
+    const turn = isRotatable(kind) ? ` <span class="cat-help-turn">${pad ? t('cat.help.rotatePad') : localizeKeys(t('cat.help.rotate'))}</span>` : '';
     return `
       <div class="cat-tool">
+        <button type="button" class="modal-x cat-tool-x" data-close aria-label="${t('common.close')}">×</button>
         <p class="cat-help"><b>${esc(catalogName(kind))}</b> · ${what}${turn}</p>
         <div class="cat-tool-btns">
           ${isRotatable(kind) ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
@@ -937,6 +1198,13 @@ export class Hud {
       if (reason) {
         write(reason, st.reason ?? '');
         reason.hidden = !st.reason;
+        // a project to discover: its goal, not a refusal, then the city's progress
+        reason.classList.toggle('is-goal', st.state === 'locked');
+      }
+      const progress = card.querySelector<HTMLElement>('[data-mod-progress]');
+      if (progress) {
+        write(progress, st.state === 'locked' ? projectProgress(s, kind as ProjectKind, this.best) : '');
+        progress.hidden = st.state !== 'locked';
       }
       if (st.state === 'installed') {
         for (const r of moduleRowsOn(s, b, kind)) if (r.now !== undefined) write(card.querySelector(`[data-mod-now="${r.stat}${r.res ? `.${r.res}` : ''}"]`), r.now);
@@ -1115,10 +1383,13 @@ export class Hud {
       actions = `
         <p class="insp-warn" data-power-warn hidden></p>
         <div class="insp-actions"><button type="button" class="btn" data-install="${kind}"${st.state === 'available' ? '' : ' disabled'}>${t('insp.install')}<span class="tool-cost">${costChips(def.cost)}</span></button></div>
-        <p class="cat-reason"${st.reason ? '' : ' hidden'}>${esc(st.reason ?? '')}</p>`;
+        <p class="cat-reason${st.state === 'locked' ? ' is-goal' : ''}"${st.reason ? '' : ' hidden'}>${esc(st.reason ?? '')}</p>
+        <p class="proj-progress" data-mod-progress${st.state === 'locked' ? '' : ' hidden'}>${st.state === 'locked' ? esc(projectProgress(s, kind as ProjectKind, this.best)) : ''}</p>`;
     } else if (this.confirmRemove === kind) {
+      // a module the city had before its project was discovered: once off, it waits for the discovery to go on again
+      const kept = isLocked(s, kind) ? `<p class="insp-note" data-kept-locked>${esc(t('proj.keptLocked'))}</p>` : '';
       actions = `
-        <p class="insp-warn" data-loss hidden></p>
+        <p class="insp-warn" data-loss hidden></p>${kept}
         <div class="insp-actions"><button type="button" class="btn tone-danger" data-remove-confirm="${kind}">${t('insp.remove', { refund })}</button><button type="button" class="btn" data-remove-cancel>${t('insp.keep')}</button></div>`;
     } else {
       actions = `<div class="insp-actions"><button type="button" class="btn" data-remove="${kind}">${t('insp.remove', { refund })}</button></div>`;
@@ -1174,6 +1445,7 @@ export class Hud {
         ${info.removable ? `<button type="button" class="btn" data-remove-piece></button>` : ''}
       </div>
       <p class="insp-warn" data-scrap-room hidden></p>
+      ${info.removable && isLocked(this.s, info.kind) ? `<p class="insp-note" data-kept-locked>${esc(t('proj.keptLocked'))}</p>` : ''}
       <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;
     }
     this.markPieceRefund(info);
