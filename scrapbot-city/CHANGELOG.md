@@ -1,5 +1,51 @@
 # Changelog
 
+## In lavorazione — incremento 2, gruppo G3: tre costruzioni, tre decorazioni, spostare le decorazioni
+
+- **Tre costruzioni nuove** nella sezione Costruzioni del pannello «Oggetti e moduli»:
+  - **Basamento in cemento**: 4 crediti a casella, rimborso 2. Una superficie come il pavimento industriale (lastre di
+    cemento con il cordolo, diverse dalle piastre metalliche): ci si costruisce sopra, resta sotto l'edificio e
+    riappare quando lo si demolisce; file trascinate col mouse; una superficie per casella («Qui c'è già il
+    basamento», «Qui c'è già il pavimento»).
+  - **Muro basso**: 2 crediti + 4 rottami a casella, rimborso 1 credito + 2 rottami (i rottami solo fin dove il
+    deposito ha spazio in quel momento, come la scultura: «Rimuovi», la ruspa e la riga sotto il pulsante dicono la
+    cifra vera e la rimozione paga quella); blocchi di rottami pressati; file trascinate; si raccorda come la recinzione.
+  - **Pilastro d'angolo**: 6 crediti, rimborso 3. Muri e recinzioni ci si attaccano da ogni lato (un moncone verso
+    ogni vicino); di notte si accende la luce in cima. Non si ruota.
+- **Tre decorazioni nuove** nella sezione Decorazioni, oggetti solidi da una casella con le regole delle altre:
+  - **Albero**: 8 crediti, rimborso 4; palma, cipresso o acero rosso, scelti dalla casella; diverso dal Giardino Pixel
+    e dagli alberi di contorno; nessun effetto su smog o felicità.
+  - **Fontana**: 25 crediti + 5 pezzi, rimborso 12 + 2; vasca con il getto d'acqua che gioca (fermo con il movimento
+    ridotto).
+  - **Statua di USA-9**: 20 crediti + 10 pezzi, rimborso 10 + 5; 4 direzioni; di notte gli occhi si accendono quando
+    guarda verso la camera.
+- **Raccordi**: recinzioni e muri si raccordano con recinzioni, muri, pilastri e con i cancelli **allineati** (un
+  cancello lungo x con i vicini a est e a ovest, lungo y con quelli a nord e a sud). Una recinzione o un muro da soli
+  seguono la loro rotazione e si ruotano; raccordati seguono i vicini. **Recinzioni già posate**: cambiano aspetto solo
+  dove ora un muro o un pilastro le raccorda, e dove stanno contro il fianco di un cancello: lì prima la recinzione
+  entrava nel fianco del cancello (il limite noto dell'incremento 1), ora sta da sola nel verso della sua rotazione e
+  si può ruotare. Le altre recinzioni e tutti i cancelli restano come prima. Nel catalogo la recinzione dice «Si
+  raccorda con recinzioni, muri, pilastri e cancelli».
+- **Spostare le decorazioni già comprate** (lampione, panchina, fioriera, insegna, pergola, casetta di Miso, scultura,
+  albero, fontana, statua): nel loro pannello «Sposta», poi la casella, con la stessa anteprima e le stesse regole di
+  posa. Gratis: nessun pagamento, nessun rimborso, nessun contatore (gli oggetti posati restano quelli); rotazione e
+  aspetto (fiori, simbolo, albero) vanno con l'oggetto, anche dopo il salvataggio. Esc, il tasto destro, `B` o «Fatto»
+  lo lasciano dov'era; una casella non valida è rifiutata con il motivo e lo spostamento continua; un clic sull'oggetto
+  stesso lo lascia lì. Durante lo spostamento `R`, `Shift`+rotella e `Y` ruotano l'oggetto (con `Y` mai un consiglio).
+  Costruzioni (pavimenti, basamenti, recinzioni, muri, pilastri, cancelli), moduli ed edifici non si spostano. Il
+  secondo colpo di un doppio clic su «Sposta» non preme «Fatto» che prende il suo posto, e viceversa.
+- **Si clicca quello che si vede**: muri e pilastri come le recinzioni (un clic sopra raggiunge l'edificio dietro);
+  albero, fontana e statua prendono il clic sui propri pixel come le altre decorazioni.
+- **Nessun effetto su economia, felicità, smog, allineamento, stelle o achievement**: città del pilota automatico con
+  decine di muri, pilastri, basamenti, alberi, fontane e statue, alcune spostate durante la partita, giocano byte per
+  byte come le stesse città senza.
+- **Salvataggi**: codici in coda, 10 muro, 11 pilastro, 12 albero, 13 fontana, 14 statua; il basamento è la superficie
+  2, nel nuovo campo facoltativo `surfaces` (`[casella, codice]`; `floors` resta per il pavimento); l'aspetto di una
+  decorazione spostata su una casella che gliene darebbe un altro va nel nuovo campo facoltativo `varieties`
+  (`[casella, codice, aspetto]`). I due campi si scrivono solo quando servono: una città senza basamenti né decorazioni
+  spostate si salva come prima. I salvataggi vecchi si caricano come prima; una versione precedente che apre un
+  salvataggio nuovo ignora i campi e i codici che non conosce (quei pezzi mancano, il resto c'è).
+
 ## In lavorazione — incremento 2, integrazione di G2 (G0 + G1 + temi + G2)
 
 - **Una sola regola per il doppio clic in tutto il gioco** (`src/ui/presses.ts`): un doppio clic, un doppio tocco o
