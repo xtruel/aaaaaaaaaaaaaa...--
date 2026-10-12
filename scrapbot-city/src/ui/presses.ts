@@ -5,7 +5,8 @@
 // The session writes the record; these read it or the constants:
 // - the map with a tool in hand (src/session.ts, meantPress): the second press does nothing where the first did not
 //   mean it (the next tile, behind a dialog or panel the first press closed, a second layer with the bulldozer);
-// - the catalog (src/ui/hud.ts): the second press on an item or Done, after the list moved under it, does nothing;
+// - the catalog (src/ui/hud.ts): the second press on an item or Done, after the list moved under it, does nothing; so
+//   does the second press on a selected decoration's Move or Done, which take each other's place;
 // - the building panel's costly buttons (src/ui/hud.ts): a confirmation takes no press for PRESS_GUARD_MS after the
 //   press that brought it up, Install none after a removal on that building;
 // - a dialog's buttons (src/ui/modal.ts): a key or A held when it came up, or the second press of a double press

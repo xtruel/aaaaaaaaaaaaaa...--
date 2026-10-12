@@ -736,7 +736,8 @@ export class Hud {
 
   // An item or Done pressed redraws the panel for the new tool (the tool box above the list comes or goes, the list
   // moves): the second press of a double press there (double click, double tap, A A: soon after and close to the press
-  // before, src/ui/presses.ts) would land on another item or on Done. It does nothing.
+  // before, src/ui/presses.ts) would land on another item or on Done. It does nothing. (The same for a decoration's
+  // Move and the Done that takes its place.)
   private catalogSettled(): boolean {
     if (!secondPress()) return true;
     markSecond();
