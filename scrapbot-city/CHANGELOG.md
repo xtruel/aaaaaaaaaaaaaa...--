@@ -29,6 +29,8 @@
   (trattini di due pixel con un bordino scuro sotto) e una velatura leggerissima sul terreno raggiunto, al raggio vero
   (5 caselle, 8 con l'ugello), anche per il fantasma quando lo si piazza; disegnato sul terreno, sotto edifici, bot e
   rottami, quindi non copre la mappa. Con il movimento ridotto i trattini stanno fermi.
+- **Crediti**: Permanent Marker è indicato con la sua licenza vera, Apache 2.0; gli altri cinque font restano SIL
+  Open Font License (prima la riga li dava tutti sotto OFL).
 
 ## In lavorazione — incremento 2: le città della campagna nei loro temi
 
