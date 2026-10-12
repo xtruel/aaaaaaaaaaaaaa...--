@@ -32,7 +32,8 @@ import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEv
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
-import { SAME_PRESS_MS, forgetPresses, lastPresses, mapPress, markOffMap, markSecond, notePress } from './ui/presses';
+import { SAME_PRESS_MS, forgetPresses, lastPresses, mapPress, markOffMap, markSecond, notePress, rowLaid } from './ui/presses';
+import type { Press } from './ui/presses';
 import type { ModalAction } from './ui/modal';
 import { Tutorial } from './ui/tutorial';
 import type { Box } from './ui/tutorial';
@@ -686,8 +687,12 @@ export class GameSession implements PadTarget {
       // a press that closed the smog panel only closed it
       if (d.closedPanel) return;
       if (d.button === 2) this.cancelTool();
-      else if (d.button === 0 && row && row.tiles.length > 1) this.layRow(row.tiles);
-      else if (d.button === 0) this.click(e.clientX, e.clientY);
+      else if (d.button === 0 && row && row.tiles.length > 1) {
+        // a row only from a meant press or a real drag: the second press of a double click that slipped across a
+        // tile edge is that press (rowLaid, src/ui/presses.ts), and does what a click where it began does
+        if (rowLaid(...this.pressAt(d.x, d.y), !!d.far)) this.layRow(row.tiles);
+        else this.click(d.x, d.y);
+      } else if (d.button === 0) this.click(e.clientX, e.clientY);
     });
     this.listen(canvas, 'pointercancel', (e) => {
       release(e);
@@ -919,6 +924,15 @@ export class GameSession implements PadTarget {
     return this.build ? `b:${this.build}` : this.bulldoze ? 'doze' : this.piece ? `p:${this.piece.kind}` : '';
   }
 
+  // [the press before, the press being handled as it reaches the map at (sx, sy)]: where, on which tile, with the map
+  // where it is now and the tool in hand now.
+  private pressAt(sx: number, sy: number): [Press, Press] {
+    const [before, now] = lastPresses();
+    const r = this.renderer;
+    const tile = r.screenToTile(sx, sy);
+    return [before, { ...now, x: sx, y: sy, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tool: this.toolKey(), tile: `${tile.x},${tile.y}` }];
+  }
+
   // The owner's comfort rules for building (one placement charges once; nothing is bought by accident): false for the
   // second press of a double click, double tap or A A (mapPress, src/ui/presses.ts: within PRESS_GUARD_MS and doubleDist
   // px of the press before, the map where it was, the same tool in hand) when it would do what the first press did not
@@ -930,11 +944,7 @@ export class GameSession implements PadTarget {
   // press is measured from the one before it (markSecond), so quick taps on neighbouring tiles closer than a finger's
   // reach buy every other one, and one double tap never buys two.
   private meantPress(sx: number, sy: number): boolean {
-    const [before, now] = lastPresses();
-    const r = this.renderer;
-    const tile = r.screenToTile(sx, sy);
-    const at = { ...now, x: sx, y: sy, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tool: this.toolKey(), tile: `${tile.x},${tile.y}` };
-    const verdict = mapPress(before, at, this.bulldoze);
+    const verdict = mapPress(...this.pressAt(sx, sy), this.bulldoze);
     if (verdict === 'meant') return true;
     markSecond();
     if (verdict === 'again') return true;

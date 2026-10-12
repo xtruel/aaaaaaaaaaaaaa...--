@@ -4,7 +4,8 @@
 // controller's A at its cursor): where, when, where the map was and the tile under them when they were on the map.
 // The session writes the record; these read it or the constants:
 // - the map with a tool in hand (src/session.ts, meantPress): the second press does nothing where the first did not
-//   mean it (the next tile, behind a dialog or panel the first press closed, a second layer with the bulldozer);
+//   mean it (the next tile, behind a dialog or panel the first press closed, a second layer with the bulldozer), nor
+//   lays a row when it only slipped across a tile edge (rowLaid);
 // - the catalog (src/ui/hud.ts): the second press on an item or Done, after the list moved under it, does nothing;
 // - the building panel's costly buttons (src/ui/hud.ts): a confirmation takes no press for PRESS_GUARD_MS after the
 //   press that brought it up, Install none after a removal on that building;
@@ -63,6 +64,15 @@ export function isDouble(first: Press, second: Pick<Press, 't' | 'x' | 'y' | 'ca
 export function mapPress(before: Press, now: Press, bulldozer: boolean): 'meant' | 'again' | 'double' {
   if (before.tool !== now.tool || !isDouble(before, now)) return 'meant';
   return !bulldozer && before.tile !== '' && before.tile === now.tile ? 'again' : 'double';
+}
+
+// A row of floor or fence dragged out with the left mouse button (src/session.ts): laid as a row when its press is
+// meant, or when it was dragged out farther than a click's slip (`far`: the mouse's 12 px). The second press of a
+// double click that slips a few px across a tile edge is that press, not a row of two: the session does with it what
+// a click where it began does (on the first press's tile it can only be refused, on the next one it is "too quick"),
+// so one double click never lays two pieces.
+export function rowLaid(before: Press, start: Press, far: boolean): boolean {
+  return far || mapPress(before, start, false) === 'meant';
 }
 
 // Is a guard that started at `since` (performance.now() of the press it guards against) still on?
