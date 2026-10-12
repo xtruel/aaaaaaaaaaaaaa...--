@@ -176,6 +176,24 @@ describe('catalog: categories, filters, states', () => {
     expect(calls.at(-1)).toEqual(['onPick', 'bench']);
   });
 
+  it('a tab pressed right after taking an item (before the next drawing) stays: the item in hand does not pull it back', () => {
+    const { q, update } = setup();
+    update({ catalog: true });
+    now += 2000;
+    q('[data-cat="decorations"]')!.click();
+    q('[data-item="lamp"]')!.click();
+    q('[data-cat="construction"]')!.click();
+    update({ catalog: true, piece: { kind: 'lamp', rot: 0 } });
+    expect(q('.cat-tab.on')!.dataset.cat).toBe('construction');
+    // a project still to discover is refused: the lamp stays in hand, and the tab chosen after it stays too
+    q('[data-cat="decorations"]')!.click();
+    now += 2000;
+    q('[data-item="bench"]')!.click();
+    q('[data-cat="modules"]')!.click();
+    update({ catalog: true, piece: { kind: 'lamp', rot: 0 } });
+    expect(q('.cat-tab.on')!.dataset.cat).toBe('modules');
+  });
+
   it('in Italian: "Da scoprire", "pezzi" for the parts, "oggetti del catalogo" for the pieces placed', () => {
     setLang('it');
     const { s, q, update } = setup();

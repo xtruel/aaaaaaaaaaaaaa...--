@@ -1077,7 +1077,12 @@ export class Hud {
       btn.addEventListener('click', () => {
         if (!this.catalogSettled()) return;
         audio.play('click');
-        this.handlers.onPick(btn.dataset.item as CatalogKind);
+        // what is in hand now, known at once: a tab pressed before the next drawing is not undone by "an item taken
+        // in hand shows in its own category" (the same item again puts it away; a project still to discover is refused
+        // and leaves in hand what was there)
+        const kind = btn.dataset.item as CatalogKind;
+        if (!isLocked(this.s, kind)) this.catActive = this.catActive === kind ? null : kind;
+        this.handlers.onPick(kind);
       });
     }
     // a category or a filter: the list is drawn again at once, from its top (the tabs and chips do not move)
