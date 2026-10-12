@@ -9,7 +9,9 @@
 // - the catalog (src/ui/hud.ts): the second press on an item or Done, after the list moved under it, does nothing; so
 //   does the second press on a selected decoration's Move or Done, which take each other's place;
 // - the building panel's costly buttons (src/ui/hud.ts): a confirmation takes no press for PRESS_GUARD_MS after the
-//   press that brought it up, Install none after a removal on that building;
+//   press that brought it up, Install none after a removal on that building, nor the second press of a double press
+//   (the first selected the building on the map where its panel opens); a piece's Remove neither (the first pressed
+//   Done, which Remove takes the place of, or selected the piece where its panel opens);
 // - a dialog's buttons (src/ui/modal.ts): a key or A held when it came up, or the second press of a double press
 //   whose first opened it (2PM's offer to buy the missing parts and build), does nothing;
 // - the click that reaches behind the selected building (src/ui/pick.ts) counts from DOUBLE_PRESS_MS.
