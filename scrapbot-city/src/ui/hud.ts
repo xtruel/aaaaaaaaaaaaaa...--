@@ -92,9 +92,10 @@ function statusHtml(line: StatusLine): string {
   return `<img src="${iconUrl(line.icon)}" alt="" data-status-icon /><span data-status-text>${esc(line.text)}</span>`;
 }
 
-const STATE_ICON: Record<ModuleState, IconName> = { installed: 'check', slotTaken: 'lock', available: 'plus', cantBuy: 'cross' };
+const STATE_ICON: Record<ModuleState, IconName> = { installed: 'check', locked: 'discover', slotTaken: 'lock', available: 'plus', cantBuy: 'cross' };
 const STATE_TEXT = {
   installed: 'insp.modInstalled',
+  locked: 'insp.modLocked',
   slotTaken: 'insp.modSlotTaken',
   available: 'insp.modAvailable',
   cantBuy: 'insp.modCantBuy',

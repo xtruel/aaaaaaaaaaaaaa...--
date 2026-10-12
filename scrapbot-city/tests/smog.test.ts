@@ -7,7 +7,8 @@ import { BUILDINGS, BUILD_ORDER, DAY_LENGTH, SIM_STEP, T } from '../src/game/def
 import type { BuildingType } from '../src/game/defs';
 import { installModule } from '../src/game/pieces';
 import { airEffect, computeDerived, step } from '../src/game/sim';
-import { createGame } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame } from './all-projects';
 import type { Building, GameState } from '../src/game/state';
 import { airReport, perDayText } from '../src/ui/smog';
 

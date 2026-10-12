@@ -9,7 +9,8 @@ import { MAP_W, T } from '../src/game/defs';
 import { placePiece } from '../src/game/pieces';
 import type { PieceKind } from '../src/game/pieces';
 import { computeDerived } from '../src/game/sim';
-import { createGame } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame } from './all-projects';
 import type { GameState } from '../src/game/state';
 import { Hud } from '../src/ui/hud';
 import { forgetPresses, notePress } from '../src/ui/presses';

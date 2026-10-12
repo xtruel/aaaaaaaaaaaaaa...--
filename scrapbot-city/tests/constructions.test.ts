@@ -39,7 +39,9 @@ import {
 } from '../src/game/pieces';
 import type { PieceKind, SolidKind } from '../src/game/pieces';
 import { computeDerived, step } from '../src/game/sim';
-import { createGame, deserialize, idx, serialize } from '../src/game/state';
+import { idx, serialize } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame, deserialize } from './all-projects';
 import type { Building, GameState } from '../src/game/state';
 import { mulberry32 } from '../src/game/world';
 import { t } from '../src/i18n';

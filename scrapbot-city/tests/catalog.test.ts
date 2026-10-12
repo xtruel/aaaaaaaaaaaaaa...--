@@ -9,7 +9,9 @@ import { installModule, placePiece, removePieceAt } from '../src/game/pieces';
 import { CATALOG_ORDER } from '../src/game/pieces';
 import type { CatalogKind } from '../src/game/pieces';
 import { computeDerived } from '../src/game/sim';
-import { createGame, idx } from '../src/game/state';
+import { idx } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame } from './all-projects';
 import type { Building, GameState } from '../src/game/state';
 import { setLang, t } from '../src/i18n';
 import {
@@ -126,53 +128,53 @@ describe('catalog wording', () => {
 describe('what can be bought now', () => {
   it('a piece needs only its price, and says what is missing', () => {
     const s = city();
-    expect(catalogState(s, 'lamp')).toEqual({ ok: true });
+    expect(catalogState(s, 'lamp')).toEqual({ ok: true, state: 'available' });
     s.res.credits = 7;
     s.res.parts = 0;
     expect(shortfall(s, { credits: 10, parts: 2 })).toEqual({ credits: 3, parts: 2 });
-    expect(catalogState(s, 'lamp')).toEqual({ ok: false, reason: 'Missing 3 credits + 2 parts' });
+    expect(catalogState(s, 'lamp')).toEqual({ ok: false, state: 'cantBuy', reason: 'Missing 3 credits + 2 parts' });
     expect(catalogState(s, 'fence').ok).toBe(true);
   });
 
   it('a module needs a finished building of its type without it, then its price', () => {
     const s = city();
-    expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, reason: t('place.modDock') });
+    expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, state: 'cantBuy', reason: t('place.modDock') });
     const dock = build(s, 'dock', false);
-    expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, reason: t('place.modDock') });
+    expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, state: 'cantBuy', reason: t('place.modDock') });
     dock.built = 1;
-    expect(catalogState(s, 'dockStorage')).toEqual({ ok: true });
+    expect(catalogState(s, 'dockStorage')).toEqual({ ok: true, state: 'available' });
     expect(installModule(s, 'dockStorage', dock)).toBe(true);
-    expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, reason: t('place.modInstalled') });
+    expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, state: 'cantBuy', reason: t('place.modInstalled') });
     // a second Dock without it makes it available again, if the city can pay
     build(s, 'dock');
-    expect(catalogState(s, 'dockStorage')).toEqual({ ok: true });
+    expect(catalogState(s, 'dockStorage')).toEqual({ ok: true, state: 'available' });
     s.res.parts = 0;
-    expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, reason: 'Missing 15 parts' });
-    expect(catalogState(s, 'smelterFilter')).toEqual({ ok: false, reason: t('place.modSmelter') });
+    expect(catalogState(s, 'dockStorage')).toEqual({ ok: false, state: 'cantBuy', reason: 'Missing 15 parts' });
+    expect(catalogState(s, 'smelterFilter')).toEqual({ ok: false, state: 'cantBuy', reason: t('place.modSmelter') });
   });
 
   it('the Recycler slot: the sorter is not on offer where every Recycler has the magnet, and says why', () => {
     const s = city();
     const a = build(s, 'recycler');
     const b = build(s, 'recycler');
-    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: true });
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: true, state: 'available' });
     installModule(s, 'recyclerMagnet', a);
-    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: true }); // the second Recycler is free
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: true, state: 'available' }); // the second Recycler is free
     installModule(s, 'recyclerMagnet', b);
-    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: false, reason: 'Slot taken by Magnetic separator: remove it first' });
-    expect(catalogState(s, 'recyclerMagnet')).toEqual({ ok: false, reason: t('place.modInstalled') });
-    expect(installState(s, 'recyclerSorter', a)).toEqual({ ok: false, reason: 'Slot taken by Magnetic separator: remove it first' });
+    expect(catalogState(s, 'recyclerSorter')).toEqual({ ok: false, state: 'cantBuy', reason: 'Slot taken by Magnetic separator: remove it first' });
+    expect(catalogState(s, 'recyclerMagnet')).toEqual({ ok: false, state: 'cantBuy', reason: t('place.modInstalled') });
+    expect(installState(s, 'recyclerSorter', a)).toEqual({ ok: false, state: 'cantBuy', reason: 'Slot taken by Magnetic separator: remove it first' });
   });
 
   it('on one building: moduleCheck, with what is missing instead of the whole price', () => {
     const s = city();
     const dock = build(s, 'dock', false);
-    expect(installState(s, 'dockStorage', dock)).toEqual({ ok: false, reason: t('place.modDock') });
+    expect(installState(s, 'dockStorage', dock)).toEqual({ ok: false, state: 'cantBuy', reason: t('place.modDock') });
     dock.built = 1;
-    expect(installState(s, 'dockStorage', dock)).toEqual({ ok: true });
-    expect(installState(s, 'smelterFilter', dock)).toEqual({ ok: false, reason: t('place.modSmelter') });
+    expect(installState(s, 'dockStorage', dock)).toEqual({ ok: true, state: 'available' });
+    expect(installState(s, 'smelterFilter', dock)).toEqual({ ok: false, state: 'cantBuy', reason: t('place.modSmelter') });
     s.res.credits = 20;
-    expect(installState(s, 'dockStorage', dock)).toEqual({ ok: false, reason: 'Missing 10 credits' });
+    expect(installState(s, 'dockStorage', dock)).toEqual({ ok: false, state: 'cantBuy', reason: 'Missing 10 credits' });
   });
 });
 

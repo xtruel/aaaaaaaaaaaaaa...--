@@ -15,6 +15,7 @@ import type { BuildingType, PathKind } from '../src/game/defs';
 import { MODULES, buildingStats, installModule, moduleCheck } from '../src/game/pieces';
 import type { ModuleKind } from '../src/game/pieces';
 import { step } from '../src/game/sim';
+import { PROJECT_KINDS } from '../src/game/projects';
 import { createGame } from '../src/game/state';
 import type { GameState } from '../src/game/state';
 import { answerEvent, count, think, tryBuild } from './autopilot';
@@ -280,6 +281,9 @@ function analyse(plan: Plan, cityIndex: number): string {
   const city = CITIES[cityIndex];
   rngState = city.seed;
   const s = createGame({ seed: city.seed, cityName: city.name, cityId: city.id, mods: city.mods });
+  // the module rows measure what each module does to the waits: as a player who has discovered every project (the
+  // projects only decide what can be bought, never what it does; docs/MODULAR-INC2.md §4)
+  for (const k of PROJECT_KINDS) s.unlocked.add(k);
   // 1. The whole city up to the Spire: gaps between placements.
   const gaps: { start: number; len: number; saving: boolean }[] = [];
   let lastPlace = 0;

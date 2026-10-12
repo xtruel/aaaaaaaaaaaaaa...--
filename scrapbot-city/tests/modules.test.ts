@@ -23,7 +23,9 @@ import {
 } from '../src/game/pieces';
 import type { ModuleKind } from '../src/game/pieces';
 import { airEffect, computeDerived, step } from '../src/game/sim';
-import { createGame, deserialize, idx, serialize } from '../src/game/state';
+import { idx, serialize } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame, deserialize } from './all-projects';
 import type { Building, GameState } from '../src/game/state';
 import { OBJECTIVES } from '../src/game/story';
 import { mulberry32 } from '../src/game/world';

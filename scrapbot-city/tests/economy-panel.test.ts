@@ -13,7 +13,8 @@ import type { StatusCause } from '../src/game/economy';
 import { buildingStats, installModule } from '../src/game/pieces';
 import type { ModuleKind } from '../src/game/pieces';
 import { CLEAN_EVERY, computeDerived, step } from '../src/game/sim';
-import { createGame } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame } from './all-projects';
 import type { Building, GameState } from '../src/game/state';
 import { OBJECTIVES } from '../src/game/story';
 import { LANGS, setLang, t } from '../src/i18n';

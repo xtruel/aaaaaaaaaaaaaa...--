@@ -14,6 +14,8 @@ import { canAfford, computeStorage, costText, pay, solidReason } from './actions
 import type { PlaceCheck } from './actions';
 import { MODULES, PIECES, buildingStats, installedModules, isModuleKind, isPieceKind, moduleRefund, normRot, pieceRefundAt, pieceVariety, pieceVarietyAt, solidCode, solidKind, surfaceCode, surfaceKind } from './piecedefs';
 import type { ModuleKind, PieceKind, SolidKind, SurfaceKind } from './piecedefs';
+import { isLocked, lockedReason } from './projects';
+import type { ProjectKind } from './projects';
 import { computeDerived } from './sim';
 import { buildingCenter, idx, inBounds } from './state';
 import type { Building, GameState } from './state';
@@ -35,7 +37,10 @@ function tileFx(x: number, y: number): { x: number; y: number } {
 
 // Can `kind` be placed on tile (x, y)? Same shape as placeCheck: costOnly when only the price is missing.
 // The rotation never changes the answer (any value is accepted and brought into range when placing).
+// A project not discovered yet (docs/MODULAR-INC2.md §4) is refused first, with its goal and the city's progress:
+// whatever the input (click, tap, pad, a dragged row), nothing undiscovered is bought.
 export function pieceCheck(s: GameState, kind: PieceKind, x: number, y: number, _rot = 0): PlaceCheck {
+  if (isPieceKind(kind) && isLocked(s, kind)) return { ok: false, reason: lockedReason(s, kind as ProjectKind) };
   const spot = spotCheck(s, kind, x, y);
   if (!spot.ok) return spot;
   const def = PIECES[kind];
@@ -259,11 +264,14 @@ export function moduleNeeds(kind: ModuleKind): string {
   return isModuleKind(kind) ? NEEDS[kind]() : t('place.cannot');
 }
 
-// Can `kind` be installed on b? Only on a finished building of the right type (paused is fine) whose single module
-// slot is free: the same module again is "already installed", another one (the Recycler's magnet and sorter share
-// the slot) is "slot taken by X: remove it first". costOnly when only the price is missing.
+// Can `kind` be installed on b? Only a discovered module (a project not found yet is refused with its goal), only on a
+// finished building of the right type (paused is fine) whose single module slot is free: the same module again is
+// "already installed", another one (the Recycler's magnet and sorter share the slot) is "slot taken by X: remove it
+// first". costOnly when only the price is missing. (A module a loaded city already has stays on it, found or not:
+// only buying one is refused.)
 export function moduleCheck(s: GameState, kind: ModuleKind, b: Building): PlaceCheck {
   if (!isModuleKind(kind)) return { ok: false, reason: t('place.cannot') };
+  if (isLocked(s, kind)) return { ok: false, reason: lockedReason(s, kind as ProjectKind) };
   const def = MODULES[kind];
   if (!s.buildings.includes(b) || b.type !== def.building || b.built < 1) return { ok: false, reason: NEEDS[kind]() };
   const fitted = installedModules(b);

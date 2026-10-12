@@ -27,7 +27,9 @@ import {
 } from '../src/game/pieces';
 import type { PieceKind, SolidKind } from '../src/game/pieces';
 import { computeDerived, step } from '../src/game/sim';
-import { createGame, deserialize, idx, serialize } from '../src/game/state';
+import { idx, serialize } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame, deserialize } from './all-projects';
 import type { Building, GameState } from '../src/game/state';
 import { mulberry32 } from '../src/game/world';
 import { t } from '../src/i18n';
@@ -193,7 +195,7 @@ describe('placing decorations', () => {
     s.res.scrap = 19;
     const check = pieceCheck(s, 'sculpture', p.x, p.y);
     expect(check).toEqual({ ok: false, reason: t('place.costs', { cost: '10 credits + 20 scrap' }), costOnly: true });
-    expect(catalogState(s, 'sculpture')).toEqual({ ok: false, reason: 'Missing 1 scrap' });
+    expect(catalogState(s, 'sculpture')).toEqual({ ok: false, state: 'cantBuy', reason: 'Missing 1 scrap' });
     expect(placePiece(s, 'sculpture', p.x, p.y, 0)).toBe(false);
     expect(s.res.scrap).toBe(19);
     s.res.scrap = 20;

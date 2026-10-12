@@ -8,11 +8,14 @@ import { citizensLost, effectiveStats, statusInfo } from '../game/economy';
 import type { EffectiveStats, StatusCause } from '../game/economy';
 import { CATALOG_ORDER, MODULES, PIECES, buildingStats, buildingStatsWith, installedModules, isModuleKind, isMovable, isPieceKind, moduleCheck, moduleNeeds, pieceRefund, pieceRefundAt, solidKind, surfaceKind, turnsAt } from '../game/pieces';
 import type { BuildingStats, CatalogKind, ModuleKind, PieceKind } from '../game/pieces';
+import { cityProgress, formatCount, goalText, isLocked, isProject, lockedReason, projectDef } from '../game/projects';
+import type { GoalStat, ProjectKind } from '../game/projects';
 import { CLEAN_EVERY, energyEffect } from '../game/sim';
 import { idx, inBounds } from '../game/state';
 import type { Building, GameState } from '../game/state';
 import { t, tk } from '../i18n';
 import type { Key } from '../i18n';
+import type { IconName } from '../render/icons';
 import { buildingBehind } from './pick';
 
 // The catalog's sections: Construction (floor, fence, gate, base, wall, pillar), Decorations (the lamp, increment 2's
@@ -60,34 +63,103 @@ export function shortfall(s: GameState, cost: Cost): Cost {
 // Where a module can go, in the words of moduleCheck (which needs a building to say it): core's moduleNeeds.
 export { moduleNeeds } from '../game/pieces';
 
+// The three states of an item in the catalog (docs/MODULAR-INC2.md §4), each with its words and its icon (never a
+// colour alone): a project to discover (its goal and the progress), discovered but not to be had right now (why), or
+// one that can be bought now.
+export type ItemState = 'locked' | 'cantBuy' | 'available';
+
 export interface CatalogState {
   ok: boolean;
-  reason?: string; // why it cannot be bought or used right now
+  state: ItemState;
+  reason?: string; // why it cannot be bought or used right now (a project to discover: its goal and the city's progress)
 }
+
+export const ITEM_STATE_ICON: Record<ItemState, IconName> = { locked: 'discover', cantBuy: 'cross', available: 'plus' };
+export const ITEM_STATE_TEXT = { locked: 'cat.state.locked', cantBuy: 'cat.state.cantBuy', available: 'cat.state.available' } as const satisfies Record<ItemState, Key>;
 
 function missing(s: GameState, cost: Cost): CatalogState {
-  return { ok: false, reason: t('cat.missing', { cost: costText(shortfall(s, cost)) }) };
+  return { ok: false, state: 'cantBuy', reason: t('cat.missing', { cost: costText(shortfall(s, cost)) }) };
 }
 
-// Can the item be bought somewhere in this city now? A piece needs its price; a module also needs a finished
-// building of its type that does not have it yet.
+// Can the item be bought somewhere in this city now? A project must be discovered first; then a piece needs its
+// price; a module also needs a finished building of its type that does not have it yet.
 export function catalogState(s: GameState, kind: CatalogKind): CatalogState {
+  if (isLocked(s, kind)) return { ok: false, state: 'locked', reason: lockedReason(s, kind as ProjectKind) };
   const cost = catalogCost(kind);
-  if (isPieceKind(kind)) return canAfford(s, cost) ? { ok: true } : missing(s, cost);
+  if (isPieceKind(kind)) return canAfford(s, cost) ? { ok: true, state: 'available' } : missing(s, cost);
   const targets = s.buildings.filter((b) => b.type === MODULES[kind].building && b.built >= 1);
-  if (!targets.length) return { ok: false, reason: moduleNeeds(kind) };
+  if (!targets.length) return { ok: false, state: 'cantBuy', reason: moduleNeeds(kind) };
   const checks = targets.map((b) => moduleCheck(s, kind, b));
-  if (checks.some((c) => c.ok)) return { ok: true };
+  if (checks.some((c) => c.ok)) return { ok: true, state: 'available' };
   if (checks.some((c) => c.costOnly)) return missing(s, cost);
   // already installed, or the slot taken by the other module (moduleCheck's own words)
-  return { ok: false, reason: checks.find((c) => c.reason)?.reason ?? t('place.modInstalled') };
+  return { ok: false, state: 'cantBuy', reason: checks.find((c) => c.reason)?.reason ?? t('place.modInstalled') };
 }
+
+// ---------- categories, filters, projects ----------
+
+// The catalog's three categories (docs/MODULAR-INC2.md §4) and its filters: everything, the items discovered (the
+// increment-1 items always are), the projects still to discover. A filter goes by discovery, never by money, so the
+// rows do not come and go with every tax tick.
+export type CatalogCategory = 'construction' | 'decorations' | 'modules';
+export type CatalogFilter = 'all' | 'available' | 'locked';
+export const CATEGORIES: readonly CatalogCategory[] = ['construction', 'decorations', 'modules'];
+export const FILTERS: readonly CatalogFilter[] = ['all', 'available', 'locked'];
+
+export function categoryItems(cat: CatalogCategory): readonly CatalogKind[] {
+  return cat === 'construction' ? CONSTRUCTION : cat === 'decorations' ? DECORATIONS : MACHINE_MODULES;
+}
+
+export function categoryOf(kind: CatalogKind): CatalogCategory {
+  if (isModuleKind(kind)) return 'modules';
+  return PIECES[kind].decoration ? 'decorations' : 'construction';
+}
+
+// The items of a category that a filter shows, in catalog order.
+export function filterItems(s: GameState, cat: CatalogCategory, filter: CatalogFilter): CatalogKind[] {
+  return categoryItems(cat).filter((k) => filter === 'all' || (filter === 'locked') === isLocked(s, k));
+}
+
+// How many items of a category are discovered (or always there), out of how many.
+export function categoryCount(s: GameState, cat: CatalogCategory): { found: number; total: number } {
+  const items = categoryItems(cat);
+  return { found: items.filter((k) => !isLocked(s, k)).length, total: items.length };
+}
+
+// The tab's name: Construction, Decorations, Modules.
+export function categoryName(cat: CatalogCategory): string {
+  return t(cat === 'construction' ? 'cat.construction' : cat === 'decorations' ? 'cat.decorations' : 'cat.tab.modules');
+}
+
+// The line under a category's tab: what its items do to the city.
+export function categoryNote(cat: CatalogCategory): string {
+  return t(cat === 'construction' ? 'cat.construction.note' : cat === 'decorations' ? 'insp.decoration' : 'cat.modules.note');
+}
+
+// A project's goal, as the catalog and the building panel show it: "Make 400 parts".
+export function projectGoal(kind: ProjectKind): string {
+  return goalText(kind);
+}
+
+// A project's progress: the city's value and, when it is higher, the most reached in another city (the profile's
+// maximum): "120 / 400 in this city · best 260". The Spire: whether this city has finished it.
+export function projectProgress(s: GameState, kind: ProjectKind, best: (stat: GoalStat) => number = () => 0): string {
+  const p = projectDef(kind);
+  const { value, target } = cityProgress(s, kind);
+  if (p.stat === 'spire') return value >= target ? '' : t('proj.spireNot');
+  const top = Math.min(best(p.stat), target);
+  const n = formatCount(value);
+  return top > value ? t('proj.progressBest', { n, target: formatCount(target), best: formatCount(top) }) : t('proj.progress', { n, target: formatCount(target) });
+}
+
+export { isProject };
 
 // Can `kind` go on this building now? moduleCheck's answer, with what is missing instead of the full price.
 export function installState(s: GameState, kind: ModuleKind, b: Building): CatalogState {
+  if (isLocked(s, kind)) return { ok: false, state: 'locked', reason: lockedReason(s, kind as ProjectKind) };
   const check = moduleCheck(s, kind, b);
-  if (check.ok) return { ok: true };
-  return check.costOnly ? missing(s, MODULES[kind].cost) : { ok: false, reason: check.reason };
+  if (check.ok) return { ok: true, state: 'available' };
+  return check.costOnly ? missing(s, MODULES[kind].cost) : { ok: false, state: 'cantBuy', reason: check.reason };
 }
 
 // ---------- numbers: nominal (full power), before -> after, and now ----------
@@ -382,12 +454,15 @@ export function overtimeLeft(s: GameState, b: Building): number {
 
 // ---------- a module on one building: its state ----------
 
-// Installed; the slot taken by the other module (the Recycler's magnet and sorter); can go on now; cannot now (why).
-export type ModuleState = 'installed' | 'slotTaken' | 'available' | 'cantBuy';
+// Installed; a project still to discover (its goal; the progress goes with it: projectProgress); the slot taken by the
+// other module (the Recycler's magnet and sorter, which do not go together); can go on now; cannot now (why).
+export type ModuleState = 'installed' | 'locked' | 'slotTaken' | 'available' | 'cantBuy';
 
 export function moduleState(s: GameState, b: Building, kind: ModuleKind): { state: ModuleState; reason?: string } {
   const fitted = installedModules(b);
+  // a module the city already has stays installed, discovered or not (only buying one waits for the discovery)
   if (fitted.includes(kind)) return { state: 'installed' };
+  if (isLocked(s, kind)) return { state: 'locked', reason: projectGoal(kind as ProjectKind) };
   const check = installState(s, kind, b);
   if (check.ok) return { state: 'available' };
   return { state: fitted.length ? 'slotTaken' : 'cantBuy', reason: check.reason };

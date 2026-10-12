@@ -2,6 +2,7 @@ import { BUILDINGS, DAY_LENGTH, DEFAULT_MODS, MAP_H, MAP_W, SMOG_DANGER, T, TILE
 import type { BuildingType, CityMods, Resource } from './defs';
 import { PIECES, modulesFor, normRot, pieceVariety, solidKind, surfaceKind } from './piecedefs';
 import type { ModuleKind } from './piecedefs';
+import type { ProjectKind } from './projects';
 import { generateMap } from './world';
 
 export type BuildingStatus = 'building' | 'ok' | 'idle' | 'noPower' | 'noInput' | 'noFuel' | 'reserve';
@@ -176,6 +177,10 @@ export interface GameState {
   fx: FxEvent[];
   messages: Message[];
   pendingEvent: string | null;
+  // The projects discovered (docs/MODULAR-INC2.md §4), filled from the player's profile when the city starts or is
+  // loaded (src/profile.ts): only in memory, never in the city's save. A new city starts with none; pieceCheck and
+  // moduleCheck refuse a project that is not in here (src/game/projects.ts).
+  unlocked: Set<ProjectKind>;
 }
 
 // 3 (0.7 increment 2): saves carry scrapPending. 2: 0.6 and 0.7.0-alpha.1. 1: before 0.5. A save of an older
@@ -285,6 +290,7 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     fx: [],
     messages: [],
     pendingEvent: null,
+    unlocked: new Set(),
   };
   if (s.tutorial) {
     // no surprises while learning: events and storms start after the tutorial
@@ -355,7 +361,7 @@ export function pushMessage(s: GameState, text: string, tone: MessageTone = 'inf
 // neither. Increment 2 (G3) adds two optional fields, written only when there is something in them, so a city
 // without these pieces saves as before: `surfaces`, the [index, code] of the other surfaces (2 = concrete base), and
 // `varieties`, the [index, kind, look] of a moved planter, sign or tree whose look is not its tile's own.
-type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' | 'solid' | 'rot' | 'variety' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages'> & {
+type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' | 'solid' | 'rot' | 'variety' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages' | 'unlocked'> & {
   tiles: string;
   amount: number[];
   floors?: number[];
@@ -365,7 +371,8 @@ type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' 
 };
 
 export function serialize(s: GameState): string {
-  const { tiles, amount, occ: _occ, claims: _claims, floor, solid, rot, variety, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
+  // (the projects discovered belong to the player's profile, not to the city: never saved here)
+  const { tiles, amount, occ: _occ, claims: _claims, floor, solid, rot, variety, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, unlocked: _unlocked, ...rest } = s;
   // Bots are not saved: what they carry is unloaded in the save, as if they reached a drop-off now. It goes into
   // storage as far as it fits (and counts as collected, once: the bots in the saved city are gone); the rest is
   // written as scrapPending, which the loaded city unloads when there is room. Nothing is lost or made up.
@@ -401,7 +408,8 @@ export function deserialize(json: string): GameState {
   // Start from a fresh city so fields added in newer versions get sane defaults.
   const base = createGame({ seed: 1 });
   const spireDone = d.spireDone ?? d.buildings.some((b) => b.type === 'spire' && b.built >= 1);
-  const { floors, solids, surfaces, varieties, ...saved } = d;
+  // a save never brings projects with it (a hand-edited one cannot either): the session fills them from the profile
+  const { floors, solids, surfaces, varieties, unlocked: _unlocked, ...saved } = d as typeof d & { unlocked?: unknown };
   const s: GameState = {
     ...base,
     ...(saved as Omit<SaveData, 'tiles' | 'amount' | 'floors' | 'solids' | 'surfaces' | 'varieties'>),
@@ -430,6 +438,7 @@ export function deserialize(json: string): GameState {
     messages: [],
     // an event dialog that was open when the game was saved comes back on load
     pendingEvent: d.pendingEvent ?? null,
+    unlocked: new Set(),
   };
   for (const b of d.buildings) {
     const placed = addBuilding(s, b.type, b.x, b.y, b.id);

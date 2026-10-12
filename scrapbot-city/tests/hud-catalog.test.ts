@@ -8,7 +8,9 @@ import type { BuildingType } from '../src/game/defs';
 import { installModule, placePiece, removeModule } from '../src/game/pieces';
 import type { CatalogKind, ModuleKind } from '../src/game/pieces';
 import { computeDerived } from '../src/game/sim';
-import { createGame, idx } from '../src/game/state';
+import { idx } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame } from './all-projects';
 import type { Building, GameState } from '../src/game/state';
 import { setLang } from '../src/i18n';
 import { Hud } from '../src/ui/hud';

@@ -52,6 +52,8 @@ const ICONS = {
   check: ['.......K', '......KG', '.....KGK', 'K...KGK.', 'GK.KGK..', 'KGKGK...', '.KGK....', '..K.....'],
   cross: ['KK....KK', 'KXK..KXK', '.KXKKXK.', '..KXXK..', '..KXXK..', '.KXKKXK.', 'KXK..KXK', 'KK....KK'],
   plus: ['..KKKK..', '..KGGK..', 'KKKGGKKK', 'KGGGGGGK', 'KGGGGGGK', 'KKKGGKKK', '..KGGK..', '..KKKK..'],
+  // a project still to discover (docs/MODULAR-INC2.md §4): a magnifying glass, in the catalog and the building panel
+  discover: ['.KKKK...', 'KWCCCK..', 'KCCCCK..', 'KCCCCK..', '.KKKKK..', '....KSK.', '.....KSK', '......KK'],
 } satisfies Record<string, string[]>;
 
 export type IconName = keyof typeof ICONS;

@@ -10,7 +10,9 @@ import { demolish, placeBuilding, placeCheck } from '../src/game/actions';
 import { MAP_H, MAP_W, SIM_STEP, T } from '../src/game/defs';
 import { installModule, removeModule } from '../src/game/pieces';
 import { computeDerived, step } from '../src/game/sim';
-import { createGame, deserialize, serialize } from '../src/game/state';
+import { serialize } from '../src/game/state';
+// cities where every project is discovered: these tests are about the items' own rules
+import { createGame, deserialize } from './all-projects';
 import type { Building, GameState } from '../src/game/state';
 import { mulberry32 } from '../src/game/world';
 import { demolishStorageDrop, moduleStorageDrop, scrapLost } from '../src/ui/catalog';
