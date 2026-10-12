@@ -36,10 +36,11 @@
 - **Notifica «Nuovo progetto: Panchina» con «Apri»**: apre il catalogo su quella voce, evidenziata, senza prendere né
   comprare niente; più progetti insieme fanno una notifica sola («Nuovi progetti (3)»). Sta sotto la barra in alto o
   sopra la barra degli edifici, dove non copre il fumetto del tutorial (anche quando il fumetto si sposta al passo
-  dopo), i pannelli, la scheda dell'obiettivo né il punto
-  del mouse, del cursore del controller o dell'ultimo tocco sulla mappa; mentre compare lascia passare i colpi alla
-  mappa e «Apri» non prende il secondo colpo di un doppio clic. Un numerino sul pulsante «Oggetti e moduli» (nessun
-  pulsante nuovo) conta i progetti che il catalogo non ha ancora mostrato.
+  dopo), i pannelli, la scheda dell'obiettivo né il punto del mouse, del cursore del controller o dell'ultimo tocco
+  sulla mappa; resta ferma finché niente le va sopra, e se un pannello o il fumetto le va sopra si sposta, di nuovo
+  lontano da quei punti; mentre compare o si sposta lascia passare i colpi alla mappa e «Apri» non prende il secondo
+  colpo di un doppio clic. Un numerino sul pulsante «Oggetti e moduli» (nessun pulsante nuovo) conta i progetti che il
+  catalogo non ha ancora mostrato.
 - **Salvataggi vecchi**: caricando una città di 0.5, 0.6 o 0.7.0-alpha.1 si scopre solo quello che i suoi dati provano
   (statistiche, cittadini, Guglia; e le città con la Guglia completata nel profilo della campagna), annunciato con la
   notifica: il salvataggio 0.6 di prova (211 pezzi, 594 rottami) scopre separatore magnetico e fioriera, quello
