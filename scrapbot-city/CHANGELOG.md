@@ -1,5 +1,55 @@
 # Changelog
 
+## In lavorazione — incremento 2, gruppo G4: progetti da scoprire, catalogo per categorie e filtri
+
+- **Progetti da scoprire** (docs/MODULAR-INC2.md §4): i 18 elementi nuovi dell'incremento 2 si scoprono raggiungendo un
+  traguardo in una città, campagna o gioco libero (anche il Campo Scuola), misurato sulle statistiche della città
+  corrente: separatore magnetico 100 pezzi prodotti; panchina 10 cittadini; casetta di Miso 3 carezze; fioriera 300
+  rottami raccolti; basamento 10 edifici completati; albero 20 cittadini; capsula abitativa 30 cittadini; selezionatore
+  400 pezzi; ugello esteso 10 caselle di melma bonificate; pannelli orientabili 30 di energia prodotta (Campi Solari o
+  Inceneritori); insegna 25 edifici; braccio doppio 5.000 crediti guadagnati; muro basso 1.000 rottami; pilastro 20
+  oggetti del catalogo posati (non la risorsa «pezzi»); pergola 50 cittadini; scultura la Guglia completata; fontana
+  10.000 crediti; statua 40 edifici. I sei elementi dell'incremento 1 e tutti gli edifici restano disponibili come
+  prima. Nessuna valuta di ricerca, nessun acquisto, nessun caso, nessuna attesa a tempo reale; nessun progetto
+  richiede un altro progetto; scoprire non dà risorse; una volta scoperto un progetto resta scoperto.
+- **Nessun ingresso lo aggira**: comprare un progetto non scoperto (clic, tocco, `A`, fila trascinata, installazione dal
+  pannello) è rifiutato con il traguardo e il progresso («Progetto da scoprire: Produci 400 pezzi (120 / 400 in
+  questa città)») e non costa niente; dal catalogo non si prende in mano. Oggetti e moduli che una città caricata ha
+  già restano dove sono, si ruotano, si spostano e si tolgono come prima (prima di toglierli un avviso dice che non si
+  potranno ricomprare finché il progetto non è scoperto).
+- **Profilo dei progetti**: chiave `projects` (`{ version: 1, discovered: [...], best: {...} }`), nei file del gioco
+  desktop come i salvataggi (Steam Cloud). `best` tiene per ogni traguardo il massimo raggiunto **in una** città:
+  ricaricare la stessa città non somma niente, città diverse non si sommano. Il profilo cresce soltanto (i progetti si
+  uniscono, i massimi salgono); un testo danneggiato o di un'altra versione viene copiato a parte
+  (`backup:projects:v…`) prima di essere riscritto, e i progetti che contiene si conservano. I progetti non stanno
+  mai nel salvataggio della città.
+- **Il catalogo «Oggetti e moduli»**: tre categorie (Costruzioni, Decorazioni, Moduli) e tre filtri (Tutti,
+  Disponibili, Da scoprire, ciascuno con il suo numero), ricordati finché si gioca la città. Ogni voce dice il suo stato
+  con una parola e un'icona: «Da scoprire» con il traguardo e il progresso («120 / 400 in questa città · massimo 260»,
+  il massimo quando un'altra città è andata più avanti), «Non ora» con il motivo, «Acquistabile». Gli stati cambiano
+  sul posto, senza ridisegnare la lista (nessun clic perso). La didascalia delle Costruzioni non dice più
+  «Decorazione». Sulle finestre basse (1280×720, 1024×640) il pannello è un po' più largo e più compatto e, con un
+  oggetto in mano, il riquadro dell'oggetto prende il posto della testata: ogni voce si porta per intero in vista in
+  tutte le 8 lingue a 1024×640, 1280×720, 1280×800 e 1920×1080.
+- **Pannello dell'edificio**: un modulo da scoprire mostra «Da scoprire», il traguardo e il progresso, con «Installa»
+  spento; poi «Installabile», «Installato», «Slot occupato» (con il modulo che lo occupa), «Non ora» (con il motivo).
+- **Notifica «Nuovo progetto: Panchina» con «Apri»**: apre il catalogo su quella voce, evidenziata, senza prendere né
+  comprare niente; più progetti insieme fanno una notifica sola («Nuovi progetti (3)»). Sta sotto la barra in alto o
+  sopra la barra degli edifici, dove non copre il fumetto del tutorial, i pannelli, la scheda dell'obiettivo né il punto
+  del mouse, del cursore del controller o dell'ultimo tocco sulla mappa; mentre compare lascia passare i colpi alla
+  mappa e «Apri» non prende il secondo colpo di un doppio clic. Un numerino sul pulsante «Oggetti e moduli» (nessun
+  pulsante nuovo) conta i progetti che il catalogo non ha ancora mostrato.
+- **Salvataggi vecchi**: caricando una città di 0.5, 0.6 o 0.7.0-alpha.1 si scopre solo quello che i suoi dati provano
+  (statistiche, cittadini, Guglia; e le città con la Guglia completata nel profilo della campagna), annunciato con la
+  notifica: il salvataggio 0.6 di prova (211 pezzi, 594 rottami) scopre separatore magnetico e fioriera, quello
+  0.7.0-alpha.1 (35 oggetti posati) il pilastro; una statistica che il salvataggio non ha conta 0.
+- **Nessun effetto sulla simulazione**: la scoperta legge soltanto la città (nessun `Math.random`); il bilanciamento e
+  le attese seminate sono byte per byte quelli di prima; Scrapbot City, il gioco libero e la città affollata si
+  disegnano identici pixel per pixel.
+- **Ritmo misurato** con `npm run pace` (pilota automatico, cinque città e gioco libero, verde e industriale, minuti a
+  velocità 1): panchina, fioriera, basamento e albero usabili entro 5 minuti in tutte le 14 partite (e nella prova
+  dall'interfaccia: entro 4:30); nessuna soglia ritoccata.
+
 ## In lavorazione — incremento 2, gruppo G3: tre costruzioni, tre decorazioni, spostare le decorazioni
 
 - **Tre costruzioni nuove** nella sezione Costruzioni del pannello «Oggetti e moduli»:

@@ -94,6 +94,10 @@ versione 2, le nuove la 3), il gioco ne tiene una copia identica, una volta sola
 `backup_save_<slot>_v2.sav` (e `backup_meta_<slot>_v2.sav`). Non viene mai cancellata; si sincronizza con il cloud
 come gli altri `.sav`. Per riaprirla, a gioco chiuso, copiala (non rinominarla, così la copia resta) sopra
 `save_<slot>.sav`, e `backup_meta_<slot>_v2.sav` sopra `meta_<slot>.sav`.
+I progetti scoperti (incremento 2, G4: quali elementi del catalogo il giocatore ha sbloccato e, per ogni traguardo, il
+massimo raggiunto in una città) stanno in `projects.sav`, che il cloud sincronizza come gli altri: chi li ha scoperti su
+un computer li ritrova sull'altro. Il file cresce soltanto; se non si può leggere o è di un'altra versione, prima di
+riscriverlo il gioco ne tiene una copia (`backup_projects_v<n>.sav`, mai cancellata) e conserva i progetti che contiene.
 Il pulsante **"Open the saves folder"** nelle impostazioni apre la cartella (utile per l'assistenza ai giocatori).
 Chi aveva già giocato con la 0.4 desktop non perde niente: al primo avvio i vecchi dati vengono copiati nei file.
 
