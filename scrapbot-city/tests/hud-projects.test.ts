@@ -288,6 +288,47 @@ describe('notice: "New project: Bench" with Open', () => {
     update({ catalog: false });
     expect(badge.hidden).toBe(true);
   });
+
+  it('stands clear of the tutorial bubble (position: fixed, so it has no offsetParent), also when the bubble comes over it', () => {
+    const { q, hud, update } = setup();
+    const coach = document.createElement('div');
+    coach.className = 'coach';
+    coach.style.position = 'fixed';
+    document.body.append(coach);
+    // the layout jsdom does not do: a 1024 px wide window, the build bar from y 600, the bubble over the band under the
+    // top bar from x 300 (the notice's first choice there is its middle, x 312..712)
+    const rects = new Map<Element, DOMRect>([
+      [q('[data-toolbar]')!, new DOMRect(0, 600, 1024, 168)],
+      [coach, new DOMRect(300, 60, 710, 240)],
+    ]);
+    const box = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      return rects.get(this) ?? new DOMRect(0, 0, 0, 0);
+    });
+    const drawn = vi.spyOn(Element.prototype, 'getClientRects').mockImplementation(function (this: Element) {
+      const r = rects.get(this);
+      return (r ? [r] : []) as unknown as DOMRectList;
+    });
+    try {
+      const note = q('[data-project-note]')!;
+      Object.defineProperty(note, 'offsetWidth', { value: 400 });
+      Object.defineProperty(note, 'offsetHeight', { value: 56 });
+      const at = () => new DOMRect(parseFloat(note.style.left), parseFloat(note.style.top), 400, 56);
+      const clear = (a: DOMRect, b: DOMRect) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+      hud.notifyProjects(['bench']);
+      update();
+      expect(note.hidden).toBe(false);
+      expect(clear(at(), rects.get(coach)!)).toBe(true);
+      // the next tutorial step puts the bubble where the notice stands: the notice moves off it
+      const was = at();
+      rects.set(coach, new DOMRect(was.left - 10, was.top - 10, 420, 200));
+      update();
+      expect(clear(at(), rects.get(coach)!)).toBe(true);
+    } finally {
+      box.mockRestore();
+      drawn.mockRestore();
+      coach.remove();
+    }
+  });
 });
 
 describe('building panel: the module slot of a project', () => {

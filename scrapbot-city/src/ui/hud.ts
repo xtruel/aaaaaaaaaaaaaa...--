@@ -769,8 +769,9 @@ export class Hud {
     const vw = window.innerWidth;
     const w = el.offsetWidth;
     const h = el.offsetHeight;
+    // what is on screen: drawn boxes (not offsetParent, which is null for the tutorial's bubble: it is position: fixed)
     const boxes = (sel: string) =>
-      [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => !e.hidden && e.offsetParent !== null).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
+      [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => !e.hidden && e.getClientRects().length > 0).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
     const hard = [...boxes('.coach'), ...boxes('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective], [data-smog-alert], .hud-top > *, [data-toolbar], #toasts .toast')];
     const overlap = (a: DOMRect, x: number, y: number) => Math.max(0, Math.min(a.right, x + w) - Math.max(a.left, x)) * Math.max(0, Math.min(a.bottom, y + h) - Math.max(a.top, y));
     const kept = this.noticeSpot;
