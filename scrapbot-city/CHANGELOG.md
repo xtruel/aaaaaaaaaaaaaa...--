@@ -132,7 +132,9 @@
   compariva sul suo tetto); le luci in vista e quelle davanti agli edifici restano come prima, e un cortile pieno di
   lampioni costa da disegnare quanto prima.
 - **Nessun effetto su economia, felicità, smog, allineamento, stelle o achievement**: una città con decine di
-  decorazioni gioca byte per byte come la stessa città senza (test con il pilota automatico). Salvataggi: codici 4
+  decorazioni su caselle che la città non usa gioca byte per byte come la stessa città senza (test con il pilota
+  automatico); dove una decorazione occupa una casella, vale la regola di ogni oggetto solido (la spazzatura cade
+  altrove, lì non si costruisce), con esiti identici a una recinzione sulla stessa casella. Salvataggi: codici 4
   panchina … 9 scultura, in coda a recinzione 1, cancello 2, lampione 3; i salvataggi vecchi si caricano come prima.
 - **Comodità di costruzione** (brief §3), per tutti i pezzi del catalogo, con mouse, touch e controller: il costo è in
   vista prima di comprare, annullare è gratis, una posa paga una volta, dopo la posa lo strumento resta in mano.
