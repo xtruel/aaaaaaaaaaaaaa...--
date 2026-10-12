@@ -236,11 +236,13 @@ export class Hud {
   private focusKind: CatalogKind | null = null;
   private fresh = new Set<CatalogKind>();
   private seen = new Set<CatalogKind>();
-  // a new project's notice: what it announces, seconds left, and when it last appeared or grew (performance.now())
+  // a new project's notice: what it announces, seconds left, and when it last appeared, grew or had to move
+  // (performance.now())
   private notice: { kinds: ProjectKind[]; left: number; armedAt: number } | null = null;
-  // where it stands: chosen when it appears or grows (then also off the pointer), kept while nothing comes over it, so
-  // it never runs away from a pointer going to its Open
-  private noticeSpot: { x: number; y: number; top: boolean } | null = null;
+  // where it stands: chosen when it appears or grows (then also off the pointer), kept while nothing more comes over it
+  // than when it was placed (cover), so it never runs away from a pointer going to its Open; moved (off the pointer
+  // again) when a panel, the tutorial's bubble or a card comes over it
+  private noticeSpot: { x: number; y: number; top: boolean; cover: number } | null = null;
   private noticeTick = 0;
   private best: (stat: GoalStat) => number = () => 0;
   // when the smog panel last closed (performance.now()): the map takes no purchase in the moments after (session)
@@ -762,8 +764,9 @@ export class Hud {
 
   // Where the notice goes: under the top bar, or else above the build bar, wherever it covers none of what the player
   // is using: the tutorial's bubble, the side panels, the goal card, the smog alarm, the bars, an achievement and, when
-  // it appears or grows, the spot under the mouse or the controller's cursor (so it never lands under a press about to
-  // be made). Then it stays put unless one of those comes over it.
+  // it appears, grows or has to move, the spot under the mouse or the controller's cursor and the last press on the map
+  // (so it never lands under a press about to be made). Then it stays put unless one of those comes over it; when it
+  // moves for that, presses go through it for a moment, as when it appears.
   private placeNotice(avoid: { x: number; y: number }[]): void {
     const el = this.el['project-note'];
     const vw = window.innerWidth;
@@ -774,40 +777,63 @@ export class Hud {
       [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => !e.hidden && e.getClientRects().length > 0).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
     const hard = [...boxes('.coach'), ...boxes('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective], [data-smog-alert], .hud-top > *, [data-toolbar], #toasts .toast')];
     const overlap = (a: DOMRect, x: number, y: number) => Math.max(0, Math.min(a.right, x + w) - Math.max(a.left, x)) * Math.max(0, Math.min(a.bottom, y + h) - Math.max(a.top, y));
+    const covered = (x: number, y: number) => hard.reduce((c, r) => c + overlap(r, x, y), 0);
+    // it stays put while nothing more comes over it than when it was placed (nothing, unless the screen had no room)
     const kept = this.noticeSpot;
-    if (kept && hard.every((r) => overlap(r, kept.x, kept.y) === 0)) return;
+    if (kept && covered(kept.x, kept.y) <= kept.cover) return;
     const soft = boxes('[data-feed] .msg');
-    // where the next press is likely: never under it if anywhere else will do
-    const presses = kept ? [] : avoid.map((p) => new DOMRect(p.x - 40, p.y - 40, 80, 80));
     const below = parseFloat(this.root.style.getPropertyValue('--below-alarm')) || 80;
     const low = this.el.toolbar.getBoundingClientRect().top - h - 12;
-    // three bands (under the top bar, above the build bar, between them) and, in each, the middle of every gap the
-    // panels and cards leave wide enough, then the centre and the two sides
-    const spots: { x: number; y: number; top: boolean }[] = [];
-    for (const [y, top] of [
-      [below, true],
-      [low, false],
-      [Math.round((below + low) / 2), false],
-    ] as const) {
-      const taken = [...hard, ...presses].filter((r) => r.bottom > y && r.top < y + h).map((r) => [r.left, r.right] as const).sort((a, b) => a[0] - b[0]);
-      let from = 8;
-      for (const [l, r] of [...taken, [vw - 8, vw - 8] as const]) {
-        if (l - from >= w) spots.push({ x: from + (l - from - w) / 2, y, top });
-        from = Math.max(from, r + 8);
+    // The best place given what is on screen and the points to keep clear of: three bands (under the top bar, above the
+    // build bar, between them) and, in each, the middle of every gap the panels and cards leave wide enough, then the
+    // centre and the two sides.
+    const choose = (presses: DOMRect[]) => {
+      const spots: { x: number; y: number; top: boolean }[] = [];
+      for (const [y, top] of [
+        [below, true],
+        [low, false],
+        [Math.round((below + low) / 2), false],
+      ] as const) {
+        const taken = [...hard, ...presses].filter((r) => r.bottom > y && r.top < y + h).map((r) => [r.left, r.right] as const).sort((a, b) => a[0] - b[0]);
+        let from = 8;
+        for (const [l, r] of [...taken, [vw - 8, vw - 8] as const]) {
+          if (l - from >= w) spots.push({ x: from + (l - from - w) / 2, y, top });
+          from = Math.max(from, r + 8);
+        }
+        for (const x of [(vw - w) / 2, 12, vw - w - 12]) spots.push({ x, y, top });
       }
-      for (const x of [(vw - w) / 2, 12, vw - w - 12]) spots.push({ x, y, top });
+      let best = spots[0];
+      let bestCost = Infinity;
+      spots.forEach((p, i) => {
+        const x = Math.max(8, Math.min(vw - w - 8, p.x));
+        const cost = presses.reduce((c, r) => c + overlap(r, x, p.y) * 1e6, 0) + covered(x, p.y) * 100 + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
+        if (cost < bestCost) {
+          bestCost = cost;
+          best = { ...p, x };
+        }
+      });
+      return best;
+    };
+    // where the next press is likely: never under it if anywhere else will do
+    const presses = avoid.map((p) => new DOMRect(p.x - 40, p.y - 40, 80, 80));
+    const same = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.round(a.x) === Math.round(b.x) && Math.round(a.y) === Math.round(b.y);
+    let best: { x: number; y: number; top: boolean };
+    if (!kept) best = choose(presses);
+    else {
+      // something came over it. Where the screen alone puts it now: the same place (nothing better left) keeps it there;
+      // another place is a move, made like an appearance: clear of the pointer and the last press, and letting presses
+      // through for a moment (a press meant for the map where it lands goes to the map)
+      best = choose([]);
+      if (same(best, kept)) best = kept;
+      else {
+        best = choose(presses);
+        if (!same(best, kept)) {
+          if (this.notice) this.notice.armedAt = performance.now();
+          el.classList.add('arming');
+        }
+      }
     }
-    let best = spots[0];
-    let bestCost = Infinity;
-    spots.forEach((p, i) => {
-      const x = Math.max(8, Math.min(vw - w - 8, p.x));
-      const cost = presses.reduce((c, r) => c + overlap(r, x, p.y) * 1e6, 0) + hard.reduce((c, r) => c + overlap(r, x, p.y) * 100, 0) + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
-      if (cost < bestCost) {
-        bestCost = cost;
-        best = { ...p, x };
-      }
-    });
-    this.noticeSpot = best;
+    this.noticeSpot = { ...best, cover: covered(best.x, best.y) };
     el.style.left = `${Math.round(best.x)}px`;
     el.style.top = `${Math.round(best.y)}px`;
     // achievements come down under it rather than over it

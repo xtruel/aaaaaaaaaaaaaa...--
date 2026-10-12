@@ -329,6 +329,52 @@ describe('notice: "New project: Bench" with Open', () => {
       coach.remove();
     }
   });
+
+  it('when a panel comes over it, it moves clear of the pointer, lets presses through for a moment, then stays put', () => {
+    const { q, hud, update } = setup();
+    const rects = new Map<Element, DOMRect>([[q('[data-toolbar]')!, new DOMRect(0, 600, 1024, 168)]]);
+    const box = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      return rects.get(this) ?? new DOMRect(0, 0, 0, 0);
+    });
+    const drawn = vi.spyOn(Element.prototype, 'getClientRects').mockImplementation(function (this: Element) {
+      const r = rects.get(this);
+      return (r ? [r] : []) as unknown as DOMRectList;
+    });
+    try {
+      const note = q('[data-project-note]')!;
+      Object.defineProperty(note, 'offsetWidth', { value: 400 });
+      Object.defineProperty(note, 'offsetHeight', { value: 56 });
+      const at = () => new DOMRect(parseFloat(note.style.left), parseFloat(note.style.top), 400, 56);
+      const under = (n: DOMRect, p: { x: number; y: number }) => p.x >= n.left - 40 && p.x <= n.right + 40 && p.y >= n.top - 40 && p.y <= n.bottom + 40;
+      hud.notifyProjects(['bench']);
+      update();
+      const first = at();
+      now += PRESS_GUARD_MS + 10;
+      update();
+      expect(note.classList.contains('arming')).toBe(false);
+      // the pointer rests on the map in the band under the top bar, left of the notice, where the notice would go
+      // if it moved over there; then the catalog opens (O on the keyboard) and its panel comes over the notice
+      const pointer = { x: first.left + 42, y: first.top + 28 };
+      rects.set(q('[data-catalog-panel]')!, new DOMRect(first.right - 12, 60, 330, 500));
+      update({ catalog: true, avoid: [pointer] });
+      expect(at().left === first.left && at().top === first.top).toBe(false);
+      expect(under(at(), pointer)).toBe(false);
+      // it moved: a press already on its way to the map goes through it
+      expect(note.classList.contains('arming')).toBe(true);
+      now += PRESS_GUARD_MS + 10;
+      update({ catalog: true, avoid: [pointer] });
+      expect(note.classList.contains('arming')).toBe(false);
+      // now the pointer goes to its Open: it stays where it is
+      const placed = at();
+      const open = { x: placed.right - 40, y: placed.top + 28 };
+      update({ catalog: true, avoid: [open] });
+      expect(at().left).toBe(placed.left);
+      expect(at().top).toBe(placed.top);
+    } finally {
+      box.mockRestore();
+      drawn.mockRestore();
+    }
+  });
 });
 
 describe('building panel: the module slot of a project', () => {
