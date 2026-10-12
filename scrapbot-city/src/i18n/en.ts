@@ -731,7 +731,7 @@ export const en = {
   'insp.used.parts': "Parts used / min",
   'insp.used.credits': "Credits used / min",
   'insp.radius': "Sludge radius (tiles)",
-  'insp.cleanEvery': "One sludge tile every (s)",
+  'insp.cleanEvery': "Sludge tile every (s)",
   'insp.stopped': "stopped",
   'insp.waiting': "waiting",
   'insp.overtime': "Overtime: production and smog ×1.5 for {n} s more, on top of any module.",

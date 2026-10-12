@@ -30,6 +30,11 @@
   crediti + 4 rottami)», la cifra vera (i rottami della scultura solo fin dove il deposito ha spazio), come fa
   l'effetto di un modulo; il clic paga esattamente quella. Col mouse e col cursore del controller; col dito, che non
   ha un «sopra», la cifra resta nel pannello dell'oggetto e nella scritta che sale dopo la rimozione.
+- **Pannello dell'edificio più compatto**: le colonne dei numeri stanno 6 px l'una dall'altra (come nelle schede dei
+  moduli) e i pulsanti delle schede usano il corpo della scheda; in inglese «Sludge radius (tiles)», «Sludge tile every
+  (s)» (prima «One sludge tile every (s)») e «Remove (+25 credits + 15 parts)» stanno su una riga a 1280×800 e a
+  1024×640; nelle altre lingue le etichette lunghe vanno ancora a capo tra le parole, ma meno (righe in più: da 142 a
+  102 su 48 pannelli misurati), nessuna più di prima, nessun testo che esce dal pannello.
 
 ## In lavorazione — incremento 2, gruppo G2: le sei decorazioni del brief
 

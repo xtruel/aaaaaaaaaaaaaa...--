@@ -2107,6 +2107,12 @@ select {
   margin-top: 0;
 }
 
+/* a card's buttons in the card's own size: "Remove (+25 credits + 15 parts)" keeps one line */
+.insp-mod .insp-actions .btn {
+  font-size: 14px;
+  padding-inline: 8px;
+}
+
 .insp-mod .cat-reason {
   margin-top: 6px;
 }
@@ -2170,6 +2176,12 @@ select {
 
 .inspector .insp-rows.no-now {
   grid-template-columns: minmax(min-content, 1fr) auto;
+}
+
+/* the building's numbers as close together as a module card's: the label column gains 8 px, so "Sludge radius
+   (tiles)" and "Sludge tile every (s)" keep one line in English */
+.inspector .insp-rows {
+  column-gap: 6px;
 }
 
 /* the cycle's inputs and outputs, the fuel: a line each across the whole width */
