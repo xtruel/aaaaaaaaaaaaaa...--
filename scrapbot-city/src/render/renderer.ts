@@ -135,6 +135,10 @@ const PIECE_H: Record<SolidKind, number> = {
   fountain: 23,
   statue: 30,
 };
+// Pieces at least this tall (voxels: fountain, sign, sculpture, statue, tree) hide the night lights behind them (a lamp's
+// lens, a sign's neon, a building's glow): a lower one standing in front of a light's tile cannot reach up to it on
+// screen, so it is left out of the light cutting, and a yard of lamps and fences costs what it did.
+const CUTS_LIGHT_H = 23;
 const PIECE_REACH = 64; // no piece's sprite or shadow reaches this far (px) from its tile: farther off-view ones are skipped early
 const FENCE_FRAMES = Array.from({ length: 16 }, (_, mask) => `pc/fence/${mask}`);
 const GATE_FRAMES = ['pc/gate/x', 'pc/gate/y'];
@@ -2279,49 +2283,122 @@ export class Renderer {
   }
 
   private lightBuildings: number[] = []; // drawPieceLights: the buildings drawn this frame, in draw order
+  private lightPieces: number[] = []; // drawLighting: the pieces drawn this frame, in draw order
+  private cutRects: number[] = []; // drawCutLights: x, y, w, h of each light on the layer, in draw order
+  private cutGlows: Frame[] = []; // drawCutLights: the glow frame of each light on the layer, in draw order
+  // framesMeet's answers: two atlas frames (by their place in the atlas) at a given offset; the same few pairs and
+  // offsets come back every frame in a yard
+  private meets = new Map<string, boolean>();
 
-  // The placed pieces' lights at night (the gate's lamp, the lamp's lens and pool, a sign's neon, the sculpture's eyes),
-  // cut where a building drawn in front of them covers them, as the pieces themselves are: a sign or a lamp behind a
-  // building does not shine through the building. A light no building in front reaches is drawn as it always was; the
-  // others go on a layer in draw order, where each building erases the lights behind it (a see-through one only in
-  // part), and the layer goes over the city as the lights did one by one (the context is already additive, at the
-  // night's strength). Other pieces do not cut a light: they are small, and a yard full of lamps costs what it did.
+  // Do the opaque pixels of frame a, drawn at (ax, ay), and of frame b, drawn at (bx, by) (world px), meet? A tall
+  // piece whose box only grazes a light's box (a tree's empty corner over a lamp's pool) neither cuts it nor erases.
+  private framesMeet(a: Frame, ax: number, ay: number, b: Frame, bx: number, by: number): boolean {
+    const dx = Math.round(bx - ax);
+    const dy = Math.round(by - ay);
+    const key = `${a.x},${a.y},${b.x},${b.y},${dx},${dy}`;
+    let v = this.meets.get(key);
+    if (v === undefined) {
+      v = false;
+      const x1 = Math.min(a.w, dx + b.w);
+      const y1 = Math.min(a.h, dy + b.h);
+      for (let y = Math.max(0, dy); y < y1 && !v; y++) for (let x = Math.max(0, dx); x < x1 && !v; x++) v = opaqueAt(a, x, y) && opaqueAt(b, x - dx, y - dy);
+      if (this.meets.size > 20000) this.meets.clear();
+      this.meets.set(key, v);
+    }
+    return v;
+  }
+
+  // Is the glow g at (x, y) (world px) covered by something drawn after draw index k, in `after` (draw indexes, in
+  // order)? Boxes for the buildings (the layer, drawCutLights, erases only where the sprite really is); for the pieces
+  // their opaque pixels must meet the glow's (framesMeet).
+  private coveredAfter(after: number[], k: number, g: Frame, x: number, y: number, pixels: boolean): boolean {
+    for (let n = after.length - 1; n >= 0 && after[n] > k; n--) {
+      const o = this.drawn[after[n]];
+      if (o.sx < x + g.w && o.sy < y + g.h && o.sx + o.w > x && o.sy + o.h > y && (!pixels || !o.f || this.framesMeet(g, x, y, o.f, o.sx, o.sy))) return true;
+    }
+    return false;
+  }
+
+  // Does the piece on tile index i hide the night lights behind it (CUTS_LIGHT_H)?
+  private cutsLight(s: GameState, i: number): boolean {
+    const kind = solidKind(s.solid[i]);
+    return !!kind && PIECE_H[kind] >= CUTS_LIGHT_H;
+  }
+
+  // Is the point (world px) on the opaque pixels of a piece drawn after draw index k?
+  private pieceOverPoint(pieces: number[], k: number, x: number, y: number): boolean {
+    for (let n = pieces.length - 1; n >= 0 && pieces[n] > k; n--) {
+      const o = this.drawn[pieces[n]];
+      if (o.f && opaqueAt(o.f, Math.floor(x - o.sx), Math.floor(y - o.sy))) return true;
+    }
+    return false;
+  }
+
+  // The glow of draw index k (a built building's glow frame, or a piece's light) and where it goes (world px); null
+  // when it has none.
+  private lightOf(s: GameState, k: number): { g: Frame; x: number; y: number } | null {
+    const d = this.drawn[k];
+    if (d.kind === K_BUILDING) {
+      const b = s.buildings[d.index];
+      if (!d.f || !b || b.id !== d.ref || b.built < 1) return null;
+      const g = frame(glowOf(this.buildingFrameName(s, b)));
+      return g ? { g, x: d.sx, y: d.sy } : null;
+    }
+    if (d.kind !== K_PIECE) return null;
+    const g = frame(glowOf(this.pieceNames[d.ref]));
+    if (!g) return null;
+    const tx = d.ref % MAP_W;
+    const top = tileTop(tx, (d.ref - tx) / MAP_W);
+    return { g, x: top.X - g.ax, y: top.Y - g.ay };
+  }
+
+  // The placed pieces' lights at night (the gate's lamp, the lamp's lens and pool, a sign's neon, the sculpture's and
+  // the statue's eyes, a pillar's lamp), cut where a building or a tall piece (CUTS_LIGHT_H) drawn in front of them
+  // covers them, as the pieces themselves are: a sign behind a building, or behind a tree, does not shine through it.
+  // A light nothing in front reaches is drawn as it always was; the others go through drawCutLights.
   private drawPieceLights(s: GameState, camX: number, camY: number, img: HTMLImageElement): void {
     const ctx = this.ctx;
     // the buildings drawn, in draw order (few next to the pieces and bots)
     const blds = this.lightBuildings;
     blds.length = 0;
     for (let k = 0; k < this.drawnCount; k++) if (this.drawn[k].kind === K_BUILDING && this.drawn[k].f) blds.push(k);
+    const pieces = this.lightPieces;
     const cut: number[] = [];
+    for (let k = 0; k < this.drawnCount; k++) {
+      if (this.drawn[k].kind !== K_PIECE) continue;
+      const l = this.lightOf(s, k);
+      if (!l) continue;
+      const { g, x, y } = l;
+      if (this.coveredAfter(blds, k, g, x, y, false) || this.coveredAfter(pieces, k, g, x, y, true)) cut.push(k);
+      else ctx.drawImage(img, g.x, g.y, g.w, g.h, x - camX, y - camY, g.w, g.h);
+    }
+    if (cut.length) this.drawCutLights(s, cut, true, camX, camY, img);
+  }
+
+  // Lights that something drawn in front of them covers on screen (draw indexes in `cut`, in draw order: buildings'
+  // glows or pieces' lights): drawn on a layer in draw order, where every tall piece (CUTS_LIGHT_H) drawn in front of
+  // one of them erases what it covers of the lights behind it, and so does every building when `byBuildings` (the
+  // pieces' lights: a see-through building only in part). The layer then goes over the city as the lights did one by
+  // one (the context is already additive, at the night's strength). A building's glow is cut by the tall pieces in
+  // front of it only, as it was never cut by the buildings in front of it: a city without them draws as before.
+  private drawCutLights(s: GameState, cut: number[], byBuildings: boolean, camX: number, camY: number, img: HTMLImageElement): void {
+    const rects = this.cutRects;
+    rects.length = 0;
+    const glows = this.cutGlows;
+    glows.length = 0;
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
     let y1 = -Infinity;
-    for (let k = 0; k < this.drawnCount; k++) {
-      const d = this.drawn[k];
-      if (d.kind !== K_PIECE) continue;
-      const g = frame(glowOf(this.pieceNames[d.ref]));
-      if (!g) continue;
-      const tx = d.ref % MAP_W;
-      const top = tileTop(tx, (d.ref - tx) / MAP_W);
-      const gx = top.X - g.ax;
-      const gy = top.Y - g.ay;
-      let behind = false;
-      for (let n = blds.length - 1; n >= 0 && blds[n] > k && !behind; n--) {
-        const o = this.drawn[blds[n]];
-        behind = o.sx < gx + g.w && o.sy < gy + g.h && o.sx + o.w > gx && o.sy + o.h > gy;
-      }
-      if (!behind) {
-        ctx.drawImage(img, g.x, g.y, g.w, g.h, gx - camX, gy - camY, g.w, g.h);
-        continue;
-      }
-      cut.push(k);
-      x0 = Math.min(x0, gx);
-      y0 = Math.min(y0, gy);
-      x1 = Math.max(x1, gx + g.w);
-      y1 = Math.max(y1, gy + g.h);
+    for (const k of cut) {
+      const { g, x, y } = this.lightOf(s, k)!;
+      rects.push(x, y, g.w, g.h);
+      glows.push(g);
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x + g.w);
+      y1 = Math.max(y1, y + g.h);
     }
-    if (!cut.length) return;
     const w = Math.ceil(x1 - x0);
     const h = Math.ceil(y1 - y0);
     lightLayer ??= document.createElement('canvas');
@@ -2336,22 +2413,34 @@ export class Renderer {
     let next = 0;
     for (let k = cut[0]; k < this.drawnCount; k++) {
       const o = this.drawn[k];
-      if (o.kind === K_BUILDING && o.f && o.sx < x1 && o.sy < y1 && o.sx + o.w > x0 && o.sy + o.h > y0) {
-        const b = s.buildings[o.index];
-        m.globalCompositeOperation = 'destination-out';
-        m.globalAlpha = b && b.id === o.ref && this.coversFocus(b, o.sx, o.sy, o.w, o.h) ? 0.35 : 1;
-        m.drawImage(img, o.f.x, o.f.y, o.f.w, o.f.h, o.sx - x0, o.sy - y0, o.f.w, o.f.h);
-      } else if (k === cut[next]) {
+      if (next < cut.length && k === cut[next]) {
+        const { g, x, y } = this.lightOf(s, k)!;
         next++;
-        const g = frame(glowOf(this.pieceNames[o.ref]))!;
-        const tx = o.ref % MAP_W;
-        const top = tileTop(tx, (o.ref - tx) / MAP_W);
         m.globalCompositeOperation = 'lighter';
         m.globalAlpha = 1;
-        m.drawImage(img, g.x, g.y, g.w, g.h, top.X - g.ax - x0, top.Y - g.ay - y0, g.w, g.h);
+        m.drawImage(img, g.x, g.y, g.w, g.h, x - x0, y - y0, g.w, g.h);
+        continue;
       }
+      if (!o.f || !((o.kind === K_PIECE && this.cutsLight(s, o.ref)) || (byBuildings && o.kind === K_BUILDING))) continue;
+      if (o.sx >= x1 || o.sy >= y1 || o.sx + o.w <= x0 || o.sy + o.h <= y0) continue;
+      // only over a light already on the layer (one behind it); a piece only where its pixels meet the light's
+      let over = false;
+      for (let n = 0; n < next && !over; n++) {
+        const r = n * 4;
+        over = o.sx < rects[r] + rects[r + 2] && o.sy < rects[r + 1] + rects[r + 3] && o.sx + o.w > rects[r] && o.sy + o.h > rects[r + 1];
+        if (over && o.kind === K_PIECE) over = this.framesMeet(glows[n], rects[r], rects[r + 1], o.f, o.sx, o.sy);
+      }
+      if (!over) continue;
+      let alpha = 1;
+      if (o.kind === K_BUILDING) {
+        const b = s.buildings[o.index];
+        alpha = b && b.id === o.ref && this.coversFocus(b, o.sx, o.sy, o.w, o.h) ? 0.35 : 1;
+      }
+      m.globalCompositeOperation = 'destination-out';
+      m.globalAlpha = alpha;
+      m.drawImage(img, o.f.x, o.f.y, o.f.w, o.f.h, o.sx - x0, o.sy - y0, o.f.w, o.f.h);
     }
-    ctx.drawImage(lightLayer, 0, 0, w, h, x0 - camX, y0 - camY, w, h);
+    this.ctx.drawImage(lightLayer, 0, 0, w, h, x0 - camX, y0 - camY, w, h);
   }
 
   // The frame of a ghost: a fence, wall or pillar joins the real line pieces around it and the ghosts of its row that
@@ -2541,21 +2630,32 @@ export class Renderer {
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = Math.min(1, (dark - 0.15) * 2.2);
     const blinkOn = Math.floor(this.clock * 2) % 2 === 0;
+    // the tall pieces drawn (CUTS_LIGHT_H), in draw order: a building's glow and beacons do not shine through one
+    // standing in front of it (a tree before a Dock's neon). None in a city without them: everything is drawn as it
+    // always was.
+    const pieces = this.lightPieces;
+    pieces.length = 0;
+    for (let k = 0; k < this.drawnCount; k++) if (this.drawn[k].kind === K_PIECE && this.drawn[k].f && this.cutsLight(s, this.drawn[k].ref)) pieces.push(k);
+    const cut: number[] = [];
     for (let k = 0; k < this.drawnCount; k++) {
       const d = this.drawn[k];
       if (d.kind !== K_BUILDING || !d.f) continue;
       const b = s.buildings[d.index];
       if (!b || b.id !== d.ref || b.built < 1) continue;
       const g = frame(glowOf(this.buildingFrameName(s, b)));
-      if (g) ctx.drawImage(img, g.x, g.y, g.w, g.h, d.sx - camX, d.sy - camY, g.w, g.h);
-      // blinking beacons from the model's light points
+      if (g) {
+        if (pieces.length && this.coveredAfter(pieces, k, g, d.sx, d.sy, true)) cut.push(k);
+        else ctx.drawImage(img, g.x, g.y, g.w, g.h, d.sx - camX, d.sy - camY, g.w, g.h);
+      }
+      // blinking beacons from the model's light points (not where a piece drawn in front of the building covers them)
       const art = artOf(b);
       if (blinkOn && art?.points.light) {
         const top = tileTop(b.x, b.y);
         ctx.fillStyle = PAL.red;
-        for (const p of art.points.light) ctx.fillRect(top.X + p[0] - 2 - camX, top.Y + p[1] - 2 - camY, 4, 4);
+        for (const p of art.points.light) if (!pieces.length || !this.pieceOverPoint(pieces, k, top.X + p[0], top.Y + p[1])) ctx.fillRect(top.X + p[0] - 2 - camX, top.Y + p[1] - 2 - camY, 4, 4);
       }
     }
+    if (cut.length) this.drawCutLights(s, cut, false, camX, camY, img);
     // placed gates, lamps and decorations: the gate's amber light; the lamp's lens and the pool of light it throws on
     // the ground, both in its glow frame (so no street-lamp pool here: it would light the ground twice); a neon sign's
     // tubes; the sculpture's eyes when it faces the camera (its frames 0 and 1 have a glow)

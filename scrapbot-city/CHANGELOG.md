@@ -41,6 +41,14 @@
   della mappa, dove si apre il suo pannello: il primo colpo lo selezionava e apriva il pannello, il secondo cadeva su
   «Rimuovi» (l'oggetto tolto) o su «Installa» (un Bot Dock comprava il deposito, 30 crediti + 15 pezzi). Ora quel
   secondo colpo non fa niente; un colpo a sé, dopo, rimuove o installa come prima.
+- **Di notte le luci non passano attraverso alberi, statue e fontane**: l'insegna al neon, la lente e la pozza del
+  lampione, la luce del pilastro, gli occhi della statua e della scultura e il bagliore di un edificio (il neon del
+  Bot Dock) si disegnavano sopra un albero, una statua o una fontana che sta davanti (prima solo gli edifici coprivano
+  le luci dei pezzi). Ora i pezzi alti (fontana, insegna, scultura, statua, albero) le coprono dove le coprono anche
+  di giorno; quelli bassi (recinzioni, muri, cancelli, panchine, pilastri, lampioni) non arrivano all'altezza di una
+  luce dietro di loro e restano fuori dal conto: un cortile di lampioni e recinzioni costa quanto prima (luci 0,1 ms
+  per fotogramma), un cortile fitto di 192 pezzi G3 di notte 0,8 ms invece di 0,2. Una città senza pezzi si disegna
+  identica a 600e82d.
 - **Si clicca quello che si vede**: muri e pilastri come le recinzioni (un clic sopra raggiunge l'edificio dietro);
   albero, fontana e statua prendono il clic sui propri pixel come le altre decorazioni.
 - **Nessun effetto su economia, felicità, smog, allineamento, stelle o achievement**: città del pilota automatico con
