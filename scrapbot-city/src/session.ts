@@ -74,6 +74,8 @@ interface Row {
 const PAN_SPEED = 260; // screen px per second
 const CURSOR_SPEED = 900; // controller cursor, screen px per second at full tilt
 const PANEL_SCROLL = 700; // right stick over a side panel that scrolls, px per second
+// how long the last press on the map counts as where the next one may land (a new project's notice keeps off it)
+const LAST_PRESS_KEPT_MS = 20000;
 // WASD by physical position: ZQSD on AZERTY keyboards.
 const PAN_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
 
@@ -150,6 +152,7 @@ export class GameSession implements PadTarget {
   // reaches as it goes (no chance, nothing in the sim changes)
   private projects: ProjectTracker;
   private bestOf = (stat: GoalStat) => this.projects.bestOf(stat);
+  private lastMapPress: { x: number; y: number; t: number } | null = null; // where the map was last pressed (any input)
 
   constructor(root: HTMLElement, s: GameState, settings: Settings, handlers: SessionHandlers, fromSlot: SlotId | null = null) {
     this.root = root;
@@ -418,7 +421,7 @@ export class GameSession implements PadTarget {
         selectedPiece: this.selectedPiece,
         moving: this.moving,
         best: this.bestOf,
-        pointer: this.pointer.x >= 0 && (this.pointer.inside || this.padOn) ? { x: this.pointer.x, y: this.pointer.y } : null,
+        avoid: this.pressSpots(),
       });
       // a tutorial step done by placing a building puts the build tool away, so the next step starts clean
       // instead of with a red "already there" ghost on the building just placed
@@ -953,6 +956,7 @@ export class GameSession implements PadTarget {
   // Every press anywhere (mouse, finger, the pad's A at its cursor) is remembered (src/ui/presses.ts): the second press
   // of a double press buys nothing on the map (meantPress) and picks nothing in the catalog (the HUD).
   private notePress(x: number, y: number, onMap: boolean, touch = false): void {
+    if (onMap) this.lastMapPress = { x, y, t: performance.now() };
     const r = this.renderer;
     const tile = onMap ? r.screenToTile(x, y) : null;
     notePress({ t: performance.now(), x, y, cam: `${r.cam.x},${r.cam.y},${r.zoom}`, tile: tile ? `${tile.x},${tile.y}` : '', tool: this.toolKey(), touch });
@@ -1131,6 +1135,16 @@ export class GameSession implements PadTarget {
     this.catalog = true;
     this.selectedId = -1;
     this.selectedPiece = -1;
+  }
+
+  // Where the next press on the map is likely to land, for a new project's notice to stay clear of: the mouse or the
+  // controller's cursor over the map, and the last press on the map in the last 20 seconds (a finger has no hover).
+  private pressSpots(): { x: number; y: number }[] {
+    const out: { x: number; y: number }[] = [];
+    if (this.pointer.x >= 0 && (this.pointer.inside || this.padOn)) out.push({ x: this.pointer.x, y: this.pointer.y });
+    const last = this.lastMapPress;
+    if (last && performance.now() - last.t < LAST_PRESS_KEPT_MS) out.push({ x: last.x, y: last.y });
+    return out;
   }
 
   // A new project's Open: the catalog opens (or stays open) at that item, in its category; nothing is taken in hand or
@@ -1702,7 +1716,7 @@ export class GameSession implements PadTarget {
     } else {
       actions = [
         { label: t('pause.resume'), primary: true, onClick: closeModal },
-        { label: t('pause.save'), onClick: () => openSlots('save', { state: s, onBack: () => this.openPause() }) },
+        { label: t('pause.save'), onClick: () => openSlots('save', { state: s, onBack: () => this.openPause(), onSaved: () => this.projects.flush() }) },
         { label: t('pause.load'), onClick: () => openSlots('load', { onLoad: (slot) => this.handlers.onLoadSlot(slot), onBack: () => this.openPause() }) },
         settings,
         {

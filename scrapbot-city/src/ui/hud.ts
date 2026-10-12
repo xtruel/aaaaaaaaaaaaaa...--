@@ -99,7 +99,9 @@ export interface HudView {
   selectedPiece: number; // tile index of the selected fence, gate, lamp, wall, pillar, decoration or surface; -1 none
   moving?: number; // the selected decoration is being moved (its tile index); -1 or left out: no
   best?: (stat: GoalStat) => number; // the most reached for a goal's measure in any one city (the projects profile)
-  pointer?: { x: number; y: number } | null; // the mouse or the controller's cursor: a new project's notice keeps off it
+  // where a press on the map is likely to come next (the mouse or the controller's cursor over the map, the last press on
+  // it, a finger's last tap): a new project's notice appears clear of these points
+  avoid?: { x: number; y: number }[];
 }
 
 // How long a new project's notice stays (seconds while no dialog is open).
@@ -236,6 +238,9 @@ export class Hud {
   private seen = new Set<CatalogKind>();
   // a new project's notice: what it announces, seconds left, and when it last appeared or grew (performance.now())
   private notice: { kinds: ProjectKind[]; left: number; armedAt: number } | null = null;
+  // where it stands: chosen when it appears or grows (then also off the pointer), kept while nothing comes over it, so
+  // it never runs away from a pointer going to its Open
+  private noticeSpot: { x: number; y: number; top: boolean } | null = null;
   private noticeTick = 0;
   private best: (stat: GoalStat) => number = () => 0;
   // when the smog panel last closed (performance.now()): the map takes no purchase in the moments after (session)
@@ -732,6 +737,7 @@ export class Hud {
     el.querySelector('[data-note-names]')!.textContent = `${names.join(', ')}${more > 0 ? ` +${more}` : ''}`;
     el.setAttribute('aria-label', t('proj.notice', { name: n.kinds.map((k) => catalogName(k)).join(', ') }));
     el.classList.add('arming');
+    this.noticeSpot = null;
   }
 
   // The notice counts down only while no dialog covers it (an ending, a story event: it is still there after).
@@ -751,13 +757,14 @@ export class Hud {
     // just appeared or grew: presses go through it to the map (a placement aimed there is not taken by Open)
     el.classList.toggle('arming', now - n.armedAt < PRESS_GUARD_MS);
     el.classList.toggle('leaving', n.left < 0.6);
-    this.placeNotice(view.pointer ?? null);
+    this.placeNotice(view.avoid ?? []);
   }
 
   // Where the notice goes: under the top bar, or else above the build bar, wherever it covers none of what the player
-  // is using: the tutorial's bubble, the side panels, the goal card, the smog alarm, the bars, an achievement, and the
-  // spot under the mouse or the controller's cursor (so it never lands under a press about to be made).
-  private placeNotice(pointer: { x: number; y: number } | null): void {
+  // is using: the tutorial's bubble, the side panels, the goal card, the smog alarm, the bars, an achievement and, when
+  // it appears or grows, the spot under the mouse or the controller's cursor (so it never lands under a press about to
+  // be made). Then it stays put unless one of those comes over it.
+  private placeNotice(avoid: { x: number; y: number }[]): void {
     const el = this.el['project-note'];
     const vw = window.innerWidth;
     const w = el.offsetWidth;
@@ -765,25 +772,41 @@ export class Hud {
     const boxes = (sel: string) =>
       [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => !e.hidden && e.offsetParent !== null).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
     const hard = [...boxes('.coach'), ...boxes('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective], [data-smog-alert], .hud-top > *, [data-toolbar], #toasts .toast')];
-    const soft = boxes('[data-feed] .msg');
-    if (pointer && pointer.x >= 0) hard.push(new DOMRect(pointer.x - 40, pointer.y - 40, 80, 80));
     const overlap = (a: DOMRect, x: number, y: number) => Math.max(0, Math.min(a.right, x + w) - Math.max(a.left, x)) * Math.max(0, Math.min(a.bottom, y + h) - Math.max(a.top, y));
+    const kept = this.noticeSpot;
+    if (kept && hard.every((r) => overlap(r, kept.x, kept.y) === 0)) return;
+    const soft = boxes('[data-feed] .msg');
+    // where the next press is likely: never under it if anywhere else will do
+    const presses = kept ? [] : avoid.map((p) => new DOMRect(p.x - 40, p.y - 40, 80, 80));
     const below = parseFloat(this.root.style.getPropertyValue('--below-alarm')) || 80;
-    const dock = this.el.toolbar.getBoundingClientRect().top;
-    const xs = [(vw - w) / 2, 12, vw - w - 12];
+    const low = this.el.toolbar.getBoundingClientRect().top - h - 12;
+    // three bands (under the top bar, above the build bar, between them) and, in each, the middle of every gap the
+    // panels and cards leave wide enough, then the centre and the two sides
     const spots: { x: number; y: number; top: boolean }[] = [];
-    for (const x of xs) spots.push({ x, y: below, top: true });
-    for (const x of xs) spots.push({ x, y: dock - h - 12, top: false });
+    for (const [y, top] of [
+      [below, true],
+      [low, false],
+      [Math.round((below + low) / 2), false],
+    ] as const) {
+      const taken = [...hard, ...presses].filter((r) => r.bottom > y && r.top < y + h).map((r) => [r.left, r.right] as const).sort((a, b) => a[0] - b[0]);
+      let from = 8;
+      for (const [l, r] of [...taken, [vw - 8, vw - 8] as const]) {
+        if (l - from >= w) spots.push({ x: from + (l - from - w) / 2, y, top });
+        from = Math.max(from, r + 8);
+      }
+      for (const x of [(vw - w) / 2, 12, vw - w - 12]) spots.push({ x, y, top });
+    }
     let best = spots[0];
     let bestCost = Infinity;
     spots.forEach((p, i) => {
       const x = Math.max(8, Math.min(vw - w - 8, p.x));
-      const cost = hard.reduce((c, r) => c + overlap(r, x, p.y) * 100, 0) + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
+      const cost = presses.reduce((c, r) => c + overlap(r, x, p.y) * 1e6, 0) + hard.reduce((c, r) => c + overlap(r, x, p.y) * 100, 0) + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
       if (cost < bestCost) {
         bestCost = cost;
         best = { ...p, x };
       }
     });
+    this.noticeSpot = best;
     el.style.left = `${Math.round(best.x)}px`;
     el.style.top = `${Math.round(best.y)}px`;
     // achievements come down under it rather than over it
