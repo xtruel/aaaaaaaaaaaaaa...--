@@ -96,6 +96,22 @@ Crea `steam/content/windows` e `steam/content/linux` (la build Windows si fa anc
 Ogni build contiene anche `licenses/` (licenze dei font e di steamworks.js). Poi controlla i moduli nativi:
 `npm run steam:check` (e su Linux `xvfb-run -a npm run steam:launch-check`), vedi docs/STEAM.md sezione 5.
 
+**Le build che ci sono oggi in `content/`** (rifatte il 13/10/2026 su Linux x64 dal ramo `rc-0.7.0`, commit `d976dc9`,
+versione **0.7.0-rc.1**; fuori da git, come `release/`):
+
+| | `content/windows` | `content/linux` |
+|---|---|---|
+| File, dimensione | 90 file, 278,2 MiB | 90 file, 271,6 MiB |
+| Eseguibile (sha256) | `Scrapbot City.exe` `34313e51ed22a8c3…` (dati di versione `0.7.0-rc.1`, icona a 7 misure) | `scrapbot-city` `ee99780b5878638d…` (eseguibile) |
+| `resources/app.asar` (sha256) | `afd4d74e1c3baa52…` | `1f1c7347cbc6c268…` |
+| `dist/index.html` dentro `app.asar` | sha256 `d9f5a6d870ef75dd…`, identico byte per byte a una build web di release pulita dello stesso commit | lo stesso file (stesso sha256) |
+| `licenses/` | font (OFL, Permanent Marker Apache 2.0 con l'avviso di Font Diner, Inc.), steamworks.js, `THIRD-PARTY-NOTICES.txt` | uguale |
+| Provata | **mai avviata su Windows**: solo generata | **verificata qui** senza client Steam (Xvfb, rendering software): `npm run steam:check` e `npm run steam:launch-check` senza FAIL; una partita col mouse (nuova città, pezzi dal catalogo, un progetto scoperto, salvataggio, Quit, riavvio, Continue) |
+
+`node steam/prepare-upload.cjs --check` sulle stesse build: rifiuta di partire ed elenca solo i 5 segnaposto (App ID
+e i due depot, passi 1 e 2). Nessun caricamento è stato fatto né provato con queste build. Il runtime "sniper" non è
+stato riprovato su questa versione.
+
 ## Passo 5 — Prova a vuoto, poi caricamento sul ramo beta
 
 ```bash
@@ -133,7 +149,8 @@ Su Windows: `steam\upload.bat <account_build> --beta beta` (stesse opzioni).
 
 ## Achievement
 
-`achievements.csv` contiene i 18 achievement di oggi (dalla 0.6.0: `src/achievements.ts` e `src/i18n/en.ts`):
+`achievements.csv` contiene i 18 achievement di oggi (`src/achievements.ts` e `src/i18n/en.ts`; la 0.7.0-rc.1 non ne
+aggiunge: gli API name del CSV coincidono con i 18 id del codice, controllato il 13/10/2026):
 
 - `api_name`: da copiare **identico** in Steamworks (il gioco invia `ACH_` + l'id in maiuscolo, `electron/main.cjs`);
 - `display_name`, `description`: testi inglesi;
@@ -145,9 +162,8 @@ Su Windows: `steam\upload.bat <account_build> --beta beta` (stesse opzioni).
 `portuguese`, `polish`, `dutch`: i nomi delle lingue usati da Steamworks) da copiare nei campi di ogni lingua.
 Il file è UTF-8 con BOM, così Excel mostra bene accenti e lettere polacche.
 
-**La lista crescerà**: l'aggiornamento dei contenuti (0.7, in lavorazione) aggiungerà nuovi achievement.
-Quando arriva, rigenera i CSV, crea in Steamworks solo le righe nuove e non cambiare mai l'API name di un
-achievement già pubblicato (chi l'ha sbloccato lo perderebbe).
+**Se una versione futura aggiunge achievement**: rigenera i CSV, crea in Steamworks solo le righe nuove e non cambiare
+mai l'API name di un achievement già pubblicato (chi l'ha sbloccato lo perderebbe).
 
 ## Se qualcosa va storto
 

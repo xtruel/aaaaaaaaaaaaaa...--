@@ -16,8 +16,9 @@ Steamworks sono in inglese, come li vedrai sul sito.
 
 **Le regole di questo ramo.** Il lavoro per Steam è nato sul ramo `steam-package`, separato dal ramo del gioco. Il
 13/10/2026 la 0.7.0-beta.1 verificata (`c199a4f`, [BETA-REPORT.md](BETA-REPORT.md)) è stata unita al pacchetto Steam
-sul ramo `rc-0.7.0`, versione **0.7.0-rc.1**. Le build Steam descritte nella sezione 0 sono ancora quelle costruite
-l'11/10 dalla **0.6.0**: vanno rifatte da questo commit (passo 5). Una RC non è un via libera commerciale.
+sul ramo `rc-0.7.0`, versione **0.7.0-rc.1**. Lo stesso giorno le build Steam (`steam/content/`, fuori da git) sono
+state rifatte da questo ramo (commit `d976dc9`, 0.7.0-rc.1) e ricontrollate su Linux (sezione 0). Una RC non è un via
+libera commerciale.
 Qui nessuno ha un App ID, un account Steamworks, il client Steam, un PC Windows o uno Steam Deck: **niente è stato
 caricato, pubblicato, pagato o configurato su Steam**, e nessuna funzione di Steam è dichiarata funzionante senza una
 prova vera. Pubblicare, cambiare prezzi, spendere soldi o mettere una build sul ramo pubblico richiedono la **tua**
@@ -29,14 +30,15 @@ approvazione esplicita.
 - [ ] 2. Creare l'app, i depot e il ramo `beta`; scrivere App ID e depot nel progetto (SteamPipe, sezione 2)
 - [ ] 3. Pagina del negozio: testi, grafica, trailer, lingue, requisiti, questionario sui contenuti
 - [ ] 4. Depot, opzioni di avvio, runtime Linux, componenti da installare
-- [ ] 5. Ricostruire le build Steam dalla **0.7.0-rc.1** (ramo `rc-0.7.0`: la 0.7.0-beta.1 verificata unita al
-  pacchetto Steam) e rifare i controlli nativi (sezione 5)
+- [x] 5. Ricostruire le build Steam dalla **0.7.0-rc.1** (ramo `rc-0.7.0`: la 0.7.0-beta.1 verificata unita al
+  pacchetto Steam) e rifare i controlli nativi (sezione 5) — *fatto il 13/10 da `d976dc9`; da rifare dal commit che
+  deciderai di vendere*
 - [ ] 6. Caricare sul ramo `beta` e provare su Windows, Linux e Steam Deck (sezione 6)
 - [ ] 7. Achievement · 8. Steam Cloud · 9. Controller e revisione Steam Deck
 - [ ] 10. Dichiarazione sull'IA (nel questionario) · 11. Prezzo (lo decidi tu)
 - [ ] 12. Pagina "Coming Soon" e Steam Next Fest · 13. Uscita (lista di controllo finale)
 
-## 0. Dove siamo — stato onesto (11 ottobre 2026; unione con la 0.7 il 13 ottobre)
+## 0. Dove siamo — stato onesto (11 ottobre 2026; unione con la 0.7 e build Steam rifatte il 13 ottobre)
 
 Quattro parole, sempre con lo stesso significato:
 - **Fatto**: è nel repository (codice, script, file).
@@ -53,23 +55,23 @@ quello si vede solo sul ramo beta.
 | Cosa | Stato | Dettagli |
 |---|---|---|
 | Gioco 0.7 unito al pacchetto Steam (ramo `rc-0.7.0`, 0.7.0-rc.1) | **Fatto** e **verificato qui** nel browser | 24 elementi del catalogo, `projects.sav`; controlli statici, test, numeri identici alla 0.7.0-beta.1 e `npm run e2e` (Chromium headless, input simulato) sul codice unito: CHANGELOG, 0.7.0-rc.1 |
-| Salvataggi su file nell'app desktop (`electron/file-store.cjs`) | **Fatto** e **verificato qui** (test) | scrittura atomica, copia `.bak`, file rovinato copiato a parte (`.damaged-<n>`) prima di usare la `.bak`, `storage:getDamaged` per i progetti; `tests/desktop-store.test.ts`, `tests/storage.test.ts`. Su Windows solo dal codice |
-| Build Linux per Steam (`steam/content/linux`, 90 file, 271,0 MiB) | **Generato** e **verificato qui** | costruita l'11/10 dalla 0.6.0 (`npm run dist:steam`); avviata senza client Steam: menu in <1 s, una città gira, salvataggi in `~/.config/Scrapbot City/saves`, "Quit" chiude con codice 0, nessun errore nella pagina (`npm run steam:launch-check`) |
-| Build Windows per Steam (`steam/content/windows`, 90 file, 277,6 MiB) | **Generato** | costruita da Linux; l'exe è Electron 33.4.11 con icona e dati di versione; **mai avviata su Windows** |
-| steamworks.js 0.4.0 contro Electron 33.4.11 | **Verificato qui** (Linux) · **controllo statico** (Windows) | sezione 5 |
-| Comportamento senza Steam | **Verificato qui** (Linux) | `Steam not available: Failed to load module '…/steamclient.so'` nel log, il gioco continua; tastiera del Deck: il gioco riceve "no" e usa i suoi campi; achievement: chiamata ignorata |
+| Salvataggi su file nell'app desktop (`electron/file-store.cjs`) | **Fatto** e **verificato qui** (test) | scrittura atomica, copia `.bak`, file rovinato copiato a parte (`.damaged-<n>`) prima di usare la `.bak`, `storage:getDamaged` per i progetti; `tests/desktop-store.test.ts`, `tests/storage.test.ts`. Il 13/10 anche nella build Linux 0.7.0-rc.1 impacchettata: *Save game* → slot 1 (`save_1.sav`, `meta_1.sav`), *Save & main menu* (`save_auto.sav`, `last.sav` = `auto`), `projects.sav` con il progetto trovato, `.bak` dei file riscritti; riavvio e *Continue*: città e progetti tornano. Su Windows solo dal codice |
+| Build Linux per Steam (`steam/content/linux`, 90 file, 271,6 MiB) | **Generato** e **verificato qui** | rifatta il 13/10 dalla 0.7.0-rc.1 (`d976dc9`, `npm run dist:steam`); `scrapbot-city` sha256 `ee99780b…`, `app.asar` sha256 `1f1c7347…`; il `dist/index.html` dentro `app.asar` è identico byte per byte a una build web di release pulita dello stesso commit (sha256 `d9f5a6d8…`). Avviata senza client Steam (`npm run steam:launch-check`, nessun FAIL): menu in 0,6–0,7 s, una città gira, salvataggi in `$XDG_CONFIG_HOME/Scrapbot City/saves`, "Quit" chiude con codice 0, nessun errore nella pagina. Una partita col mouse (Playwright, input simulato, Xvfb): nuova città, 22 pavimenti e un pilastro dal catalogo, progetto *Corner pillar* scoperto, salvataggio, Quit (codice 0), riavvio, *Continue*: risorse, pezzi e progetto tornano, nessun errore |
+| Build Windows per Steam (`steam/content/windows`, 90 file, 278,2 MiB) | **Generato** | rifatta il 13/10 da Linux dalla 0.7.0-rc.1; `Scrapbot City.exe` (Electron 33.4.11, sha256 `34313e51…`) con icona (7 misure) e dati di versione `0.7.0-rc.1`; `app.asar` sha256 `afd4d74e…` con lo stesso `dist/index.html` della build Linux; **mai avviata su Windows** |
+| steamworks.js 0.4.0 contro Electron 33.4.11 | **Verificato qui** (Linux) · **controllo statico** (Windows) | sezione 5; `npm run steam:check` rifatto il 13/10 sulle build 0.7.0-rc.1: nessun FAIL, stessi binari |
+| Comportamento senza Steam | **Verificato qui** (Linux) | rifatto il 13/10 sulla build 0.7.0-rc.1, senza App ID e con 480: `Steam not available: Failed to load module '…/steamclient.so'` nel log, il gioco continua; tastiera del Deck: il gioco riceve "no" e usa i suoi campi; achievement: chiamata ignorata |
 | Achievement su Steam | **Da verificare** | servono App ID, i 18 achievement creati in Steamworks (sezione 7) e il client Steam |
 | Overlay di Steam (Shift+Tab) | **Da verificare** | il codice c'è (`electronEnableSteamOverlay`); si vede solo avviando da Steam |
 | Steam Cloud | **Da configurare** e **da verificare** | il gioco scrive i file nella cartella giusta (verificato qui su Linux; su Windows solo dal codice); configurazione in sezione 8 |
 | Steam Deck | **Da verificare** | nessun Deck qui; `SteamDeck=1` (schermo intero) provato in passato solo impostando la variabile a mano; la tastiera a schermo arriva solo da steamworks.js con Steam aperto su un Deck vero: **mai provata** |
 | Controller | **Verificato solo con Gamepad API simulata** in Chromium (sessioni precedenti) | da provare con un controller vero e con Steam Input |
-| Build nel runtime Linux "sniper" | **Verificato** in passato **senza** client Steam (contenitore preparato a mano) | la prova vera è dal client Steam |
-| Script SteamPipe (`steam/sdk/*.vdf`, `upload.sh`, `upload.bat`) | **Fatto** | `node steam/prepare-upload.cjs --check` oggi rifiuta di partire per i segnaposto (verificato l'11/10); provati in passato con uno steamcmd finto; l'11/10 alle 00:20 è stato avviato anche lo steamcmd vero in *preview* con `+login anonymous` e un App ID inventato, fuori dal repository: connessione fallita, niente inviato (dettagli in [steam/README.md](../steam/README.md), passo 5); `upload.bat` mai provato su Windows |
+| Build nel runtime Linux "sniper" | **Verificato** in passato (build 0.6.0) **senza** client Steam (contenitore preparato a mano) | **non** rifatto sulla 0.7.0-rc.1; la prova vera è dal client Steam |
+| Script SteamPipe (`steam/sdk/*.vdf`, `upload.sh`, `upload.bat`) | **Fatto** | `node steam/prepare-upload.cjs --check` rifiuta di partire per i 5 segnaposto (App ID e i due depot; verificato l'11/10 e il 13/10 con le build 0.7.0-rc.1, nessun altro problema elencato); provati in passato con uno steamcmd finto; l'11/10 alle 00:20 è stato avviato anche lo steamcmd vero in *preview* con `+login anonymous` e un App ID inventato, fuori dal repository: connessione fallita, niente inviato (dettagli in [steam/README.md](../steam/README.md), passo 5); `upload.bat` mai provato su Windows |
 | Grafica del negozio | **Generato** | dimensioni tutte conformi alle regole attuali; screenshot del menu tolto dal set; screenshot da rifare sulla build finale; tre dubbi sul logo da decidere (ASSETS-PROVENANCE §5) |
 | Testi del negozio, requisiti, tag | **Bozza** | STORE-COPY.md (righe **[pending final build]** da controllare) |
 | Questionario sui contenuti | **Bozza** | CONTENT-SURVEY-DRAFT.md |
 | Trailer | **Fatto** (pipeline) · **Generato** (video di prova) | provato da capo a fondo l'11/10 sulla build del ramo principale (`04d782e`, 0.7.0-alpha.1): video di prova di 54 s, 1920×1080, 30 fps, H.264 9,8 Mbit/s, audio muto, più 11 schermate; fuori da git. Va rifatto sulla build finale |
-| Licenze di terzi nelle build | **Fatto** | cartella `licenses/` nelle due build (font OFL/Apache, steamworks.js MIT); in revisione (11/10) aggiunto l'avviso di copyright di Permanent Marker (Font Diner, Inc.), che il file LICENSE del pacchetto non ha, e ricostruite le build (`app.asar` identico) |
+| Licenze di terzi nelle build | **Fatto** | cartella `licenses/` nelle due build (font OFL/Apache, steamworks.js MIT); in revisione (11/10) aggiunto l'avviso di copyright di Permanent Marker (Font Diner, Inc.), che il file LICENSE del pacchetto non ha, e ricostruite le build (`app.asar` identico). Ricontrollata il 13/10 nelle build 0.7.0-rc.1: `licenses/` uguale nelle due, con `THIRD-PARTY-NOTICES.txt`, i 6 font e l'avviso di Permanent Marker (Apache 2.0) |
 
 **Cosa devi fare tu** (nessuno può farlo al posto tuo): account e pagamenti (1), creare app, depot e ramo beta (2),
 pagina, grafica, trailer e questionario (3, 10), impostazioni di Steamworks (4, 7, 8, 9), caricare e provare (6),
@@ -122,7 +124,8 @@ Esempio con App ID 1234560 (numeri **inventati**, solo per mostrare la forma: us
 ```
 
 Controllo senza caricare niente: `node steam/prepare-upload.cjs --check`. Si rifiuta di partire finché resta un
-segnaposto o se i numeri dei due file non coincidono (verificato l'11/10/2026: oggi elenca i 5 segnaposto).
+segnaposto o se i numeri dei due file non coincidono (verificato l'11/10/2026 e il 13/10/2026 con le build 0.7.0-rc.1:
+oggi elenca i 5 segnaposto).
 
 ### 2.3 steamcmd (una volta sola)
 
@@ -225,7 +228,7 @@ di questo progetto usano `--no-sandbox` solo perché girano come root, cosa che 
 
 ## 5. Moduli nativi: steamworks.js ed Electron
 
-Controllo dell'11/10/2026, rifacibile in ogni momento:
+Controllo dell'11/10/2026, rifatto il 13/10/2026 sulle build 0.7.0-rc.1 (stessi risultati), rifacibile in ogni momento:
 
 ```bash
 npm run steam:check                                   # controlli statici + carica il modulo dentro Electron
@@ -239,7 +242,7 @@ xvfb-run -a npm run steam:launch-check -- --out /tmp/launch-check   # avvia la b
 | Compatibilità ABI | i moduli usano **N-API** (ABI stabile tra versioni di Node): non dipendono da NODE_MODULE_VERSION. La funzione più recente che usano è di **N-API 6**; Electron 33 offre N-API 9 → compatibili. Per questo `npmRebuild: false` è corretto |
 | Linux: `steamworksjs.linux-x64-gnu.node` (sha256 `3d242b59…`) | x86-64; trova `libsteam_api.so` accanto a sé (RUNPATH `$ORIGIN`); richiede **glibc 2.34** o più nuova (`libsteam_api.so` solo 2.14). Su sistemi più vecchi il modulo non si carica e il gioco gira senza Steam |
 | Linux: caricamento dentro Electron 33.4.11 | **verificato qui**, sia da `node_modules` sia dalla build impacchettata: il modulo si carica; `init()` senza App ID e con 480 lancia `Failed to load module '…/steamclient.so'` (nessun client Steam) e il processo continua |
-| Linux: build impacchettata avviata | **verificato qui**: modulo e `libsteam_api.so` mappati nel processo principale (`/proc/<pid>/maps`), log `Steam not available: …`, menu, città, salvataggi, Quit con codice 0; memoria con una città aperta circa 730 MB in 6 processi (rendering software: indicativo) |
+| Linux: build impacchettata avviata | **verificato qui**: modulo e `libsteam_api.so` mappati nel processo principale (`/proc/<pid>/maps`), log `Steam not available: …`, menu, città, salvataggi, Quit con codice 0; memoria con una città aperta circa 740 MB in 6 processi (13/10, rendering software: indicativo) |
 | Windows: `steamworksjs.win32-x64-msvc.node` (sha256 `1042713f…`) | x86-64; importa `steam_api64.dll` e `VCRUNTIME140.dll` (+ CRT universale di Windows 10); cerca le funzioni N-API nell'eseguibile a runtime. **Controllo statico**: `Scrapbot City.exe` (Electron 33.4.11) esporta 145 funzioni `napi_*`, comprese tutte le 57 che il modulo chiama |
 | Windows: caricamento | **da verificare (titolare)**: qui non c'è Windows |
 | Build impacchettate | contengono gli stessi binari di `node_modules` (hash identici); la `.lib` (serve solo per compilare) non è inclusa |
@@ -319,7 +322,7 @@ file è rovinato e il gioco legge al suo posto la `.sav.bak`, prima ne copia il 
 | Sistema | Cartella | Come lo sappiamo |
 |---|---|---|
 | Windows | `%APPDATA%\Scrapbot City\saves` (`C:\Users\<nome>\AppData\Roaming\Scrapbot City\saves`) | dal codice (`appData` = Roaming su Windows); **da verificare** |
-| Linux / Steam Deck | `~/.config/Scrapbot City/saves` (o `$XDG_CONFIG_HOME/Scrapbot City/saves`) | **verificato qui** l'11/10 con la build Linux |
+| Linux / Steam Deck | `~/.config/Scrapbot City/saves` (o `$XDG_CONFIG_HOME/Scrapbot City/saves`) | **verificato qui** l'11/10 con la build Linux, e il 13/10 con la build Linux 0.7.0-rc.1 |
 
 ### 8.2 Che cosa si sincronizza (build 0.7.0-rc.1, salvataggi uguali alla 0.7.0-beta.1)
 
@@ -469,9 +472,10 @@ Prima di premere "Release", ogni riga deve essere vera:
 
 ## 14. Cosa manca (onestamente)
 
-1. **Le build Steam rifatte dalla 0.7.0-rc.1** (oggi sono della 0.6.0) e i controlli nativi rifatti su quelle
-   (sezione 5). La 0.7.0-beta.1 (catalogo da 24 elementi, sblocchi, temi delle città) è verificata nel browser
-   ([BETA-REPORT.md](BETA-REPORT.md)) e unita qui.
+1. **Le build Steam della versione da vendere.** Quelle in `steam/content/` sono state rifatte il 13/10 dalla
+   0.7.0-rc.1 (`d976dc9`) e ricontrollate su Linux (sezioni 0 e 5); la build Windows è solo generata, mai avviata.
+   Vanno rifatte dal commit che deciderai di vendere. La 0.7.0-beta.1 (catalogo da 24 elementi, sblocchi, temi delle
+   città) è verificata nel browser ([BETA-REPORT.md](BETA-REPORT.md)) e unita qui.
 2. **Prove con Steam vero**: Windows, Steam Deck, achievement, overlay, Cloud, tastiera del Deck, controller.
 3. **Screenshot e trailer della build finale** (le pipeline sono pronte); **audio del trailer**; **icone degli
    achievement**.
