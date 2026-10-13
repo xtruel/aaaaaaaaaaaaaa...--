@@ -459,6 +459,7 @@ export const pl: Dict = {
   'pause.mainMenu': 'Menu główne',
   'pause.skipTutorial': 'Pomiń samouczek',
   'pause.tutorialNotSaved': 'samouczek nie jest zapisywany',
+  'pause.smogKept': 'alarm smogowy: zostaje zapis z początku dnia',
 
   // ---------- hints ----------
   'hint.eyebrow': 'USA-9 · Podpowiedź',

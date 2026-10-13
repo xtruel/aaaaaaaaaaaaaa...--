@@ -456,6 +456,7 @@ export const de: Dict = {
   'pause.mainMenu': 'Hauptmenü',
   'pause.skipTutorial': 'Tutorial überspringen',
   'pause.tutorialNotSaved': 'das Tutorial wird nicht gespeichert',
+  'pause.smogKept': 'Smogalarm: der Spielstand vom Tagesbeginn bleibt',
 
   // ---------- hints ----------
   'hint.eyebrow': 'USA-9 · Tipp',

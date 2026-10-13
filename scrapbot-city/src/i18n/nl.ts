@@ -456,6 +456,7 @@ export const nl: Dict = {
   'pause.mainMenu': 'Hoofdmenu',
   'pause.skipTutorial': 'Tutorial overslaan',
   'pause.tutorialNotSaved': 'de tutorial wordt niet opgeslagen',
+  'pause.smogKept': 'smogalarm: de opslag van het begin van de dag blijft',
 
   // ---------- hints ----------
   'hint.eyebrow': 'USA-9 · Tip',

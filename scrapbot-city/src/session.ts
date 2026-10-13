@@ -286,6 +286,9 @@ export class GameSession implements PadTarget {
     this.projects.flush();
     const slot = this.slot;
     if (!slot || this.s.outcome?.kind === 'smog') return;
+    // while the smog countdown runs, the city's save stays the one from before it (the start of the day): leaving now
+    // must not put the countdown there, or the lost city's "Load the last autosave" would lose it again and again
+    if (!canAutosave(this.s)) return;
     const ok = saveGame(slot, this.s);
     if (!ok && !this.saveFailed) pushMessage(this.s, t('msg.saveFailed'), 'bad');
     this.saveFailed = !ok;
@@ -1672,6 +1675,8 @@ export class GameSession implements PadTarget {
 
   private openPause(): void {
     const s = this.s;
+    // leaving during the smog countdown keeps the save from the start of the day (save): the buttons say so
+    const kept = canAutosave(s) ? t('pause.saved') : t('pause.smogKept');
     const settings = {
       label: t('menu.settings'),
       onClick: () =>
@@ -1701,7 +1706,7 @@ export class GameSession implements PadTarget {
         { label: t('pause.resume'), primary: true, onClick: closeModal },
         {
           label: t('pause.region'),
-          hint: t('pause.saved'),
+          hint: kept,
           onClick: () => {
             this.save();
             this.handlers.onRegionMap();
@@ -1710,7 +1715,7 @@ export class GameSession implements PadTarget {
         settings,
         {
           label: t('pause.mainMenu'),
-          hint: t('pause.saved'),
+          hint: kept,
           onClick: () => {
             this.save();
             this.handlers.onExitToMenu();
@@ -1724,7 +1729,8 @@ export class GameSession implements PadTarget {
         { label: t('pause.load'), onClick: () => openSlots('load', { onLoad: (slot) => this.handlers.onLoadSlot(slot), onBack: () => this.openPause() }) },
         settings,
         {
-          label: t('pause.saveMenu'),
+          label: canAutosave(s) ? t('pause.saveMenu') : t('pause.mainMenu'),
+          hint: canAutosave(s) ? undefined : kept,
           onClick: () => {
             this.save();
             this.handlers.onExitToMenu();

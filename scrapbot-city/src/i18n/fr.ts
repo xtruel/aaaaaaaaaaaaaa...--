@@ -456,6 +456,7 @@ export const fr: Dict = {
   'pause.mainMenu': "Menu principal",
   'pause.skipTutorial': "Passer le tutoriel",
   'pause.tutorialNotSaved': "le tutoriel n'est pas sauvegardé",
+  'pause.smogKept': "alerte smog : la sauvegarde du début de journée reste",
 
   // ---------- hints ----------
   'hint.eyebrow': "USA-9 · Conseil",

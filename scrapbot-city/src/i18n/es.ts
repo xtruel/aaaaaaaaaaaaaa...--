@@ -459,6 +459,7 @@ export const es: Dict = {
   'pause.mainMenu': 'Menú principal',
   'pause.skipTutorial': 'Saltar el tutorial',
   'pause.tutorialNotSaved': 'el tutorial no se guarda',
+  'pause.smogKept': 'alarma de smog: se queda la partida del inicio del día',
 
   // ---------- hints ----------
   'hint.eyebrow': 'USA-9 · Pista',
