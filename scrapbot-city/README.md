@@ -1,4 +1,4 @@
-# Scrapbot City — build 0.7.0-beta.1
+# Scrapbot City — build 0.7.0-rc.1
 
 City builder in pixel art: piccoli robot raccolgono spazzatura, tu decidi cosa diventa.
 **Recycle × Build × Expand × Survive.** Un pianeta pulito o un profitto più grande?
@@ -22,10 +22,14 @@ npm run e2e          # test end-to-end nel browser (Chromium headless con Playwr
 npm run e2e:list     # i test end-to-end, il loro input (simulato) e cosa coprono
 npm run desktop      # app desktop (Electron)
 npm run dist:steam   # build Windows + Linux per Steam: release/ e steam/content/ (guida: docs/STEAM.md)
+npm run steam:check  # steamworks.js contro l'Electron installato: controlli statici e caricamento (docs/STEAM.md, sezione 5)
 ```
 
 Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, Steam Cloud, Steam Deck, upload,
 pagina del negozio, prezzo. Per i test con giocatori veri c'è **[docs/PLAYTEST.md](docs/PLAYTEST.md)**.
+La **0.7.0-rc.1** è la 0.7.0-beta.1 con il pacchetto Steam unito (steamworks.js, icone, script SteamPipe, materiali
+del negozio) e l'ultimo problema basso della beta chiuso: cosa cambia è nel [CHANGELOG](CHANGELOG.md). Una release
+candidate non è un via libera commerciale: Steam, Windows, Steam Deck e controller veri restano da provare.
 Report di consegna della **0.7.0-beta.1** (le 24 voci del catalogo, test, numeri, prestazioni, problemi aperti, cosa
 non è verificato): **[docs/BETA-REPORT.md](docs/BETA-REPORT.md)**, screenshot in `docs/beta/`.
 Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
@@ -59,8 +63,9 @@ Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
   [docs/MODULAR-INC1.md](docs/MODULAR-INC1.md) e [docs/MODULAR-INC2.md](docs/MODULAR-INC2.md).
 - **Suggerimenti** (lampadina o tasto `Q`): USA-9 legge la città e consiglia cosa costruire, spiegando il perché.
   I primi 3 per città sono gratis e uno nuovo torna ogni 5 giorni. Poi si pagano in crediti, e il prezzo sale a ogni acquisto.
-- **18 achievement**, salvati localmente; il ponte verso Steam c'è nella versione desktop ma non è ancora attivo né
-  provato (servono steamworks.js e un App ID: vedi docs/STEAM.md).
+- **18 achievement**, salvati localmente; il ponte verso Steam c'è nella versione desktop (steamworks.js 0.4.0) ma non
+  è ancora attivo né provato con Steam (servono un App ID, gli achievement creati in Steamworks e il client Steam: vedi
+  docs/STEAM.md).
 - **Eventi narrativi** con USA-9, Miso, K. Kurogane (2PM Corp), i cittadini e la Pixel Planet Initiative.
 - **Finali**: Garden City, 2PM Megacity, Different Futures, Smog Over. Dopo la Guglia si può continuare a costruire
   per prendere le stelle mancanti; se la città soffoca si riparte dall'ultimo salvataggio automatico.
@@ -137,7 +142,11 @@ src/
     iso/               proiezione, atlante, ordinamento per profondità, cittadini e scenografia
   assets/iso/          atlante generato da npm run art (atlas.png + atlas.json con gli ancoraggi)
   ui/                  menu, HUD, tutorial, regione, finestre di dialogo
-electron/              app desktop per Steam
+electron/              app desktop per Steam (salvataggi su file in file-store.cjs, steamworks.js in main.cjs)
+steam/                 pacchetto Steam: script SteamPipe, achievement, grafica e testi del negozio, licenze (guida: docs/STEAM.md)
+build/                 icone delle build desktop
+scripts/steam-*        contenuti dei depot, App ID per le prove, controlli dei moduli nativi e dell'avvio
+scripts/trailer/       trailer registrato dalla build di rilascio
 e2e/                   test end-to-end nel browser (npm run e2e), guida in e2e/README.md
 scripts/balance.ts     pilota automatico per il bilanciamento
 scripts/art/           pipeline della grafica: modelli voxel (models/), ray casting (voxel.ts), PNG, atlante
@@ -154,4 +163,4 @@ docs/PLAYTEST.md       come organizzare un playtest e cosa osservare
 ## Ancora da fare
 
 - Musica di un compositore, passata grafica di un artista pixel, playtest con persone nuove, revisione madrelingua delle traduzioni.
-- Dettagli in [docs/STEAM.md](docs/STEAM.md), sezione 15.
+- Dettagli in [docs/STEAM.md](docs/STEAM.md), sezione 14.

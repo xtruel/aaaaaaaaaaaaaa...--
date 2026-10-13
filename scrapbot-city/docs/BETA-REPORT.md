@@ -501,7 +501,7 @@ Cose che solo hardware vero o persone vere possono dire. **Non è stato verifica
 - [ ] Pacchetto Steam rifatto da questo commit (ramo `steam-package`), con lo sha256 del `index.html` spedito uguale a
   quello qui sopra.
 - [ ] `npm test`, `npm run e2e` e il confronto dei numeri rieseguiti sul commit della RC.
-- [ ] Dichiarazione dei contenuti generati con l'IA in Steamworks (`docs/STEAM.md`, sezione 9).
+- [ ] Dichiarazione dei contenuti generati con l'IA in Steamworks (`docs/STEAM.md`, sezione 10).
 
 ## Screenshot
 
