@@ -1,5 +1,46 @@
 # Changelog
 
+## In lavorazione — incremento 2, gruppo G5: rifinitura
+
+- **Nomi della barra degli edifici dentro la loro scheda in tutte le 8 lingue**: sotto i 1280 px le schede sono larghe
+  72 px e alcuni nomi sono una parola sola («Incineradora», «Naprawialnia», «Inceneritore», «Incinérateur»): uscivano
+  sul bordo. Solo su quella scheda il nome perde la spaziatura tra le lettere e, se serve, rimpicciolisce di mezzo
+  pixel alla volta (mai sotto 10 px); parole e significato restano gli stessi. Misurato a 1024×640, 1024×768,
+  1280×720, 1280×800 e 1920×1080: testo sul bordo in 10 casi su 40 prima, 0 ora; da 1280 px in su non cambia niente.
+- **Messaggi ripetuti raggruppati**: una riga che torna mentre è ancora sullo schermo (7,2 s dopo l'ultima volta) si
+  mostra una volta sola con il numero («Qui c'è già qualcosa ×3») e scende al posto più recente, invece di impilare
+  copie che spingono via le altre notizie; solo lo stesso testo con lo stesso tono si raggruppa (un altro numero o un
+  altro nome è un'altra riga) e niente aspetta: ogni riga compare nel fotogramma in cui arriva (il conto alla rovescia
+  dello smog e gli avvisi di energia hanno un posto loro). Lo stesso trofeo in coda non si ripete.
+- **Istruzioni per l'input in uso**: il gioco distingue tastiera e mouse, tocco e controller (un dito che tocca lo
+  schermo prende il posto del controller, come già faceva il mouse) e ogni testo che dice come fare qualcosa usa i
+  comandi giusti: azioni e ultimo consiglio del tutorial, aiuto del catalogo con un oggetto in mano (posa, fila,
+  modulo, rotazione), aiuto di «Sposta», ultima riga dell'introduzione, consiglio della pausa, messaggi «tutorial
+  saltato» e «macerie»; gli Extra elencano i comandi di tutti gli input, prima quelli in uso (aggiunta la riga del
+  tocco). I testi sullo schermo cambiano sul posto quando il giocatore cambia input; i tasti sulle schede della barra
+  si nascondono con il controller o il tocco. 18 testi nuovi e 4 riformulati (solo mouse) in 8 lingue; il test elenca
+  ogni testo inglese che nomina un comando.
+- **Menu principale**: le quattro schede dei percorsi erano disegnate un attimo prima che l'atlante delle immagini
+  fosse pronto e restavano con i vecchi disegni piatti della 0.5; ora mostrano la città isometrica (anche i bot e Miso
+  di «Plasma la città»). La mappa della regione e le schede dei salvataggi erano già attuali;
+  `docs/mockup-main-menu.png` non viene distribuito con il gioco.
+- **Testo nitido**: controllato a devicePixelRatio 1, 1,25, 1,5 e 2 e nelle cinque misure di finestra: immagini e
+  canvas sempre a pixel netti. La scheda dell'obiettivo non è più ruotata di 1°: il suo testo e il ritratto di USA-9
+  venivano ricampionati (nitidezza +13–16 %). Le righe dell'effetto CRT cadono su pixel interi dello schermo anche al
+  125 % e al 150 % (prima si addensavano in bande irregolari sopra i testi piccoli). L'effetto CRT resta attivo per
+  impostazione predefinita: nell'angolo più scuro il contrasto dei testi piccoli resta almeno 7,4:1.
+- **Catalogo con un oggetto in mano sulle finestre fino a 820 px di altezza**: la scheda dell'oggetto prende il posto
+  della testata (anche a 1024×768 e 1280×800) e le righe dicono nome, prezzo e stato (effetto e traguardo tornano
+  quando l'oggetto si mette via): almeno due righe intere in vista in tutte le 8 lingue (prima una a 1024×640, a
+  1024×768 alcune righe dei moduli erano più alte della lista e non si vedevano mai per intero).
+- **Pannello dello smog e catalogo aperti insieme**: sulle finestre larghe 1024 px il pannello dello smog finiva sotto
+  il catalogo (7 testi su 12 coperti a 1024×640); ora sta tra la scheda dell'obiettivo e il catalogo, più stretto se
+  serve; centrato come prima dove c'è posto.
+- **Lo smog di notte prende il colore della notte della città**: nelle città a tema la foschia notturna si sposta
+  quanto la notte del tema si discosta da quella del gioco (ruggine e verde un po' più verdi, neon viola, compagnia più
+  calda); Scrapbot City e il gioco libero si disegnano identici pixel per pixel, di giorno, al tramonto e di notte.
+- Nessun numero della simulazione cambia: bilanciamento e attese seminate identici byte per byte.
+
 ## In lavorazione — incremento 2, gruppo G4: progetti da scoprire, catalogo per categorie e filtri
 
 - **Progetti da scoprire** (docs/MODULAR-INC2.md §4): i 18 elementi nuovi dell'incremento 2 si scoprono raggiungendo un
