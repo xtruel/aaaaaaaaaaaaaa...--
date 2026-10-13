@@ -617,18 +617,28 @@ export class Renderer {
 
   // ---------- coordinates ----------
 
+  // The camera as the map is drawn: on whole art pixels (render rounds it), so what a press picks and the tile under
+  // the pointer are what is drawn there, also after a pan that left the camera between two art pixels.
+  private get viewX(): number {
+    return Math.round(this.cam.x);
+  }
+
+  private get viewY(): number {
+    return Math.round(this.cam.y);
+  }
+
   // Ground point under a screen point (CSS px).
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
-    return groundAt(this.cam.x + sx / this.pxZoom, this.cam.y + sy / this.pxZoom);
+    return groundAt(this.viewX + sx / this.pxZoom, this.viewY + sy / this.pxZoom);
   }
 
   screenToTile(sx: number, sy: number): { x: number; y: number } {
-    return tileAt(this.cam.x + sx / this.pxZoom, this.cam.y + sy / this.pxZoom);
+    return tileAt(this.viewX + sx / this.pxZoom, this.viewY + sy / this.pxZoom);
   }
 
   // Screen point (CSS px) of a world point.
   worldToScreen(wx: number, wy: number, wz = 0): { x: number; y: number } {
-    return { x: (wx - wy - this.cam.x) * this.pxZoom, y: ((wx + wy) / 2 - wz - this.cam.y) * this.pxZoom };
+    return { x: (wx - wy - this.viewX) * this.pxZoom, y: ((wx + wy) / 2 - wz - this.viewY) * this.pxZoom };
   }
 
   tileToScreen(tx: number, ty: number): { x: number; y: number } {
@@ -637,8 +647,8 @@ export class Renderer {
 
   // The building drawn under a screen point (its visible pixels, nearest first), or -1.
   pickBuilding(sx: number, sy: number): number {
-    const ix = Math.floor(this.cam.x + sx / this.pxZoom);
-    const iy = Math.floor(this.cam.y + sy / this.pxZoom);
+    const ix = Math.floor(this.viewX + sx / this.pxZoom);
+    const iy = Math.floor(this.viewY + sy / this.pxZoom);
     for (let k = this.drawnCount - 1; k >= 0; k--) {
       const d = this.drawn[k];
       if (ix < d.sx || iy < d.sy || ix >= d.sx + d.w || iy >= d.sy + d.h) continue;
@@ -663,8 +673,8 @@ export class Renderer {
   // point when it holds a piece or a visible floor: its tile index, or -1. A building drawn in front of the point
   // covers what is behind it (pickBuilding is asked first).
   pickPiece(sx: number, sy: number): number {
-    const ix = Math.floor(this.cam.x + sx / this.pxZoom);
-    const iy = Math.floor(this.cam.y + sy / this.pxZoom);
+    const ix = Math.floor(this.viewX + sx / this.pxZoom);
+    const iy = Math.floor(this.viewY + sy / this.pxZoom);
     for (let k = this.drawnCount - 1; k >= 0; k--) {
       const d = this.drawn[k];
       if (ix < d.sx || iy < d.sy || ix >= d.sx + d.w || iy >= d.sy + d.h) continue;
@@ -687,8 +697,10 @@ export class Renderer {
     const z = this.pxZoom;
     const s = this.terrainState;
     const f = s && inBounds(tx, ty) && s.solid[i] !== 0 ? frame(this.pieceFrameName(s, tx, ty, i)) : undefined;
-    if (f) return { left: (top.X - f.ax - this.cam.x) * z, top: (top.Y - f.ay - this.cam.y) * z, right: (top.X - f.ax + f.w - this.cam.x) * z, bottom: (top.Y - f.ay + f.h - this.cam.y) * z };
-    return { left: (top.X - TILE - this.cam.x) * z, top: (top.Y - this.cam.y) * z, right: (top.X + TILE - this.cam.x) * z, bottom: (top.Y + TILE - this.cam.y) * z };
+    const cx = this.viewX;
+    const cy = this.viewY;
+    if (f) return { left: (top.X - f.ax - cx) * z, top: (top.Y - f.ay - cy) * z, right: (top.X - f.ax + f.w - cx) * z, bottom: (top.Y - f.ay + f.h - cy) * z };
+    return { left: (top.X - TILE - cx) * z, top: (top.Y - cy) * z, right: (top.X + TILE - cx) * z, bottom: (top.Y + TILE - cy) * z };
   }
 
   // The frame of the solid piece on a tile. A fence, wall or pillar joins its line neighbours (fenceMask), and the
@@ -728,7 +740,9 @@ export class Renderer {
     const w = f ? f.w : BUILDINGS[b.type].w * TILE * 2;
     const h = f ? f.h : BUILDINGS[b.type].h * TILE;
     const z = this.pxZoom;
-    return { left: (top.X - ax - this.cam.x) * z, top: (top.Y - ay - this.cam.y) * z, right: (top.X - ax + w - this.cam.x) * z, bottom: (top.Y - ay + h - this.cam.y) * z };
+    const cx = this.viewX;
+    const cy = this.viewY;
+    return { left: (top.X - ax - cx) * z, top: (top.Y - ay - cy) * z, right: (top.X - ax + w - cx) * z, bottom: (top.Y - ay + h - cy) * z };
   }
 
   // ---------- terrain cache ----------
