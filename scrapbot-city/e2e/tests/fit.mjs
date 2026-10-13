@@ -7,10 +7,15 @@
 //            not cut; every row can be scrolled ENTIRELY into sight, nothing covers it, none of its texts is cut sideways
 //  panels:   the Recycler's and the Dock's building panels: inside the window, clear of both bars, nothing cut
 //            sideways; every module card's button can be scrolled into sight and is not covered
+//  kept:     the panel of each of the 12 pieces of a project the profile has not discovered (a city that kept them):
+//            the "not discovered yet" warning right above Remove, fully in sight at the panel's top, and in sight
+//            whenever Remove is (at the top, Remove scrolled into sight, the panel scrolled to its end); not cut, not
+//            covered (0.7.0-rc.1: it sat under Remove, out of sight at 1024x640 in de/fr/pt)
 //  menu:     the build stamp in the top-left corner clear of the logo's star; the hand-lettered "Different futures,
 //            same city" (when shown) clear of the path cards' labels
 //  toast:    a toast over an ending dialog covers none of the dialog's buttons
-// One picture per language at 1024x640 (catalog with a tool) and two at 1920x1080 (en, de).
+// One picture per language at 1024x640 (catalog with a tool), one per language at 1024x640 of an undiscovered statue's
+// panel, and two at 1920x1080 (en, de).
 import { startTest } from '../lib/report.mjs';
 import { frames, launch, openGame, S, settle, until } from '../lib/page.mjs';
 import { serve } from '../lib/server.mjs';
@@ -22,6 +27,9 @@ const server = await serve(T.cfg.debug);
 const browser = await launch();
 let page = null;
 const BEST = { version: 1, discovered: [], best: { partsMade: 60, pop: 8, creditsEarned: 4200, scrapCollected: 250, built: 9, energyProd: 20, cleaned: 5, piecesPlaced: 12, catPets: 2 } };
+// pieces of a project (none discovered with BEST), staged on the map by their codes as a loaded city would have them:
+// solid codes (src/game/piecedefs.ts SOLID_CODES), and the concrete base as a surface (floor code 2)
+const KEPT = [['bench', 4], ['planter', 5], ['sign', 6], ['pergola', 7], ['cathouse', 8], ['sculpture', 9], ['wall', 10], ['pillar', 11], ['tree', 12], ['fountain', 13], ['statue', 14], ['base', -2]];
 const TOOLS = [
   [null, 'construction'],
   [null, 'decorations'],
@@ -133,6 +141,49 @@ const panelFit = () => {
   return { bad: [...new Set(bad)], scrolls: p.scrollHeight - p.clientHeight };
 };
 
+// the panel of a kept piece whose project is not discovered: the warning right above Remove and in sight whenever
+// Remove is; Remove can be scrolled into sight with the warning; neither cut nor covered
+const keptFit = () => {
+  const bad = [];
+  const p = document.querySelector('[data-inspector]');
+  const note = p.querySelector('[data-kept-locked]');
+  const rm = p.querySelector('[data-remove-piece]');
+  if (!note || !rm) return { bad: [`no ${note ? 'Remove' : 'warning'}`], removeAtTop: false };
+  if (note.nextElementSibling !== rm) bad.push('the warning is not right above Remove');
+  const P = p.getBoundingClientRect();
+  const inSight = (el) => {
+    const r = el.getBoundingClientRect();
+    return r.height > 0 && r.top >= P.top - 0.5 && r.bottom <= P.bottom + 0.5 && r.left >= P.left - 0.5 && r.right <= P.right + 0.5;
+  };
+  const check = (when) => {
+    if (note.getBoundingClientRect().bottom > rm.getBoundingClientRect().top + 0.5) bad.push(`${when}: the warning not above Remove`);
+    if (inSight(rm) && !inSight(note)) bad.push(`${when}: Remove in sight, the warning not`);
+  };
+  p.scrollTop = 0;
+  check('at the top');
+  const removeAtTop = inSight(rm);
+  if (!inSight(note)) bad.push('at the top: the warning not fully in sight');
+  // as the controller's focus or a wheel brings it: Remove fully in sight, the warning with it
+  rm.scrollIntoView({ block: 'nearest' });
+  if (!inSight(rm) || !inSight(note)) bad.push('Remove scrolled into sight: Remove or the warning not fully in sight');
+  const covered = (el) => {
+    const r = el.getBoundingClientRect();
+    const at = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 8));
+    return !at || !(at === el || el.contains(at)) ? at?.className || 'nothing' : null;
+  };
+  for (const [name, el] of [['Remove', rm], ['the warning', note]]) {
+    const by = covered(el);
+    if (by) bad.push(`${name} covered by ${by}`);
+  }
+  const range = document.createRange();
+  range.selectNodeContents(note);
+  if ([...range.getClientRects()].some((q) => q.width > 0 && (q.right > P.right + 0.5 || q.left < P.left - 0.5)) || note.scrollWidth > note.clientWidth + 1) bad.push('the warning cut sideways');
+  p.scrollTop = p.scrollHeight;
+  check('at the end of the panel');
+  p.scrollTop = 0;
+  return { bad, removeAtTop };
+};
+
 // the main menu: the corner stamp's lines, the logo's star, the hand-lettered text, the path cards' labels
 const menuFit = () => {
   const bad = [];
@@ -196,6 +247,22 @@ await T.run(async () => {
       s.res.parts = 900;
       s.res.scrap = 100;
     });
+    // the 12 pieces of projects this profile has not discovered, kept by the city (two tiles apart, near the HQ)
+    const yard = await G.freeBlock(page, KEPT.length * 2 - 1, 1, 1);
+    const kept = await S(page, ([list, yard]) => {
+      const s = window.scrapbot.session().s;
+      const at = {};
+      list.forEach(([kind, code], n) => {
+        const i = yard.y0 * 56 + yard.x0 + n * 2;
+        if (code > 0) {
+          s.solid[i] = code;
+          s.rot[i] = 0;
+        } else s.floor[i] = -code;
+        at[kind] = i;
+      });
+      return at;
+    }, [KEPT, yard]);
+    T.note(`${lang}: staged 12 pieces of undiscovered projects at ${JSON.stringify(yard)}`);
     for (const size of T.cfg.sizes) {
       const [w, h] = size.split('x').map(Number);
       await page.setViewportSize({ width: w, height: h });
@@ -252,6 +319,21 @@ await T.run(async () => {
       }
       await S(page, () => window.scrapbot.session().selectBuilding(-1));
       T.ok(`${tag}: the Recycler's and the Dock's panels fit (inside, clear of the bars, every button reachable)`, panelBad.length === 0, panelBad.slice(0, 4).join('; '));
+      const keptBad = [];
+      const scrollFor = [];
+      for (const [kind] of KEPT) {
+        await S(page, (i) => window.scrapbot.session().selectPiece(i), kept[kind]);
+        await until(page, (k) => !document.querySelector('[data-inspector]').hidden && !!document.querySelector('[data-inspector] [data-remove-piece]') && !!document.querySelector('[data-inspector] [data-kept-locked]'), kind, { what: `the ${kind} panel with its warning` });
+        await settle(page);
+        const side = await S(page, sideBox, '[data-inspector]');
+        const r = await S(page, keptFit);
+        for (const b of [...side, ...r.bad]) keptBad.push(`${kind}: ${b}`);
+        if (!r.removeAtTop) scrollFor.push(kind);
+        if (kind === 'statue' && size === '1024x640') await T.shot(page, `kept-statue-panel-${lang}-${size}`);
+      }
+      await S(page, () => window.scrapbot.session().selectPiece(-1));
+      T.ok(`${tag}: the panels of 12 undiscovered pieces: the warning right above Remove, fully in sight at the top and whenever Remove is, not cut or covered`, keptBad.length === 0, keptBad.slice(0, 4).join('; '));
+      T.note(`${tag}: Remove needs a scroll of the panel (the warning above it in sight) for ${scrollFor.length ? scrollFor.join(', ') : 'none'}`);
       // an ending (staged with the hook, as a finished Spire brings it), a toast over it; then "keep building"
       await S(page, () => {
         const ses = window.scrapbot.session();
@@ -266,7 +348,7 @@ await T.run(async () => {
       await page.waitForTimeout(700); // (the dialog takes no key or button press in its first 600 ms)
       await S(page, () => document.querySelectorAll('#modal-root .modal-actions > button')[0].click());
       await until(page, () => !document.querySelector('#modal-root .modal') && !window.scrapbot.session().s.outcome, null, { what: 'the ending closed, the city going on' });
-      summary[tag] = { toolbar: bar.length, catalog: catBad.length, panels: panelBad.length, toast: toastBad.length };
+      summary[tag] = { toolbar: bar.length, catalog: catBad.length, panels: panelBad.length, kept: keptBad.length, toast: toastBad.length };
     }
     T.ok(`${lang}: no page errors`, errors.length === 0, errors.slice(0, 2).join(' | '));
     await g.ctx.close();

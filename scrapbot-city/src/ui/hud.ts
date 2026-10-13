@@ -1535,8 +1535,10 @@ export class Hud {
   // A selected piece (floor, base, fence, gate, lamp, wall, pillar or decoration): what it is, that it is only for
   // looks, Rotate, Move (a decoration) and Remove with what it really gives back (markPieceRefund keeps that up to
   // date), then what it is like. The buttons come before the description, so on a short window (1024x640) they are in
-  // sight without scrolling the panel. While it is being moved: what to do (in controller buttons when a pad is in use)
-  // and Done, which leaves it where it is; no Remove (nothing to spend or get back during a move).
+  // sight without scrolling the panel; a piece of a project not discovered yet has its warning right above Remove, and
+  // there Remove itself can need a scroll (the warning comes first). While it is being moved: what to do (in controller
+  // buttons when a pad is in use) and Done, which leaves it where it is; no Remove (nothing to spend or get back during
+  // a move).
   private renderPiece(info: PieceInfo, i: number, moving = false): void {
     const panel = this.el.inspector;
     this.renderedId = -1;
@@ -1559,15 +1561,17 @@ export class Hud {
       </div>
       <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;
     } else {
+      // a piece the city had before its project was discovered: the warning that it cannot be bought back sits right
+      // above Remove, so whatever scrolls Remove into sight (a short window, the controller) brings it along
+      const kept = info.removable && isLocked(this.s, info.kind) ? `<p class="insp-note" data-kept-locked>${esc(t('proj.keptLocked'))}</p>` : '';
       panel.innerHTML = `${head}
       <p class="insp-status piece-note">${t(PIECES[info.kind].decoration ? 'insp.decoration' : 'cat.construction.note')}</p>
       <div class="insp-actions">
         ${info.rotatable ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
         ${info.movable ? `<button type="button" class="btn" data-move-piece>${t('insp.move')}</button>` : ''}
-        ${info.removable ? `<button type="button" class="btn" data-remove-piece></button>` : ''}
+        ${info.removable ? `${kept}<button type="button" class="btn" data-remove-piece></button>` : ''}
       </div>
       <p class="insp-warn" data-scrap-room hidden></p>
-      ${info.removable && isLocked(this.s, info.kind) ? `<p class="insp-note" data-kept-locked>${esc(t('proj.keptLocked'))}</p>` : ''}
       <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;
     }
     this.markPieceRefund(info);

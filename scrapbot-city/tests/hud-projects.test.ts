@@ -5,16 +5,16 @@
 // the badge, and the note on a kept item whose project is not discovered.
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { placeBuilding, placeCheck } from '../src/game/actions';
-import { MAP_H, MAP_W } from '../src/game/defs';
+import { MAP_H, MAP_W, T } from '../src/game/defs';
 import type { BuildingType } from '../src/game/defs';
-import { installModule } from '../src/game/pieces';
-import type { CatalogKind } from '../src/game/pieces';
+import { PIECES, installModule, placePiece } from '../src/game/pieces';
+import type { CatalogKind, PieceKind } from '../src/game/pieces';
 import { PROJECT_KINDS } from '../src/game/projects';
 import type { GoalStat } from '../src/game/projects';
 import { computeDerived } from '../src/game/sim';
 import { createGame } from '../src/game/state';
 import type { Building, GameState } from '../src/game/state';
-import { setLang } from '../src/i18n';
+import { LANGS, setLang, t } from '../src/i18n';
 import { Hud, NOTICE_SECONDS } from '../src/ui/hud';
 import type { HudHandlers, HudView } from '../src/ui/hud';
 import { PRESS_GUARD_MS, forgetPresses } from '../src/ui/presses';
@@ -476,5 +476,49 @@ describe('building panel: the module slot of a project', () => {
     q('[data-remove="recyclerMagnet"]')!.click();
     update({ selectedId: rec.id });
     expect(root.querySelector('[data-kept-locked]')!.textContent).toBe('Not discovered yet: once removed, it cannot be bought again until you discover it.');
+  });
+});
+
+// 0.7.0-rc.1 (BETA-REPORT, low item): in a short window the panel scrolls; the warning sat under Remove, out of sight
+// in German, French and Portuguese at 1024x640. It now sits in the column of buttons, right above Remove, so whatever
+// brings Remove into sight brings the warning with it (the e2e test `fit` measures it in 8 languages x 4 sizes).
+describe('the panel of a kept piece whose project is not discovered', () => {
+  const PROJECT_PIECES = (Object.keys(PIECES) as PieceKind[]).filter((k) => (PROJECT_KINDS as readonly string[]).includes(k));
+
+  it('in every language: the warning right above Remove, nothing between them; none on a discovered piece', () => {
+    expect(PROJECT_PIECES).toHaveLength(12);
+    for (const { id } of LANGS) {
+      setLang(id);
+      const { s, root, update } = setup();
+      s.res.scrap = 200; // the sculpture and the low wall take scrap
+      const free: number[] = [];
+      for (let i = 0; i < s.tiles.length && free.length < PROJECT_PIECES.length; i++)
+        if (i % MAP_W > 2 && (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS) && s.occ[i] === -1 && !s.solid[i] && !s.floor[i]) free.push(i);
+      PROJECT_PIECES.forEach((k, n) => {
+        const i = free[n];
+        const x = i % MAP_W;
+        const y = Math.floor(i / MAP_W);
+        // a city that kept it although this profile has not discovered it (a save from another computer, an old copy)
+        s.unlocked.add(k as never);
+        expect(placePiece(s, k, x, y, 0), `${id} ${k}`).toBe(true);
+        s.unlocked.delete(k as never);
+        update({ selectedPiece: i });
+        const panel = root.querySelector<HTMLElement>('[data-inspector]')!;
+        const note = panel.querySelector<HTMLElement>('[data-kept-locked]');
+        const remove = panel.querySelector<HTMLElement>('[data-remove-piece]')!;
+        expect(note?.textContent, `${id} ${k}`).toBe(t('proj.keptLocked'));
+        expect(note!.parentElement, `${id} ${k}`).toBe(remove.parentElement);
+        expect(note!.parentElement!.classList.contains('insp-actions')).toBe(true);
+        expect(note!.nextElementSibling, `${id} ${k}: right above Remove`).toBe(remove);
+        expect(panel.querySelectorAll('[data-kept-locked]')).toHaveLength(1);
+        // discovered: no warning, the column is buttons only
+        s.unlocked.add(k as never);
+        update({ selectedPiece: -1 });
+        update({ selectedPiece: i });
+        expect(panel.querySelector('[data-kept-locked]'), `${id} ${k} discovered`).toBeNull();
+        expect([...panel.querySelector('.insp-actions')!.children].every((c) => c.tagName === 'BUTTON')).toBe(true);
+      });
+    }
+    setLang('en');
   });
 });
