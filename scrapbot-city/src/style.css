@@ -1333,7 +1333,6 @@ select {
   border: 3px solid var(--ink);
   border-radius: var(--r);
   box-shadow: var(--lift);
-  transform: rotate(-1deg);
 }
 
 .obj-face {
@@ -4429,8 +4428,9 @@ body:has(.smog-panel:not([hidden])) .toasts {
   z-index: 60;
   pointer-events: none;
   display: none;
+  /* --crt-line, --crt-step: 1 and 3 px rounded to whole device pixels (src/main.ts) */
   background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0 var(--crt-line, 1px), transparent var(--crt-line, 1px) var(--crt-step, 3px)),
     radial-gradient(ellipse at center, transparent 65%, rgba(18, 11, 41, 0.35) 100%);
 }
 

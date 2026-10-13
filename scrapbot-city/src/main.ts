@@ -25,6 +25,7 @@ import * as hints from './game/hints';
 import { createGame } from './game/state';
 import { initGamepad } from './gamepad';
 import { initInputMode } from './input';
+import { alignScanlines } from './ui/crt';
 import { loadKeyboardLayout } from './keys';
 import type { GameState } from './game/state';
 import { lang, setLang, t } from './i18n';
@@ -84,6 +85,9 @@ function setFullscreen(on: boolean): void {
     // fullscreen is optional: some embeds refuse it
   }
 }
+
+alignScanlines();
+window.addEventListener('resize', alignScanlines);
 
 function applySettings(next: Settings): void {
   const fullscreenChanged = next.fullscreen !== settings.fullscreen;
