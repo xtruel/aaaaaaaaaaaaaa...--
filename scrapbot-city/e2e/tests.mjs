@@ -1,0 +1,26 @@
+// The suite: one row per test (a test file run with one configuration). `minutes` is the usual run time on the
+// 4-core machine the suite was written on (a test is killed at 4x that, plus 2 minutes).
+export const TESTS = [
+  { name: 'release-smoke', file: 'release-smoke.mjs', input: 'mouse', build: 'release', minutes: 1, what: 'release build: no test hook, no page error, menus and dialogs, a free play city, product storage keys only' },
+  { name: 'items-mouse', file: 'items.mjs', input: 'mouse', build: 'debug', minutes: 4, cfg: { size: '1280x800' }, what: 'the 24 items: build, turn, place, select, move, save/reload/Load, remove; refund shown = paid' },
+  { name: 'items-touch', file: 'items.mjs', input: 'touch', build: 'debug', minutes: 5, cfg: { size: '1024x640' }, what: 'the same with a finger at 1024x640' },
+  { name: 'items-pad', file: 'items.mjs', input: 'pad', build: 'debug', minutes: 6, cfg: { size: '1280x800' }, what: 'the same with a controller' },
+  { name: 'comfort-mouse', file: 'comfort.mjs', input: 'mouse', build: 'debug', minutes: 3, cfg: { size: '1280x800' }, what: 'comfort rules over the 24 items: price before buying, pans buy nothing, one press one charge, double presses, panels, dialogs, notice' },
+  { name: 'comfort-touch', file: 'comfort.mjs', input: 'touch', build: 'debug', minutes: 4, cfg: { size: '1280x800' }, what: 'the same with a finger' },
+  { name: 'comfort-pad', file: 'comfort.mjs', input: 'pad', build: 'debug', minutes: 5, cfg: { size: '1280x800' }, what: 'the same with a controller' },
+  { name: 'discovery-mouse', file: 'discovery.mjs', input: 'mouse', build: 'debug', minutes: 1, cfg: { size: '1280x800' }, what: 'new profile: catalog tabs/filters/states, Miso petted -> notice -> Open (Apri) -> buy' },
+  { name: 'discovery-touch', file: 'discovery.mjs', input: 'touch', build: 'debug', minutes: 1, cfg: { size: '1024x640' }, what: 'the same with a finger at 1024x640' },
+  { name: 'discovery-pad', file: 'discovery.mjs', input: 'pad', build: 'debug', minutes: 1, cfg: { size: '1280x800' }, what: 'the same with a controller' },
+  { name: 'module-slots', file: 'module-slots.mjs', input: 'mouse', build: 'debug', minutes: 1, cfg: { size: '1280x800' }, what: 'module slot states: Not now, To discover (goal, progress), Can be installed, Installed, Slot taken' },
+  { name: 'saves', file: 'saves.mjs', input: 'mouse', build: 'debug+release', minutes: 3, cfg: { size: '1280x800' }, what: 'slots, autosave, Continue, Load, storage-loss warnings, bot cargo, backups, 0.6 and 0.7.0-alpha.1 saves' },
+  { name: 'double-press-mouse', file: 'double-press.mjs', input: 'mouse', build: 'debug', minutes: 2, cfg: { size: '1280x800' }, what: "double presses on a module's Remove, Demolish, the Remove confirmation, Install after a removal, a decoration's Move and Done" },
+  { name: 'double-press-touch', file: 'double-press.mjs', input: 'touch', build: 'debug', minutes: 2, cfg: { size: '1280x800' }, what: 'the same with a finger' },
+  { name: 'double-press-pad', file: 'double-press.mjs', input: 'pad', build: 'debug', minutes: 2, cfg: { size: '1280x800' }, what: 'the same with a controller' },
+  { name: 'covered-mouse', file: 'covered.mjs', input: 'mouse', build: 'debug', minutes: 1, cfg: { size: '1280x800' }, what: 'a fence behind a building: the first press selects the building, a second reaches the fence; the bulldozer takes it up' },
+  { name: 'covered-touch', file: 'covered.mjs', input: 'touch', build: 'debug', minutes: 1, cfg: { size: '1280x800' }, what: 'the same with a finger' },
+  { name: 'covered-pad', file: 'covered.mjs', input: 'pad', build: 'debug', minutes: 1, cfg: { size: '1280x800' }, what: 'the same with a controller' },
+  { name: 'left-mouse', file: 'left-mouse.mjs', input: 'mouse', build: 'debug', minutes: 1, cfg: { size: '1280x800' }, what: 'the left mouse button never pans, in every tool state' },
+  { name: 'fit', file: 'fit.mjs', inputLabel: 'none (layout read from the DOM)', build: 'debug', minutes: 3, what: 'catalog, building panel and toolbar fit: 8 languages x 1024x640, 1280x720, 1280x800, 1920x1080' },
+  { name: 'campaign-home', file: 'campaign.mjs', input: 'mouse', build: 'debug', minutes: 5, what: 'the first campaign city played to its end with buildings only (no catalog object), through dialogs and storms' },
+  { name: 'cities', file: 'cities.mjs', input: 'mouse', build: 'release', minutes: 3, what: 'the five campaign cities open from the release build, day and night pictures' },
+];

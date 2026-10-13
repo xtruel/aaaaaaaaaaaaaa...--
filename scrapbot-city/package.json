@@ -18,6 +18,8 @@
     "dist:mac": "vite build && electron-builder --mac dir",
     "i18n:check": "esbuild scripts/i18n-check.ts --bundle --platform=node --format=esm --outfile=.cache/i18n-check.mjs --log-level=warning && node .cache/i18n-check.mjs",
     "test": "vitest run",
+    "e2e": "node e2e/run.mjs",
+    "e2e:list": "node e2e/run.mjs --list",
     "art": "esbuild scripts/art/build.ts --bundle --platform=node --format=esm --outfile=.cache/art.mjs --log-level=warning && node .cache/art.mjs",
     "waits": "esbuild scripts/wait-analysis.ts --bundle --platform=node --format=esm --outfile=.cache/waits.mjs --log-level=warning && node .cache/waits.mjs",
     "pace": "esbuild scripts/discovery-pace.ts --bundle --platform=node --format=esm --outfile=.cache/pace.mjs --log-level=warning && node .cache/pace.mjs"
