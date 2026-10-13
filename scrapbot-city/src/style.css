@@ -2359,6 +2359,14 @@ select {
     width: 400px;
   }
 
+  /* the smog alarm keeps to the room left of the wider catalog while it is open, so its words and countdown stay in
+     sight: 350 px on the left as always (the goal card), and on the right the panel's 400 px, its 10 px margin and a
+     gap of 20 px (10 px more while the alarm pulses) */
+  .hud:has(.catalog:not([hidden])) .smog-alert {
+    left: calc(50% - 40px);
+    max-width: max(240px, calc(100% - 780px));
+  }
+
   .catalog .cat-help-turn {
     display: none;
   }

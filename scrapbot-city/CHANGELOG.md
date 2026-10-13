@@ -51,6 +51,9 @@
 - **Ritmo misurato** con `npm run pace` (pilota automatico, cinque città e gioco libero, verde e industriale, minuti a
   velocità 1): panchina, fioriera, basamento e albero usabili entro 5 minuti in tutte le 14 partite (e nella prova
   dall'interfaccia: entro 4:30); nessuna soglia ritoccata.
+- **L'allarme dello smog resta leggibile accanto al catalogo** sulle finestre basse (1280×720, 1024×640): il catalogo
+  più largo copriva la fine dell'avviso del 95% (a 1024×640 anche i secondi rimasti); mentre il catalogo è aperto
+  l'avviso sta nello spazio tra la scheda dell'obiettivo e il pannello, su più righe se serve.
 
 ## In lavorazione — incremento 2, gruppo G3: tre costruzioni, tre decorazioni, spostare le decorazioni
 
