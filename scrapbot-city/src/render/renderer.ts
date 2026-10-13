@@ -109,8 +109,10 @@ const K_LAMP = 6;
 const K_PIECE = 7;
 const POOL = [5, 10, 14, 16, 14, 10, 5]; // half-widths of a lamp's light pool, row by row
 // The light of a city without a theme (atlas.ts ThemeArtMeta.light): no daylight colour ('' or 'r,g,b', multiplied
-// into the ground of the terrain cache), the night veil's colour, a factor on its opacity.
-const GAME_LIGHT = { day: '', veil: '16,12,52', dark: 1 };
+// into the ground of the terrain cache), the night veil's colour, a factor on its opacity; and how far a theme's night
+// veil is from the game's own (16, 12, 52), which the smog haze takes on at night (none without a theme).
+const GAME_VEIL = [16, 12, 52] as const;
+const GAME_LIGHT = { day: '', veil: GAME_VEIL.join(','), dark: 1, nightShift: [0, 0, 0] as [number, number, number] };
 
 // Player-built pieces (0.7): how tall the solid ones stand (voxels; draw order, bots fly over them), and their
 // frames: a fence by the mask of its line neighbours (alone: along x or y by its rotation), a gate by its
@@ -742,7 +744,14 @@ export class Renderer {
     if (theme !== this.theme) this.tinted.clear();
     this.theme = theme;
     const look = theme ? themeArt[theme] : null;
-    this.light = look ? { day: look.light.day.some((c) => c < 255) ? look.light.day.join(',') : '', veil: look.light.night.join(','), dark: look.light.dark } : GAME_LIGHT;
+    this.light = look
+      ? {
+          day: look.light.day.some((c) => c < 255) ? look.light.day.join(',') : '',
+          veil: look.light.night.join(','),
+          dark: look.light.dark,
+          nightShift: [0, 1, 2].map((c) => look.light.night[c] - GAME_VEIL[c]) as [number, number, number],
+        }
+      : GAME_LIGHT;
     const sc = placeScenery(s.seed, RING, decorArt, theme && look ? { id: theme, scenery: look.scenery, decor: look.decor } : null);
     this.scenery = sc.items;
     this.sceneryTaken = sc.taken;
@@ -2834,16 +2843,18 @@ export class Renderer {
     const ctx = this.ctx;
     const w = this.viewW;
     const soot = ramp(p, HAZE_SOOT);
-    // dust (176,156,118) to soot (74,68,60) by day, a dim brown glow (66,48,40) at night
-    const tone = (dust: number, sooty: number, dark: number) => Math.round((dust + (sooty - dust) * soot) * (1 - night) + dark * night);
-    ctx.fillStyle = `rgba(${tone(176, 74, 66)},${tone(156, 68, 48)},${tone(118, 60, 40)},${ramp(p, HAZE_VEIL)})`;
+    // dust (176,156,118) to soot (74,68,60) by day, a dim brown glow (66,48,40) at night, shifted as far as a city
+    // theme's night is from the game's own (rust: greener, neon: violet...; nothing moves without a theme)
+    const shift = this.light.nightShift;
+    const tone = (dust: number, sooty: number, dark: number, c: 0 | 1 | 2) => Math.max(0, Math.min(255, Math.round((dust + (sooty - dust) * soot) * (1 - night) + (dark + shift[c]) * night)));
+    ctx.fillStyle = `rgba(${tone(176, 74, 66, 0)},${tone(156, 68, 48, 1)},${tone(118, 60, 40, 2)},${ramp(p, HAZE_VEIL)})`;
     ctx.fillRect(0, 0, w, this.viewH);
     const overcast = ramp(p, HAZE_OVERCAST);
     if (overcast <= 0) return;
     // the low sky: darkest at the top, starting under the top bar where it can be seen
     const y0 = Math.round(this.insets.top / this.pxZoom);
     const band = Math.ceil((y0 + this.viewH * 0.45) / SKY_BANDS);
-    const sky = `${tone(66, 46, 30)},${tone(58, 40, 24)},${tone(52, 36, 26)}`;
+    const sky = `${tone(66, 46, 30, 0)},${tone(58, 40, 24, 1)},${tone(52, 36, 26, 2)}`;
     for (let k = 0; k < SKY_BANDS; k++) {
       ctx.fillStyle = `rgba(${sky},${0.7 * overcast * (1 - k / SKY_BANDS)})`;
       ctx.fillRect(0, k * band, w, band);
