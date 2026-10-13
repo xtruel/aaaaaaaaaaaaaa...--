@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DOUBLE_DIST, DOUBLE_DIST_TOUCH, DOUBLE_PRESS_MS, PRESS_GUARD_MS, forgetPresses, guarded, isDouble, lastPresses, mapPress, markOffMap, markSecond, notePress, rowLaid, secondPress } from '../src/ui/presses';
+import { DOUBLE_DIST, DOUBLE_DIST_TOUCH, DOUBLE_PRESS_MS, PRESS_GUARD_MS, forgetPresses, guarded, isDouble, lastPresses, mapPress, markOffMap, markSecond, notePress, noteTool, rowLaid, secondPress } from '../src/ui/presses';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -183,5 +183,28 @@ describe('presses', () => {
     expect(onMap({ t: 1250, x: 302, y: 401, tile: '10,5', touch: true })).toBe('double');
     // a press of its own, later, buys
     expect(onMap({ t: 1900, x: 302, y: 401, tile: '10,5', touch: true })).toBe('meant');
+  });
+
+  it('a dialog\'s button that put a tool in hand (USA-9\'s Build Recycler): the second press of its double press buys nothing on the map', () => {
+    for (const [gap, touch, dx] of [
+      [120, false, 0],
+      [300, false, 1],
+      [500, false, 0],
+      [150, true, 9],
+      [400, true, 14],
+    ] as const) {
+      forgetPresses();
+      // the first press, on the hint's button (no tool in hand, no tile under it): the session takes the Recycler
+      notePress({ t: 1000, x: 640, y: 487, cam: 'c', tile: '', tool: '', touch });
+      noteTool('b:recycler');
+      // the second press reaches the free ground the dialog uncovered, with the Recycler in hand
+      expect(onMap({ t: 1000 + gap, x: 640 + dx, y: 487, tile: '31,21', tool: 'b:recycler', touch }), `${gap} ms`).toBe('double');
+      // a press of its own, later, builds
+      expect(onMap({ t: 1000 + gap + 700, x: 640, y: 487, tile: '31,21', tool: 'b:recycler', touch })).toBe('meant');
+    }
+    // without noteTool (before the fix) the tool that changed in between made the second press a meant one
+    forgetPresses();
+    notePress({ t: 1000, x: 640, y: 487, cam: 'c', tile: '', tool: '' });
+    expect(onMap({ t: 1300, x: 640, y: 487, tile: '31,21', tool: 'b:recycler' })).toBe('meant');
   });
 });

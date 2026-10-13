@@ -35,7 +35,7 @@ import { openHint, openHintPay, openImport, openSettings, openSlots, openStoryEv
 import { Hud, typeForHotkey } from './ui/hud';
 import { esc } from './ui/escape';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
-import { SAME_PRESS_MS, forgetPresses, lastPresses, mapPress, markOffMap, markSecond, notePress, rowLaid } from './ui/presses';
+import { SAME_PRESS_MS, forgetPresses, lastPresses, mapPress, markOffMap, markSecond, notePress, noteTool, rowLaid } from './ui/presses';
 import type { Press } from './ui/presses';
 import type { ModalAction } from './ui/modal';
 import { Tutorial } from './ui/tutorial';
@@ -1472,6 +1472,8 @@ export class GameSession implements PadTarget {
       if (!hint.build) return;
       this.build = null;
       this.selectBuild(hint.build);
+      // this press took the building: the second press of its double press, on the map the dialog uncovered, buys nothing
+      noteTool(this.toolKey());
       const btn = this.root.querySelector<HTMLElement>(`[data-tool="${hint.build}"]`);
       btn?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
       btn?.classList.add('flash');

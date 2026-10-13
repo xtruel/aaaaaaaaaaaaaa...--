@@ -20,6 +20,8 @@
 //   began before the player could see it, do nothing;
 // - the region map's "Yes, start over" (src/ui/region.ts), drawn where Restart was: no press for PRESS_GUARD_MS after
 //   the Restart press;
+// - the map right after a dialog's button put a tool in hand (USA-9's Build, noteTool): the second press of that
+//   double press, on the map the dialog uncovered, is too quick;
 // - the click that reaches behind the selected building (src/ui/pick.ts) counts from DOUBLE_PRESS_MS.
 // No DOM.
 
@@ -132,6 +134,13 @@ export function notePress(p: Press): void {
 // its reason on the tile the first press used): no double press starts from it.
 export function markSecond(): void {
   last.second = true;
+}
+
+// The press being handled put a tool in hand from a dialog (USA-9's "Build Recycler" closes the hint and takes the
+// building): it counts as made with that tool, so the second press of its double press, on the map the dialog
+// uncovered, is that press's double (mapPress: 'double', too quick) and not a meant press with a new tool.
+export function noteTool(tool: string): void {
+  last.tool = tool;
 }
 
 // The press being handled did not act on the map (it only closed the smog panel): a press right after it, on the
