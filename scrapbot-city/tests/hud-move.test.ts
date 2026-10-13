@@ -34,7 +34,7 @@ beforeAll(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   forgetPresses();
-  document.body.classList.remove('pad-mode');
+  document.body.classList.remove('pad-mode', 'touch-mode');
 });
 
 function city(): GameState {
@@ -155,7 +155,7 @@ describe('the panel of a selected G3 piece', () => {
     expect(q(root, '[data-inspector] [data-scrap-room]')!.textContent).toBe('Storage has room for 1 of the 2 scrap: the rest is not given back.');
   });
 
-  it('while moving: what to do (mouse and touch, or the pad\'s buttons) and Done; no Rotate, Move or Remove', () => {
+  it('while moving: what to do (with the mouse, a finger or the pad\'s buttons) and Done; no Rotate, Move or Remove', () => {
     const { s, root, calls, update } = setup();
     const [p] = freeTiles(s, 1);
     placePiece(s, 'statue', p.x, p.y, 2);
@@ -165,12 +165,17 @@ describe('the panel of a selected G3 piece', () => {
     update({ selectedPiece: i, moving: i });
     const panel = q(root, '[data-inspector]')!;
     expect(q(panel, 'h3')!.textContent).toBe('Statue of USA-9');
-    expect(q(panel, '.cat-help')!.textContent).toBe('Move · Click or tap a tile to move it there: free, it keeps its direction and look.');
+    expect(q(panel, '.cat-help')!.textContent).toBe('Move · Click a tile to move it there: free, it keeps its direction and look.');
     expect(q(panel, '[data-rotate]')).toBeNull();
     expect(q(panel, '[data-move-piece]')).toBeNull();
     expect(q(panel, '[data-remove-piece]')).toBeNull();
     q(panel, '[data-move-done]')!.click();
     expect(calls.at(-1)).toEqual(['onEndMove']);
+    // with a finger: taps (G5: the help names the input in use)
+    document.body.classList.add('touch-mode');
+    update({ selectedPiece: i, moving: i });
+    expect(q(root, '[data-inspector] .cat-help')!.textContent).toBe('Move · Tap a tile to move it there: free, it keeps its direction and look.');
+    document.body.classList.remove('touch-mode');
     // with a controller: its buttons
     document.body.classList.add('pad-mode');
     update({ selectedPiece: i, moving: i });
@@ -316,7 +321,7 @@ describe('the panel of a selected G3 piece', () => {
       expect(q(root, '[data-inspector] [data-move-piece]')!.textContent).toBe('Sposta');
       expect(q(root, '[data-inspector] [data-remove-piece]')!.textContent).toBe('Rimuovi (+12 crediti + 2 pezzi)');
       update({ selectedPiece: i, moving: i });
-      expect(q(root, '[data-inspector] .cat-help')!.textContent).toBe('Sposta · Clicca o tocca una casella per spostarlo lì: gratis, mantiene direzione e aspetto.');
+      expect(q(root, '[data-inspector] .cat-help')!.textContent).toBe('Sposta · Clicca una casella per spostarlo lì: gratis, mantiene direzione e aspetto.');
       expect(q(root, '[data-inspector] [data-move-done]')!.textContent).toBe('Fatto');
     } finally {
       setLang('en');

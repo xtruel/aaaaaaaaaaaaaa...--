@@ -185,6 +185,28 @@ describe('catalog panel', () => {
     expect(q(panel, '.cat-help')!.textContent).toContain('Bot Dock');
   });
 
+  it('the tool help names the controls of the input in use, and changes with it while the tool is in hand (G5)', () => {
+    const { root, update } = setup();
+    const help = () => q(root, '[data-catalog-panel] .cat-help')!;
+    try {
+      update({ catalog: true, piece: { kind: 'fence', rot: 0 } });
+      expect(help().textContent).toBe('Fence · Click a tile, or drag with the left button for a row. R or Shift + wheel rotates.');
+      document.body.classList.add('touch-mode');
+      update({ catalog: true, piece: { kind: 'fence', rot: 0 } });
+      expect(help().textContent).toBe('Fence · Tap a tile to place it. ⟳ Rotate turns it.');
+      document.body.classList.replace('touch-mode', 'pad-mode');
+      update({ catalog: true, piece: { kind: 'fence', rot: 0 } });
+      expect(help().textContent).toBe('Fence · A places it on the tile under the cursor, B puts it away. Y rotates.');
+      update({ catalog: true, piece: { kind: 'dockStorage', rot: 0 } });
+      expect(help().textContent).toBe('Extra storage · A on a finished Bot Dock installs it, B puts it away.');
+      document.body.classList.replace('pad-mode', 'touch-mode');
+      update({ catalog: true, piece: { kind: 'dockStorage', rot: 0 } });
+      expect(help().textContent).toBe('Extra storage · Tap a finished Bot Dock to install it.');
+    } finally {
+      document.body.classList.remove('pad-mode', 'touch-mode');
+    }
+  });
+
   it('comes back in the new language after a language switch, tool and all', () => {
     const { root, update, hud } = setup();
     update({ catalog: true, piece: { kind: 'gate', rot: 0 } });

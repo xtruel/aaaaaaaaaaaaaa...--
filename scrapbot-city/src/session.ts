@@ -19,7 +19,7 @@ import { endingSubtitle, endingText, endingTitle, eventById } from './game/story
 import { padMode } from './gamepad';
 import type { PadFrame, PadTarget } from './gamepad';
 import { t } from './i18n';
-import { localizeKeys } from './keys';
+import { inputText } from './input';
 import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
 import type { ViewState } from './render/renderer';
@@ -950,7 +950,7 @@ export class GameSession implements PadTarget {
     this.selectBuilding(-1);
     if (s.tiles[i] === T.JUNK) pushMessage(s, t(s.res.scrap >= s.derived.storage ? 'msg.junkInfoFull' : 'msg.junkInfo', { n: s.amount[i] }), 'info');
     else if (s.tiles[i] === T.SLUDGE) pushMessage(s, t('msg.sludgeInfo'), 'info');
-    else if (s.tiles[i] === T.RUBBLE) pushMessage(s, t('msg.rubbleInfo'), 'info');
+    else if (s.tiles[i] === T.RUBBLE) pushMessage(s, inputText('msg.rubbleInfo'), 'info');
   }
 
   // Every press anywhere (mouse, finger, the pad's A at its cursor) is remembered (src/ui/presses.ts): the second press
@@ -1493,7 +1493,7 @@ export class GameSession implements PadTarget {
       this.handlers.onTutorialDone(true);
       return;
     }
-    pushMessage(s, finished ? t('msg.tutorialDone') : padMode() ? t('msg.tutorialSkippedPad') : localizeKeys(t('msg.tutorialSkipped')), 'good');
+    pushMessage(s, finished ? t('msg.tutorialDone') : inputText('msg.tutorialSkipped'), 'good');
     // free play has one autosave: the training yard never replaces a city without asking
     const old = slotMeta('auto');
     if (!old) {
@@ -1556,7 +1556,7 @@ export class GameSession implements PadTarget {
       body: `
         <p class="story">${t('intro.p1')}</p>
         <p class="story">${t('intro.p2')}</p>
-        <p class="story">${t('intro.p3')}</p>`,
+        <p class="story" data-input-help="intro.p3">${inputText('intro.p3')}</p>`,
       actions: [{ label: t('intro.go'), primary: true, onClick: closeModal }],
     });
   }
@@ -1731,7 +1731,7 @@ export class GameSession implements PadTarget {
     openModal({
       title: t('pause.title'),
       eyebrow: t('pause.eyebrow', { city: s.cityName, day: day(s) }),
-      body: `<p class="pause-tip">${localizeKeys(t('pause.tip'))}</p>`,
+      body: `<p class="pause-tip" data-input-help="pause.tip">${inputText('pause.tip')}</p>`,
       actions,
     });
   }

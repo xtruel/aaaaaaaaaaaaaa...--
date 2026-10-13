@@ -2863,6 +2863,12 @@ select {
   min-width: 20px;
 }
 
+/* the key on each card is a keyboard hint: not shown while a controller or a finger is in use */
+body.pad-mode .tool kbd,
+body.touch-mode .tool kbd {
+  display: none;
+}
+
 /* pictures are 2x close-ups (64 px): shown at their own size, or at exactly half on small windows */
 .tool-plate {
   display: grid;

@@ -4,9 +4,9 @@ import { audio } from '../audio';
 import { SMOG_DANGER } from '../game/defs';
 import type { BuildingType } from '../game/defs';
 import type { GameState } from '../game/state';
-import { padMode } from '../gamepad';
-import { hasKey, t, tk } from '../i18n';
-import { localizeKeys } from '../keys';
+import { t } from '../i18n';
+import { inputKind, inputText } from '../input';
+import type { InputKind } from '../input';
 import { portraitUrl } from '../render/icons';
 
 export interface Box {
@@ -51,7 +51,7 @@ export class Tutorial {
   private bubble: HTMLElement;
   private rings: HTMLElement[] = [];
   private rendered = -1;
-  private renderedPad = false; // the controller lines were shown: picking up the pad (or the mouse) swaps them
+  private renderedInput: InputKind = 'mouse'; // whose lines were shown: picking up the pad, a finger or the mouse swaps them
   private spot = -1; // which of the candidate places the bubble sits in
 
   constructor(
@@ -90,7 +90,7 @@ export class Tutorial {
       this.index++;
     }
     if (this.active) {
-      if (this.rendered !== this.index || this.renderedPad !== padMode()) this.render();
+      if (this.rendered !== this.index || this.renderedInput !== inputKind()) this.render();
       this.position(ctx);
     }
     return done && !!step.builds;
@@ -108,17 +108,13 @@ export class Tutorial {
 
   private render(): void {
     this.rendered = this.index;
-    this.renderedPad = padMode();
+    this.renderedInput = inputKind();
     this.spot = -1;
     const step = STEPS[this.index];
     const last = this.index === STEPS.length - 1;
-    // keyboard lines name keys in the player's layout; with a controller the lines that name keys have a
-    // version naming buttons (A, Y, L3...), which must not go through the keyboard rewrite
-    const text = (part: string) => {
-      const pad = `tut.${step.id}.${part}Pad`;
-      if (this.renderedPad && hasKey(pad)) return tk(pad, { limit: SMOG_DANGER });
-      return localizeKeys(tk(`tut.${step.id}.${part}`, { limit: SMOG_DANGER }));
-    };
+    // the lines that say how to do something name the controls of the input in use: keys in the player's keyboard
+    // layout and the mouse, a finger, or the controller's buttons (A, Y, L3...)
+    const text = (part: string) => inputText(`tut.${step.id}.${part}`, { limit: SMOG_DANGER }, this.renderedInput);
     this.bubble.innerHTML = `
       <img class="coach-face" src="${portraitUrl('usa')}" alt="" />
       <div class="coach-body">

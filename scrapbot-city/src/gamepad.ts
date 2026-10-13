@@ -43,6 +43,8 @@ function deadZone(x: number, y: number): [number, number] {
 
 export function setPadMode(on: boolean): void {
   document.body.classList.toggle('pad-mode', on);
+  // the controller takes over from a finger (src/input.ts)
+  if (on) document.body.classList.remove('touch-mode');
 }
 
 export function padMode(): boolean {

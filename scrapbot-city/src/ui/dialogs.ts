@@ -9,6 +9,7 @@ import type { GameState, OutcomeKind } from '../game/state';
 import { choiceLabel, endingSubtitle, endingText, endingTitle, eventText, eventTitle, speakerName, speakerRole } from '../game/story';
 import type { StoryEvent } from '../game/story';
 import { LANGS, bName, lang, t } from '../i18n';
+import { inputKind } from '../input';
 import { localizeKeys } from '../keys';
 import type { Key, Lang } from '../i18n';
 import { buildingThumb, iconUrl, portraitUrl } from '../render/icons';
@@ -201,6 +202,14 @@ export function openExtras(): void {
   ).join('');
   const list = (prefix: string, n: number) =>
     Array.from({ length: n }, (_, i) => `<li>${t(`${prefix}.${i + 1}` as Key)}</li>`).join('');
+  // every input's controls, those of the input in use first (keys in the player's keyboard layout)
+  const byInput = {
+    mouse: localizeKeys(list('extras.controls', 5)),
+    pad: `<li>${t('extras.controls.pad')}</li><li>${t('extras.controls.pad2')}</li><li>${t('extras.controls.pad3')}</li>`,
+    touch: `<li>${t('extras.controls.touch')}</li>`,
+  };
+  const now = inputKind();
+  const controls = [byInput[now], ...(['mouse', 'touch', 'pad'] as const).filter((k) => k !== now).map((k) => byInput[k])];
   openModal({
     title: t('extras.title'),
     eyebrow: t('extras.eyebrow', { e: unlocked.length, a: got.length, total: ACHIEVEMENTS.length }),
@@ -212,7 +221,7 @@ export function openExtras(): void {
       <h3 class="extras-h">${t('extras.howto')}</h3>
       <ul class="howto">${list('extras.howto', 7)}</ul>
       <h3 class="extras-h">${t('extras.controls')}</h3>
-      <ul class="howto keys">${localizeKeys(list('extras.controls', 5))}<li>${t('extras.controls.pad')}</li><li>${t('extras.controls.pad2')}</li><li>${t('extras.controls.pad3')}</li></ul>`,
+      <ul class="howto keys">${controls.join('')}</ul>`,
     actions: [{ label: t('common.back'), primary: true, onClick: closeModal }],
   });
 }

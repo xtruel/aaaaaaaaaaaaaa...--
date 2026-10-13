@@ -14,9 +14,9 @@ import { dayPhase } from '../game/sim';
 import { day } from '../game/state';
 import type { Building, GameState, Message } from '../game/state';
 import { OBJECTIVES, objectiveHint, objectiveText, objectiveTools } from '../game/story';
-import { padMode } from '../gamepad';
+import { inputKind, inputText } from '../input';
 import { bName, pathLabel, t, tk } from '../i18n';
-import { keyLabel, localizeKeys } from '../keys';
+import { keyLabel } from '../keys';
 import { iconUrl, pathColor, portraitUrl, toolThumb } from '../render/icons';
 import type { IconName } from '../render/icons';
 import { atlasImage, frame } from '../render/iso/atlas';
@@ -980,7 +980,7 @@ export class Hud {
         if (!filterItems(s, this.catCategory, this.catFilter).includes(active)) this.catFilter = 'all';
       }
     }
-    const key = `${active}|${padMode()}|${this.catCategory}|${this.catFilter}`;
+    const key = `${active}|${inputKind()}|${this.catCategory}|${this.catFilter}`;
     if (key === this.catalogKey) {
       this.markCatalog(s);
       return;
@@ -1161,21 +1161,24 @@ export class Hud {
   }
 
   private redrawCatalog(): void {
-    this.catalogKey = `${this.catActive}|${padMode()}|${this.catCategory}|${this.catFilter}`;
+    this.catalogKey = `${this.catActive}|${inputKind()}|${this.catCategory}|${this.catFilter}`;
     this.renderCatalog(this.s, this.catActive, true);
   }
 
-  // While a catalog tool is in hand: what to do with it (in controller buttons when a pad is in use), and the
-  // buttons a finger needs (Rotate, Done).
+  // While a catalog tool is in hand: what to do with it, with the controls of the input in use (mouse and keys, a
+  // finger, the controller's buttons), and the buttons a finger needs (Rotate, Done).
   private toolHelp(kind: CatalogKind): string {
-    const pad = padMode();
+    const input = inputKind();
     const building = isModuleKind(kind) ? bName(MODULES[kind].building) : '';
     const what = isModuleKind(kind)
-      ? t(pad ? 'cat.help.modulePad' : 'cat.help.module', { building })
-      : pad
+      ? input === 'pad'
+        ? t('cat.help.modulePad', { building })
+        : inputText('cat.help.module', { building }, input)
+      : input === 'pad'
         ? t('cat.help.pad')
-        : t(isRowKind(kind) ? 'cat.help.row' : 'cat.help.place');
-    const turn = isRotatable(kind) ? ` <span class="cat-help-turn">${pad ? t('cat.help.rotatePad') : localizeKeys(t('cat.help.rotate'))}</span>` : '';
+        : // a row is dragged with the mouse only: a finger places one tile at a time
+          inputText(isRowKind(kind) && input === 'mouse' ? 'cat.help.row' : 'cat.help.place', undefined, input);
+    const turn = isRotatable(kind) ? ` <span class="cat-help-turn">${inputText('cat.help.rotate', { rotate: esc(t('cat.rotate')) }, input)}</span>` : '';
     return `
       <div class="cat-tool">
         <button type="button" class="modal-x cat-tool-x" data-close aria-label="${t('common.close')}">×</button>
@@ -1205,7 +1208,7 @@ export class Hud {
     panel.hidden = false;
     if (piece) {
       const moving = (view.moving ?? -1) >= 0 && view.moving === view.selectedPiece;
-      const key = `piece:${view.selectedPiece}:${piece.kind}:${piece.rotatable}:${piece.removable}:${moving ? `move|${padMode()}` : ''}`;
+      const key = `piece:${view.selectedPiece}:${piece.kind}:${piece.rotatable}:${piece.removable}:${moving ? `move|${inputKind()}` : ''}`;
       if (key !== this.inspectorKey) {
         this.inspectorKey = key;
         this.renderPiece(piece, view.selectedPiece, moving);
@@ -1509,7 +1512,7 @@ export class Hud {
     if (moving) {
       panel.innerHTML = `${head}
       <div class="cat-tool move-tool">
-        <p class="cat-help"><b>${esc(t('insp.move'))}</b> · ${padMode() ? t('move.helpPad') : esc(t('move.help'))}</p>
+        <p class="cat-help"><b>${esc(t('insp.move'))}</b> · ${inputText('move.help')}</p>
         <div class="cat-tool-btns"><button type="button" class="btn" data-move-done>${t('common.done')}</button></div>
       </div>
       <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;

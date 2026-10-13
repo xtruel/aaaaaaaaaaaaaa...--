@@ -24,6 +24,7 @@ import { DEFAULT_MODS } from './game/defs';
 import * as hints from './game/hints';
 import { createGame } from './game/state';
 import { initGamepad } from './gamepad';
+import { initInputMode } from './input';
 import { loadKeyboardLayout } from './keys';
 import type { GameState } from './game/state';
 import { lang, setLang, t } from './i18n';
@@ -325,6 +326,7 @@ renderQuitScreen();
 
 onAchievement((a) => showToast(t('ach.toast'), achName(a), a.icon));
 
+initInputMode();
 initGamepad({
   target: () => session,
   onConnect: () => showToast(t('pad.connected'), t('pad.help'), 'play'),
