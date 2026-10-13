@@ -54,6 +54,11 @@
 - **L'allarme dello smog resta leggibile accanto al catalogo** sulle finestre basse (1280×720, 1024×640): il catalogo
   più largo copriva la fine dell'avviso del 95% (a 1024×640 anche i secondi rimasti); mentre il catalogo è aperto
   l'avviso sta nello spazio tra la scheda dell'obiettivo e il pannello, su più righe se serve.
+- **La notifica non scappa più davanti a un trofeo**: quando un progetto e un trofeo arrivano insieme (50 cittadini:
+  pergola e trofeo; un salvataggio vecchio caricato), il trofeo che scende sotto la notifica le passava sul bordo
+  mentre entrava; la notifica si spostava in basso lasciando passare i colpi, e un clic diretto ad «Apri» con un
+  oggetto in mano lo comprava sulla mappa. Ora un trofeo non sposta una notifica già ferma (una notifica nuova non
+  compare comunque sopra un trofeo).
 
 ## In lavorazione — incremento 2, gruppo G3: tre costruzioni, tre decorazioni, spostare le decorazioni
 

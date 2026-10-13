@@ -377,6 +377,64 @@ describe('notice: "New project: Bench" with Open', () => {
   });
 });
 
+describe('notice and an achievement toast', () => {
+  // A project and an achievement reached together (pergola and "50 citizens", or an old save loaded): the toast comes up
+  // to a second after the notice, under it (--note-bottom), sliding in from 30 px higher. Measured in a browser before
+  // this: that slide passed over the notice's lower edge, the notice took it for something coming over it and jumped to
+  // the bottom band, letting presses through again, and a click aimed at its Open (with a fence in hand) bought a fence.
+  it('stays put (and keeps taking presses) when a toast slides in over its edge; a new notice still avoids a toast', () => {
+    const { q, hud, update } = setup();
+    const toasts = document.createElement('div');
+    toasts.id = 'toasts';
+    toasts.className = 'toasts';
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toasts.append(toast);
+    document.body.append(toasts);
+    const rects = new Map<Element, DOMRect>([[q('[data-toolbar]')!, new DOMRect(0, 600, 1024, 168)]]);
+    const box = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      return rects.get(this) ?? new DOMRect(0, 0, 0, 0);
+    });
+    const drawn = vi.spyOn(Element.prototype, 'getClientRects').mockImplementation(function (this: Element) {
+      const r = rects.get(this);
+      return (r ? [r] : []) as unknown as DOMRectList;
+    });
+    try {
+      const note = q('[data-project-note]')!;
+      Object.defineProperty(note, 'offsetWidth', { value: 400 });
+      Object.defineProperty(note, 'offsetHeight', { value: 56 });
+      const at = () => new DOMRect(parseFloat(note.style.left), parseFloat(note.style.top), 400, 56);
+      const clear = (a: DOMRect, b: DOMRect) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+      hud.notifyProjects(['pergola']);
+      update();
+      const first = at();
+      now += PRESS_GUARD_MS + 10;
+      update();
+      expect(note.classList.contains('arming')).toBe(false);
+      // the toast's first frames: 30 px above its place under the notice, over the notice's lower edge
+      rects.set(toast, new DOMRect(first.left + 60, first.bottom - 14, 240, 30));
+      update();
+      expect(at().left).toBe(first.left);
+      expect(at().top).toBe(first.top);
+      expect(note.classList.contains('arming')).toBe(false);
+      // gone, then a new project while a toast is up where the notice would go first: it goes elsewhere
+      for (let k = 0; k < 30; k++) {
+        now += 500;
+        update();
+      }
+      expect(note.hidden).toBe(true);
+      rects.set(toast, new DOMRect(first.left, first.top, 400, 56));
+      hud.notifyProjects(['statue']);
+      update();
+      expect(clear(at(), rects.get(toast)!)).toBe(true);
+    } finally {
+      box.mockRestore();
+      drawn.mockRestore();
+      toasts.remove();
+    }
+  });
+});
+
 describe('building panel: the module slot of a project', () => {
   it('to discover: words and icon, goal and progress, Install greyed out; discovered: can be installed', () => {
     const { s, q, update } = setup(city(), { partsMade: 60 });

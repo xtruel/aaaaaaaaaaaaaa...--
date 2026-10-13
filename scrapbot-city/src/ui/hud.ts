@@ -775,9 +775,13 @@ export class Hud {
     // what is on screen: drawn boxes (not offsetParent, which is null for the tutorial's bubble: it is position: fixed)
     const boxes = (sel: string) =>
       [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => !e.hidden && e.getClientRects().length > 0).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
-    const hard = [...boxes('.coach'), ...boxes('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective], [data-smog-alert], .hud-top > *, [data-toolbar], #toasts .toast')];
+    const hard = [...boxes('.coach'), ...boxes('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective], [data-smog-alert], .hud-top > *, [data-toolbar]')];
+    // an achievement's toast: never a place to choose, but it does not push a notice that stands: it comes down under
+    // the notice (--note-bottom), passes over its edge only while it slides in, and lets presses through
+    const toasts = boxes('#toasts .toast');
     const overlap = (a: DOMRect, x: number, y: number) => Math.max(0, Math.min(a.right, x + w) - Math.max(a.left, x)) * Math.max(0, Math.min(a.bottom, y + h) - Math.max(a.top, y));
     const covered = (x: number, y: number) => hard.reduce((c, r) => c + overlap(r, x, y), 0);
+    const coveredAll = (x: number, y: number) => covered(x, y) + toasts.reduce((c, r) => c + overlap(r, x, y), 0);
     // it stays put while nothing more comes over it than when it was placed (nothing, unless the screen had no room)
     const kept = this.noticeSpot;
     if (kept && covered(kept.x, kept.y) <= kept.cover) return;
@@ -794,7 +798,7 @@ export class Hud {
         [low, false],
         [Math.round((below + low) / 2), false],
       ] as const) {
-        const taken = [...hard, ...presses].filter((r) => r.bottom > y && r.top < y + h).map((r) => [r.left, r.right] as const).sort((a, b) => a[0] - b[0]);
+        const taken = [...hard, ...toasts, ...presses].filter((r) => r.bottom > y && r.top < y + h).map((r) => [r.left, r.right] as const).sort((a, b) => a[0] - b[0]);
         let from = 8;
         for (const [l, r] of [...taken, [vw - 8, vw - 8] as const]) {
           if (l - from >= w) spots.push({ x: from + (l - from - w) / 2, y, top });
@@ -806,7 +810,7 @@ export class Hud {
       let bestCost = Infinity;
       spots.forEach((p, i) => {
         const x = Math.max(8, Math.min(vw - w - 8, p.x));
-        const cost = presses.reduce((c, r) => c + overlap(r, x, p.y) * 1e6, 0) + covered(x, p.y) * 100 + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
+        const cost = presses.reduce((c, r) => c + overlap(r, x, p.y) * 1e6, 0) + coveredAll(x, p.y) * 100 + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
         if (cost < bestCost) {
           bestCost = cost;
           best = { ...p, x };
