@@ -126,7 +126,10 @@ function move(dir: 'up' | 'down' | 'left' | 'right'): void {
     const dx = r.left + r.width / 2 - ax;
     const dy = r.top + r.height / 2 - ay;
     const main = dir === 'up' ? -dy : dir === 'down' ? dy : dir === 'left' ? -dx : dx;
-    const cross = dir === 'up' || dir === 'down' ? dx : dy;
+    // up and down: a target straight above or below (its width overlaps this one's) is in line, wherever its centre
+    // is: a checkbox at the left under a slider as wide as the dialog, the dialog's wide button under the checkbox
+    const inLine = (dir === 'up' || dir === 'down') && r.left < a.right && r.right > a.left;
+    const cross = inLine ? 0 : dir === 'up' || dir === 'down' ? dx : dy;
     const score = main + Math.abs(cross) * 2.2;
     if (score < bestScore) {
       bestScore = score;
@@ -168,7 +171,7 @@ function back(): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
 }
 
-function menuFrame(f: PadFrame): void {
+export function menuFrame(f: PadFrame): void {
   for (const dir of ['up', 'down', 'left', 'right'] as const) if (f.pressed.has(dir)) move(dir);
   if (f.pressed.has('a')) press();
   if (f.pressed.has('b') || f.pressed.has('start')) back();
