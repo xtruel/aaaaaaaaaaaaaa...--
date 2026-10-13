@@ -26,8 +26,8 @@ Steam, Windows, lo Steam Deck e un controller veri restano da provare (vedi sott
 - **[docs/STEAM.md](docs/STEAM.md)**: la guida passo per passo del pacchetto, con i fatti della beta: controller e
   Steam Deck provati solo con un controller simulato, mai su hardware vero; la tastiera a schermo arriva solo da
   steamworks.js con Steam aperto su uno Steam Deck vero e non è mai stata provata; `projects.sav`, le copie di
-  sicurezza e come riaprirle nella sezione su Steam Cloud. Le build in `steam/content/` (fuori da git) sono ancora
-  quelle della 0.6.0: vanno rifatte da questa versione prima di caricarle.
+  sicurezza e come riaprirle nella sezione su Steam Cloud. Le build in `steam/content/` (fuori da git) sono state poi
+  rifatte da questa versione (sotto, «Build Steam e screenshot del negozio»).
 - **Unione**: conflitti in `.gitignore`, `package.json` e `docs/STEAM.md`, risolti tenendo le due parti (gli script
   della beta e quelli di Steam, le dipendenze e la configurazione delle build di Steam); `electron/main.cjs` e il
   `package-lock.json` uniti senza conflitti. Nessuna dipendenza nuova oltre a quelle già sul ramo `steam-package`
@@ -72,17 +72,27 @@ Steam, Windows, lo Steam Deck e un controller veri restano da provare (vedi sott
   `backup_projects_v0.sav`, il progetto ancora leggibile nel testo rovinato resta scoperto; scrittura con `.bak` e
   rimozione dal ponte; tastiera a schermo «no», achievement ignorato; una città di gioco libero gira; il menu dice
   0.7.0-rc.1; «Quit» chiude con codice 0.
-- `npm run steam:check`: nessun FAIL (Windows solo con controlli statici; le build impacchettate in `release/`
-  controllate qui sono ancora quelle della 0.6.0).
+- `npm run steam:check`: nessun FAIL (Windows solo con controlli statici; in quel momento le build impacchettate in
+  `release/` erano ancora quelle della 0.6.0; rifatto sulle build della 0.7.0-rc.1, sotto).
 
 ### Cosa non è verificato
 
 - Niente su Windows, su uno Steam Deck, con un controller o uno schermo touch veri: gli input delle prove sono
   simulati (mouse e tastiera di Playwright, tocchi CDP, un gamepad finto in Chromium headless).
 - Niente con il client Steam: achievement, overlay, Steam Cloud, tastiera a schermo del Deck. Nessun App ID esiste.
-- Le build Steam non sono state rifatte da questa versione (`npm run dist:steam` non eseguito qui).
+- La build Windows per Steam è solo generata (da Linux): mai avviata su Windows.
 - Durata, divertimento e disponibilità a pagare non sono misurati: servono i playtest di
   [docs/PLAYTEST.md](docs/PLAYTEST.md).
+
+### Build Steam e screenshot del negozio (dopo `d976dc9`, solo documenti nel repository)
+
+- `0d00763`: build Steam rifatte da `d976dc9` con `npm run dist:steam` (fuori da git): il `dist/index.html` dentro i
+  due `app.asar` è la build di rilascio della RC (sha256 `d9f5a6d870ef…`); `steam:check` e `steam:launch-check` senza
+  FAIL su Linux; la build Windows solo generata. Stato in [docs/STEAM.md](docs/STEAM.md) e `steam/README.md`.
+- `d1e45e2`: i 7 screenshot del negozio rifatti dalla build di rilascio della RC (provenienza in
+  `steam/ASSETS-PROVENANCE.md`, 2.3); segni «[pending final build]» di `steam/STORE-COPY.md` sciolti; il trailer non è
+  stato rifatto e va rigenerato sulla build finale.
+- Verifica indipendente della RC e lista di controllo del titolare: [docs/RC-REPORT.md](docs/RC-REPORT.md).
 
 ## 0.7.0-beta.1 — costruzione modulare, incremento 2: 24 oggetti, progetti da scoprire, smog leggibile
 

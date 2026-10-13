@@ -30,6 +30,8 @@ pagina del negozio, prezzo. Per i test con giocatori veri c'è **[docs/PLAYTEST.
 La **0.7.0-rc.1** è la 0.7.0-beta.1 con il pacchetto Steam unito (steamworks.js, icone, script SteamPipe, materiali
 del negozio) e l'ultimo problema basso della beta chiuso: cosa cambia è nel [CHANGELOG](CHANGELOG.md). Una release
 candidate non è un via libera commerciale: Steam, Windows, Steam Deck e controller veri restano da provare.
+Verifica della **0.7.0-rc.1** (hash delle build, cosa è e non è verificato, la lista di controllo del titolare per
+arrivare a un'uscita): **[docs/RC-REPORT.md](docs/RC-REPORT.md)**.
 Report di consegna della **0.7.0-beta.1** (le 24 voci del catalogo, test, numeri, prestazioni, problemi aperti, cosa
 non è verificato): **[docs/BETA-REPORT.md](docs/BETA-REPORT.md)**, screenshot in `docs/beta/`.
 Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.

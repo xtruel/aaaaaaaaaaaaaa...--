@@ -91,8 +91,7 @@ Notes for whoever pastes it:
 - **Controller and touch are left out on purpose.** They are in the game but were only ever driven by simulated input
   (Chrome DevTools touch, a simulated Gamepad API), never by a real pad, touch screen or Steam Deck. After a real
   test that works (a pad on PC, the Deck, a touch screen), the line can become "Mouse and keyboard, controller or
-  touch". Until then, either leave them out (as here) or write only "Controller and touch: supported, not yet tested
-  on real hardware".
+  touch". Until then leave them out, as here: do not call them "supported" before a real test.
 - "18 achievements": true in the game; on Steam they appear only after they are created in Steamworks
   (docs/STEAM.md, section 7) and checked with the Steam client.
 - Do **not** add "Steam Deck Verified", "Steam Cloud" or "Full controller support" in the text: Steam shows those
@@ -204,7 +203,7 @@ Valori **non misurati su hardware vero**: vanno confermati provando la build sul
 | OS (Windows) | Windows 10 64-bit | Electron 33 non supporta più Windows 7/8/8.1 |
 | OS (SteamOS + Linux) | SteamOS o Linux 64-bit (Steam Linux Runtime 3.0 "sniper") | la build Linux è avviata qui su Ubuntu 24.04 (glibc 2.39), senza client Steam |
 | Processore | *da misurare* | nessun PC "modesto" provato |
-| Memoria | *da misurare* (proposta prudente: 4 GB RAM) | qui, con una città aperta e rendering software, l'app (6 processi) occupava circa 730 MB (docs/STEAM.md §5) |
+| Memoria | *da misurare* (proposta prudente: 4 GB RAM) | qui, con una città aperta e rendering software, l'app (6 processi) occupava circa 740–765 MB (13/10, docs/STEAM.md §5) |
 | Scheda video | *da misurare* (grafica 2D, accelerazione consigliata) | qui solo rendering software, senza GPU |
 | Spazio su disco | 400 MB | build della 0.7.0-rc.1 (13/10/2026, [README.md](README.md), passo 4): Windows 278,2 MiB, Linux 271,6 MiB (con margine per gli aggiornamenti) |
 | Note | "Steam achievements need the Steam client. On Linux, Steam features need glibc 2.34 or newer." | `npm run steam:check` |

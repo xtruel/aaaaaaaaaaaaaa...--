@@ -51,7 +51,9 @@ Node 20+, le dipendenze del gioco (`npm install`: vite ed esbuild), **Playwright
 e `npx playwright install chromium`, oppure un Playwright installato globalmente: gli script lo cercano anche lì),
 **ffmpeg** e **ffprobe** con libx264. Nessuno schermo necessario.
 
-## 3. Rifarlo sulla build finale (0.7.0-beta.1)
+## 3. Rifarlo sulla build finale (quella che sarà venduta; oggi la 0.7.0-rc.1, ramo `rc-0.7.0`)
+
+Prima leggi la nota di `steam/STORE-COPY.md`, sezione 7 (le schede del catalogo e la scena «decorate»).
 
 1. Dal commit verificato della build finale (con questa cartella `scripts/trailer/` presente, dopo l'unione dei rami):
    `scripts/trailer/run.sh . /tmp/scrapbot-trailer`. Oppure, prima dell'unione, da questo ramo:

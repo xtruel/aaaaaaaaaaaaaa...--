@@ -3,8 +3,9 @@
 Il playtest serve a una cosa sola: vedere **dove si bloccano persone che non conoscono il gioco**.
 Chi l'ha sviluppato non lo vede più: sa già dove cliccare.
 
-Versione da provare: **0.7.0-beta.1** (`docs/BETA-REPORT.md`, con lo sha256 della build). Finora l'hanno giocata solo
-script, con mouse, tocco e controller simulati: nessuna persona. Quello che il playtest misura (se si capisce, se è
+Versione da provare: **0.7.0-rc.1** (`docs/RC-REPORT.md`, con gli sha256 delle build; il gioco è quello della
+0.7.0-beta.1 di `docs/BETA-REPORT.md` con una sola correzione dell'interfaccia). Finora l'hanno giocata solo script,
+con mouse, tocco e controller simulati: nessuna persona. Quello che il playtest misura (se si capisce, se è
 comodo, dove ci si annoia, se viene voglia di continuare) nessuna partita simulata lo può sostituire, e nessuna
 risposta del playtest va riportata come «ore di divertimento» o come «prezzo che la gente pagherebbe»: sono 10–20
 persone, danno indicazioni, non stime.
@@ -181,7 +182,8 @@ dopo ogni modifica ai numeri in `src/game/defs.ts`; il playtest serve per tutto 
 ## 7. Checklist prima di ogni build di prova
 
 - [ ] `npm run typecheck`, `npm test`, `npm run i18n:check` senza errori; `npm run e2e` 22/22.
-- [ ] Lo sha256 della build data ai tester scritto nel foglio della sessione (quella della 0.7.0-beta.1 è nel report).
+- [ ] Lo sha256 della build data ai tester scritto nel foglio della sessione (quelli della 0.7.0-rc.1 sono in
+  `docs/RC-REPORT.md`).
 - [ ] Partita nuova in ogni lingua: menu, tutorial fino in fondo, un evento, impostazioni.
 - [ ] Steam Deck o controller: menu → campagna → costruire → pausa → salvataggio, senza toccare il mouse.
 - [ ] Schermo touch: costruire, aprire il catalogo, posare e spostare una decorazione.
@@ -209,8 +211,9 @@ una partita col solo controller e i casi limite (sconfitta per smog, banca, demo
 | Primo acquisto sbagliato (un pannello solare o una Fabbrica per primi) lasciava senza pezzi né crediti per il Riciclatore | Il Riciclatore costa solo crediti, e l'HQ dà una piccola rendita fissa (15 crediti al giorno): provate tutte le 20 "prime mosse sbagliate", nessuna blocca più la partita |
 | Controller: focus sulla "×" dei dialoghi, due pressioni di A per ogni dialogo, "Travel" da cercare a mano | Focus sul primo pulsante utile, dialoghi semplici già pronti per A, focus automatico su "Travel here" |
 
-Tempi misurati (velocità normale): tutorial circa 5 minuti di lettura; una città completa con 3 stelle in 12–20 minuti
-di gioco per un giocatore deciso. Le 5 città della campagna durano quindi 1,5–3 ore: sotto la soglia delle 2 ore
-del rimborso Steam per chi gioca veloce. Servono più contenuti prima della vendita (vedi STEAM.md).
+Tempi misurati sui giocatori automatici della 0.5.1 (velocità normale; script, non persone): tutorial circa 5 minuti
+di lettura; una città completa con 3 stelle in 12–20 minuti di gioco. Non sono la durata per una persona: da qui non
+si ricava quante ore dura la campagna, e nessuna durata è dichiarata finché non c'è un playtest con persone.
 
-Prestazioni: 121 edifici e 35 bot a 60 fps fissi fino a 2560×1440, 10 MB di memoria.
+Prestazioni (0.5.1, Chromium headless senza GPU, non hardware vero): 121 edifici e 35 bot a 60 fps fissi fino a
+2560×1440, 10 MB di memoria.

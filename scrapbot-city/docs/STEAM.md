@@ -17,8 +17,9 @@ Steamworks sono in inglese, come li vedrai sul sito.
 **Le regole di questo ramo.** Il lavoro per Steam è nato sul ramo `steam-package`, separato dal ramo del gioco. Il
 13/10/2026 la 0.7.0-beta.1 verificata (`c199a4f`, [BETA-REPORT.md](BETA-REPORT.md)) è stata unita al pacchetto Steam
 sul ramo `rc-0.7.0`, versione **0.7.0-rc.1**. Lo stesso giorno le build Steam (`steam/content/`, fuori da git) sono
-state rifatte da questo ramo (commit `d976dc9`, 0.7.0-rc.1) e ricontrollate su Linux (sezione 0). Una RC non è un via
-libera commerciale.
+state rifatte da questo ramo (commit `d976dc9`, 0.7.0-rc.1) e ricontrollate su Linux (sezione 0); verifica
+indipendente della RC e lista di controllo del titolare in [RC-REPORT.md](RC-REPORT.md). Una RC non è un via libera
+commerciale.
 Qui nessuno ha un App ID, un account Steamworks, il client Steam, un PC Windows o uno Steam Deck: **niente è stato
 caricato, pubblicato, pagato o configurato su Steam**, e nessuna funzione di Steam è dichiarata funzionante senza una
 prova vera. Pubblicare, cambiare prezzi, spendere soldi o mettere una build sul ramo pubblico richiedono la **tua**
@@ -67,8 +68,8 @@ quello si vede solo sul ramo beta.
 | Controller | **Verificato solo con Gamepad API simulata** in Chromium (sessioni precedenti) | da provare con un controller vero e con Steam Input |
 | Build nel runtime Linux "sniper" | **Verificato** in passato (build 0.6.0) **senza** client Steam (contenitore preparato a mano) | **non** rifatto sulla 0.7.0-rc.1; la prova vera è dal client Steam |
 | Script SteamPipe (`steam/sdk/*.vdf`, `upload.sh`, `upload.bat`) | **Fatto** | `node steam/prepare-upload.cjs --check` rifiuta di partire per i 5 segnaposto (App ID e i due depot; verificato l'11/10 e il 13/10 con le build 0.7.0-rc.1, nessun altro problema elencato); provati in passato con uno steamcmd finto; l'11/10 alle 00:20 è stato avviato anche lo steamcmd vero in *preview* con `+login anonymous` e un App ID inventato, fuori dal repository: connessione fallita, niente inviato (dettagli in [steam/README.md](../steam/README.md), passo 5); `upload.bat` mai provato su Windows |
-| Grafica del negozio | **Generato** | dimensioni tutte conformi alle regole attuali; screenshot del menu tolto dal set; screenshot da rifare sulla build finale; tre dubbi sul logo da decidere (ASSETS-PROVENANCE §5) |
-| Testi del negozio, requisiti, tag | **Bozza** | STORE-COPY.md (righe **[pending final build]** da controllare) |
+| Grafica del negozio | **Generato** | dimensioni tutte conformi alle regole attuali; screenshot del menu tolto dal set; i 7 screenshot rifatti il 13/10 dalla build di rilascio 0.7.0-rc.1 (ASSETS-PROVENANCE §2.3; da rifare solo se la build in vendita cambia l'aspetto); tre dubbi sul logo da decidere (ASSETS-PROVENANCE §5) |
+| Testi del negozio, requisiti, tag | **Bozza** | STORE-COPY.md: i segni **[pending final build]** sciolti il 13/10 sulla 0.7.0-rc.1; resta **[listen before publishing]** sui brani (nessuno ha ascoltato il gioco); requisiti di sistema da misurare su hardware vero |
 | Questionario sui contenuti | **Bozza** | CONTENT-SURVEY-DRAFT.md |
 | Trailer | **Fatto** (pipeline) · **Generato** (video di prova) | provato da capo a fondo l'11/10 sulla build del ramo principale (`04d782e`, 0.7.0-alpha.1): video di prova di 54 s, 1920×1080, 30 fps, H.264 9,8 Mbit/s, audio muto, più 11 schermate; fuori da git. Va rifatto sulla build finale |
 | Licenze di terzi nelle build | **Fatto** | cartella `licenses/` nelle due build (font OFL/Apache, steamworks.js MIT); in revisione (11/10) aggiunto l'avviso di copyright di Permanent Marker (Font Diner, Inc.), che il file LICENSE del pacchetto non ha, e ricostruite le build (`app.asar` identico). Ricontrollata il 13/10 nelle build 0.7.0-rc.1: `licenses/` uguale nelle due, con `THIRD-PARTY-NOTICES.txt`, i 6 font e l'avviso di Permanent Marker (Apache 2.0) |
@@ -174,14 +175,15 @@ Steamworks → la tua app → **Edit Store Page**. Va compilata e inviata in rev
 richiede alcuni giorni lavorativi.
 
 - **Testi** (breve e lungo, inglese e italiano), requisiti di sistema da confermare, tag proposti:
-  [steam/STORE-COPY.md](../steam/STORE-COPY.md). Le righe **[pending final build]** si tolgono o si confermano sulla
-  build finale: la pagina non deve promettere niente che il gioco non abbia.
+  [steam/STORE-COPY.md](../steam/STORE-COPY.md). I segni **[pending final build]** sono stati sciolti sulla
+  0.7.0-rc.1 (se la build in vendita è un'altra, ricontrolla la tabella della sezione 3 di STORE-COPY.md); resta
+  **[listen before publishing]**: la pagina non deve promettere niente che il gioco non abbia.
 - **Grafica**: [steam/store-assets/README.md](../steam/store-assets/README.md) (file → campo di Steamworks). Regole
   ricontrollate l'11/10/2026 sulle pagine attuali di Steamworks: tutte le dimensioni sono quelle in vigore; sulle
   capsule solo artwork, nome del gioco ed eventuale sottotitolo ufficiale (slogan tolti); hero senza testo; logo
   separato su sfondo trasparente. Restano **tre decisioni tue** (targa "2PM" e katakana nel logo, insegne nelle
-  illustrazioni) e gli **screenshot da rifare sulla build finale**: dettagli in
-  [steam/ASSETS-PROVENANCE.md](../steam/ASSETS-PROVENANCE.md), sezione 5.
+  illustrazioni): dettagli in [steam/ASSETS-PROVENANCE.md](../steam/ASSETS-PROVENANCE.md), sezione 5. Gli screenshot
+  sono della 0.7.0-rc.1 (sezione 2.3 dello stesso file).
 - **Trailer**: [scripts/trailer/README.md](../scripts/trailer/README.md). Steam lo vuole fino a 1920×1080, 30 o 60 fps,
   H.264 + AAC in .mp4, 5.000+ kbit/s; consiglia che il primo trailer sia soprattutto gameplay con l'interfaccia
   visibile. La pipeline produce esattamente questo dalla build di rilascio, senza testi né immagini aggiunte; manca
@@ -242,7 +244,7 @@ xvfb-run -a npm run steam:launch-check -- --out /tmp/launch-check   # avvia la b
 | Compatibilità ABI | i moduli usano **N-API** (ABI stabile tra versioni di Node): non dipendono da NODE_MODULE_VERSION. La funzione più recente che usano è di **N-API 6**; Electron 33 offre N-API 9 → compatibili. Per questo `npmRebuild: false` è corretto |
 | Linux: `steamworksjs.linux-x64-gnu.node` (sha256 `3d242b59…`) | x86-64; trova `libsteam_api.so` accanto a sé (RUNPATH `$ORIGIN`); richiede **glibc 2.34** o più nuova (`libsteam_api.so` solo 2.14). Su sistemi più vecchi il modulo non si carica e il gioco gira senza Steam |
 | Linux: caricamento dentro Electron 33.4.11 | **verificato qui**, sia da `node_modules` sia dalla build impacchettata: il modulo si carica; `init()` senza App ID e con 480 lancia `Failed to load module '…/steamclient.so'` (nessun client Steam) e il processo continua |
-| Linux: build impacchettata avviata | **verificato qui**: modulo e `libsteam_api.so` mappati nel processo principale (`/proc/<pid>/maps`), log `Steam not available: …`, menu, città, salvataggi, Quit con codice 0; memoria con una città aperta circa 740 MB in 6 processi (13/10, rendering software: indicativo) |
+| Linux: build impacchettata avviata | **verificato qui**: modulo e `libsteam_api.so` mappati nel processo principale (`/proc/<pid>/maps`), log `Steam not available: …`, menu, città, salvataggi, Quit con codice 0; memoria con una città aperta circa 740–765 MB in 6 processi (13/10, due misure; rendering software: indicativo) |
 | Windows: `steamworksjs.win32-x64-msvc.node` (sha256 `1042713f…`) | x86-64; importa `steam_api64.dll` e `VCRUNTIME140.dll` (+ CRT universale di Windows 10); cerca le funzioni N-API nell'eseguibile a runtime. **Controllo statico**: `Scrapbot City.exe` (Electron 33.4.11) esporta 145 funzioni `napi_*`, comprese tutte le 57 che il modulo chiama |
 | Windows: caricamento | **da verificare (titolare)**: qui non c'è Windows |
 | Build impacchettate | contengono gli stessi binari di `node_modules` (hash identici); la `.lib` (serve solo per compilare) non è inclusa |
@@ -477,8 +479,8 @@ Prima di premere "Release", ogni riga deve essere vera:
    Vanno rifatte dal commit che deciderai di vendere. La 0.7.0-beta.1 (catalogo da 24 elementi, sblocchi, temi delle
    città) è verificata nel browser ([BETA-REPORT.md](BETA-REPORT.md)) e unita qui.
 2. **Prove con Steam vero**: Windows, Steam Deck, achievement, overlay, Cloud, tastiera del Deck, controller.
-3. **Screenshot e trailer della build finale** (le pipeline sono pronte); **audio del trailer**; **icone degli
-   achievement**.
+3. **Trailer della build finale** (la pipeline è pronta; gli screenshot sono già della 0.7.0-rc.1, da rifare solo se
+   la build in vendita cambia l'aspetto); **audio del trailer**; **icone degli achievement**.
 4. **Playtest** con 10–20 persone che non conoscono il gioco ([PLAYTEST.md](PLAYTEST.md)): serve anche per qualsiasi
    frase sulla durata.
 5. **Revisione madrelingua** delle traduzioni.

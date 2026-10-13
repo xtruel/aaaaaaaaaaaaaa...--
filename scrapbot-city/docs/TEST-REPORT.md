@@ -164,7 +164,7 @@ Chromium headless **senza GPU** (rasterizzazione software, il caso peggiore), ci
 
 | Risoluzione | Zoom normale | Vista d'insieme (zoom 1) | Fotogramma peggiore |
 |---|---|---|---|
-| 1280×800 (Steam Deck) | 60 fps | 60 fps | 17 ms |
+| 1280×800 (la misura dello schermo dello Steam Deck; nessuno Steam Deck provato) | 60 fps | 60 fps | 17 ms |
 | 2560×1440 | 60 fps | 59 fps | 33 ms |
 
 Tempo di disegno di un fotogramma (`render()`): mediana 1,8 ms, 90° percentile 2,4 ms (zoom 1: 2,2 / 2,7 ms).
@@ -197,7 +197,7 @@ barra in alto o la barra degli strumenti (prima, a zoom 1 su 1280×800, 119 case
 5. Le traduzioni dei testi nuovi (tutorial, avvisi) sono fatte con l'IA: servono revisioni madrelingua. 0–13 frasi per lingua restano uguali all'inglese (nomi, marchi e parole uguali nelle due lingue).
 6. Il suggerimento nel menu di pausa nomina ancora i tasti della tastiera anche con il controller.
 7. Sotto i 1024 px di larghezza la barra degli strumenti scorre di lato.
-8. Contenuti: 10 eventi narrativi in tutto; una città dura 9–16 giorni di gioco (circa 10–20 minuti a 1×), la campagna 1,5–3 ore.
+8. Contenuti: 10 eventi narrativi in tutto; una città dura 9–16 giorni di gioco (circa 10–20 minuti a 1×) nelle partite degli script, la campagna 1,5–3 ore per gli script: non è una durata misurata con persone.
 9. Due file di anteprima lasciati da un agente nella radice del container di sviluppo (`/fixlab.png`, `/preview.mjs`): fuori dal repository, innocui, da cancellare a mano.
 
 ## 10. Come ripetere i test
