@@ -2364,47 +2364,13 @@ select {
   font-size: 16px;
 }
 
-/* A short window (1280x720, 1024x640): the catalog gives its list the room. A little wider (fewer lines per row), a
-   slimmer head; with an item in hand the tool box takes the head's place (with its own close button) and leaves the
-   keys out of its help (Rotate is right under it); tabs, filters and rows tighter. */
-@media (max-height: 760px) {
-  .catalog {
-    width: 400px;
-  }
-
-  /* the smog alarm keeps to the room left of the wider catalog while it is open, so its words and countdown stay in
-     sight: 350 px on the left as always (the goal card), and on the right the panel's 400 px, its 10 px margin and a
-     gap of 20 px (10 px more while the alarm pulses) */
-  .hud:has(.catalog:not([hidden])) .smog-alert {
-    left: calc(50% - 40px);
-    max-width: max(240px, calc(100% - 780px));
-  }
-
+/* With an item in hand on a window up to 820 px high (1024x640, 1024x768, 1280x720, 1280x800) the list keeps at least
+   two whole rows in sight in every language: the tool box takes the head's place (with its own close button) and
+   leaves the keys out of its help (Rotate is right under it); the rows say name, price and state (what an item does
+   and a project's goal come back when it is put away) and the category's note steps aside. */
+@media (max-height: 820px) {
   .catalog .cat-help-turn {
     display: none;
-  }
-
-  .catalog .insp-head {
-    padding-block: 4px;
-  }
-
-  .catalog .cat-head .tool-plate {
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
-  }
-
-  .catalog .cat-head .tool-plate img {
-    width: 24px;
-    height: 24px;
-  }
-
-  .catalog .cat-head .tag {
-    display: none;
-  }
-
-  .catalog .insp-head h3 {
-    font-size: 17px;
   }
 
   .catalog.has-tool .cat-head {
@@ -2454,6 +2420,51 @@ select {
   .catalog .cat-tool-btns .btn {
     padding: 2px 10px;
     font-size: 14px;
+  }
+
+  .catalog.has-tool .cat-item .cat-effect,
+  .catalog.has-tool .cat-item .cat-project,
+  .catalog.has-tool .cat-scroll > .cat-note {
+    display: none;
+  }
+}
+
+/* A short window (1280x720, 1024x640): the catalog gives its list the room. A little wider (fewer lines per row), a
+   slimmer head; tabs, filters and rows tighter (with an item in hand: the block above). */
+@media (max-height: 760px) {
+  .catalog {
+    width: 400px;
+  }
+
+  /* the smog alarm keeps to the room left of the wider catalog while it is open, so its words and countdown stay in
+     sight: 350 px on the left as always (the goal card), and on the right the panel's 400 px, its 10 px margin and a
+     gap of 20 px (10 px more while the alarm pulses) */
+  .hud:has(.catalog:not([hidden])) .smog-alert {
+    left: calc(50% - 40px);
+    max-width: max(240px, calc(100% - 780px));
+  }
+
+  .catalog .insp-head {
+    padding-block: 4px;
+  }
+
+  .catalog .cat-head .tool-plate {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .catalog .cat-head .tool-plate img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .catalog .cat-head .tag {
+    display: none;
+  }
+
+  .catalog .insp-head h3 {
+    font-size: 17px;
   }
 
   /* one per tile, one per building: the module note says it for the modules, a tile takes one piece anyway */
