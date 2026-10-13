@@ -9,6 +9,7 @@ import { buildingThumb, iconUrl } from '../render/icons';
 import { paintRegion } from '../render/regionBg';
 import { citySlot, slotMeta } from '../storage';
 import { closeModal, isModalOpen, openModal } from './modal';
+import { guarded } from './presses';
 
 export interface RegionHandlers {
   onPlay(city: CityDef, restart: boolean): void;
@@ -20,6 +21,7 @@ export class RegionMap {
   private canvas: HTMLCanvasElement;
   private selected: CityId = 'home';
   private confirmRestart = false;
+  private restartAt = -Infinity; // performance.now() of the Restart press: "Yes, start over" comes up in its place
   private raf = 0;
   private t = 0;
 
@@ -180,11 +182,15 @@ export class RegionMap {
     panel.querySelector('[data-restart]')?.addEventListener('click', () => {
       audio.play('click');
       this.confirmRestart = true;
+      this.restartAt = performance.now();
       this.renderPanel();
       // the panel was rebuilt: the confirm button takes the focus, so a second A (or Enter) confirms
       panel.querySelector<HTMLElement>('[data-restart-yes]')?.focus();
     });
     panel.querySelector('[data-restart-yes]')?.addEventListener('click', () => {
+      // drawn where Restart was: the second press of a double click, a double tap or A A on Restart is no answer
+      // (src/ui/presses.ts); a press of its own, after it, starts the city over
+      if (guarded(this.restartAt)) return;
       audio.play('click');
       this.handlers.onPlay(city, true);
     });

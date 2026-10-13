@@ -18,6 +18,8 @@
 //   setting under its Settings), the second press of a double press on a control that just took one (the cargo
 //   blimp's Send, a slot's Save), and in a dialog that came up by itself (a story event, an ending) a press that
 //   began before the player could see it, do nothing;
+// - the region map's "Yes, start over" (src/ui/region.ts), drawn where Restart was: no press for PRESS_GUARD_MS after
+//   the Restart press;
 // - the click that reaches behind the selected building (src/ui/pick.ts) counts from DOUBLE_PRESS_MS.
 // No DOM.
 
