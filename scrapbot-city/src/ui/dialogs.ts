@@ -248,6 +248,8 @@ export function openStoryEvent(ev: StoryEvent, s: GameState, onDone: (result: st
     portrait: portraitUrl(ev.speaker),
     body: `<p class="story">${eventText(ev)}</p>`,
     dismissable: false,
+    // it comes up by itself, maybe under a press meant for the map: a press that began right after is no answer
+    unprompted: true,
     className: `modal-story speaker-${ev.speaker}`,
     actions: ev.choices.map((c, i) => ({
       label: choiceLabel(ev, i),

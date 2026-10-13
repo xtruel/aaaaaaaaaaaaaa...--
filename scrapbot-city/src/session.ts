@@ -1647,6 +1647,8 @@ export class GameSession implements PadTarget {
       eyebrow: `${s.cityName} · ${endingSubtitle(kind)}`,
       wide: true,
       dismissable: false,
+      // an ending comes up by itself (the Spire done, the smog countdown out), maybe under a press meant for the map
+      unprompted: true,
       className: `modal-ending ending-${kind}`,
       body: `
         <p class="story">${endingText(kind, esc(s.cityName))}</p>

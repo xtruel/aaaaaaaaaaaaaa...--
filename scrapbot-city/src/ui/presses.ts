@@ -12,8 +12,12 @@
 //   press that brought it up, Install none after a removal on that building, nor the second press of a double press
 //   (the first selected the building on the map where its panel opens); a piece's Remove neither (the first pressed
 //   Done, which Remove takes the place of, or selected the piece where its panel opens);
-// - a dialog's buttons (src/ui/modal.ts): a key or A held when it came up, or the second press of a double press
-//   whose first opened it (2PM's offer to buy the missing parts and build), does nothing;
+// - a dialog's buttons and controls, its actions and those in its body alike (src/ui/modal.ts, dialogPointerRefused
+//   and dialogKeyRefused): a key or A held when it came up, the second press of a double press whose first opened it
+//   (2PM's offer to buy the missing parts and build, a save slot's Overwrite under the pause menu's Save game, a
+//   setting under its Settings), the second press of a double press on a control that just took one (the cargo
+//   blimp's Send, a slot's Save), and in a dialog that came up by itself (a story event, an ending) a press that
+//   began before the player could see it, do nothing;
 // - the click that reaches behind the selected building (src/ui/pick.ts) counts from DOUBLE_PRESS_MS.
 // No DOM.
 
@@ -81,6 +85,32 @@ export function rowLaid(before: Press, start: Press, far: boolean): boolean {
 // Is a guard that started at `since` (performance.now() of the press it guards against) still on?
 export function guarded(since: number, now = performance.now()): boolean {
   return now - since < PRESS_GUARD_MS;
+}
+
+// A dialog's record of presses (src/ui/modal.ts keeps one per dialog, with its own record of the presses of a mouse
+// button or a finger, made anywhere: on the main menu and the region map no city keeps one).
+export interface DialogPresses {
+  openedAt: number; // performance.now() when it came up
+  opener: Press | null; // the press that opened it, when that was within PRESS_GUARD_MS before (a double press's first)
+  unprompted: boolean; // it came up by itself (a story event, an ending), not from a press of the player's
+  taken: { press: Press | null; t: number; key: string } | null; // the last press one of its controls took (press: null for a key or A)
+}
+
+// A press of a mouse button or a finger on one of a dialog's controls that is not meant for it: in a dialog that came
+// up by itself, a press that began within PRESS_GUARD_MS of it coming up (the player was pressing for the screen
+// behind and could not see it yet); the second press of the double press whose first opened the dialog (the next
+// dialog's button drawn under the pause menu's button just pressed); the second press of a double press on a control
+// that just took the first (Send 100 to the bank twice).
+export function dialogPointerRefused(d: DialogPresses, p: Press): boolean {
+  if (d.unprompted && guarded(d.openedAt, p.t)) return true;
+  if (d.opener && isDouble(d.opener, p)) return true;
+  return !!d.taken?.press && isDouble(d.taken.press, p);
+}
+
+// A key or the pad's A (a click with no pointer) on a dialog's control `key`: refused while a key or A held when the
+// dialog came up could reach it, and for PRESS_GUARD_MS after the same control took a press (A A on Send).
+export function dialogKeyRefused(d: DialogPresses, key: string, now = performance.now()): boolean {
+  return guarded(d.openedAt, now) || (!!d.taken && d.taken.key === key && guarded(d.taken.t, now));
 }
 
 const none = (): Press => ({ t: -Infinity, x: 0, y: 0, cam: '', tile: '', tool: '' });
