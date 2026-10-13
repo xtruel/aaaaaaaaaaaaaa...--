@@ -456,7 +456,7 @@ export const pt: Dict = {
   'pause.mainMenu': 'Menu principal',
   'pause.skipTutorial': 'Saltar o tutorial',
   'pause.tutorialNotSaved': 'o tutorial não é guardado',
-  'pause.smogKept': 'alarme de smog: fica o jogo guardado no início do dia',
+  'pause.smogKept': 'guardada no início do dia',
   'pause.trainingNotSaved': 'esta cidade de treino não está guardada',
 
   // ---------- hints ----------

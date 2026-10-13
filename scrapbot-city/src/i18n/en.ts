@@ -455,7 +455,7 @@ export const en = {
   'pause.mainMenu': 'Main menu',
   'pause.skipTutorial': 'Skip the tutorial',
   'pause.tutorialNotSaved': 'the tutorial is not saved',
-  'pause.smogKept': 'smog alarm: the save from the start of the day stays',
+  'pause.smogKept': 'saved at the start of the day',
   'pause.trainingNotSaved': 'this training city is not saved',
 
   // ---------- hints ----------

@@ -36,7 +36,7 @@ describe('leaving a city during the smog countdown', () => {
     expect(savedTime('auto')).toBe(60);
     (session as unknown as { openPause(): void }).openPause();
     const leave = dialogButtons().at(-1)!;
-    expect(leave).toEqual({ label: 'Main menu', hint: 'smog alarm: the save from the start of the day stays' });
+    expect(leave).toEqual({ label: 'Main menu', hint: 'saved at the start of the day' });
     pressButton(c, 'Main menu');
     expect(h.onExitToMenu).toHaveBeenCalledTimes(1);
     expect(savedTime('auto')).toBe(60);
@@ -56,7 +56,7 @@ describe('leaving a city during the smog countdown', () => {
     const { c, h, session } = smoggy(true);
     expect(savedTime('city-home')).toBe(60);
     (session as unknown as { openPause(): void }).openPause();
-    expect(dialogButtons().filter((b) => b.hint).map((b) => b.hint)).toEqual(['smog alarm: the save from the start of the day stays', 'smog alarm: the save from the start of the day stays']);
+    expect(dialogButtons().filter((b) => b.hint).map((b) => b.hint)).toEqual(['saved at the start of the day', 'saved at the start of the day']);
     pressButton(c, 'Region map');
     expect(h.onRegionMap).toHaveBeenCalledTimes(1);
     expect(savedTime('city-home')).toBe(60);

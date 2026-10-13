@@ -456,7 +456,7 @@ export const de: Dict = {
   'pause.mainMenu': 'Hauptmenü',
   'pause.skipTutorial': 'Tutorial überspringen',
   'pause.tutorialNotSaved': 'das Tutorial wird nicht gespeichert',
-  'pause.smogKept': 'Smogalarm: der Spielstand vom Tagesbeginn bleibt',
+  'pause.smogKept': 'gespeichert zu Tagesbeginn',
   'pause.trainingNotSaved': 'diese Übungsstadt ist nicht gespeichert',
 
   // ---------- hints ----------

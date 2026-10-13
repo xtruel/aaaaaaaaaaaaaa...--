@@ -457,7 +457,7 @@ export const it: Dict = {
   'pause.mainMenu': "Menu principale",
   'pause.skipTutorial': "Salta il tutorial",
   'pause.tutorialNotSaved': "il tutorial non viene salvato",
-  'pause.smogKept': 'allarme smog: resta il salvataggio di inizio giornata',
+  'pause.smogKept': 'salvata a inizio giornata',
   'pause.trainingNotSaved': 'questa città di addestramento non è salvata',
 
   // ---------- hints ----------
