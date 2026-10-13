@@ -2379,14 +2379,10 @@ select {
 }
 
 /* With an item in hand on a window up to 820 px high (1024x640, 1024x768, 1280x720, 1280x800) the list keeps at least
-   two whole rows in sight in every language: the tool box takes the head's place (with its own close button) and
-   leaves the keys out of its help (Rotate is right under it); the rows say name, price and state (what an item does
-   and a project's goal come back when it is put away) and the category's note steps aside. */
+   two whole rows in sight in every language: the tool box takes the head's place (with its own close button); the
+   rows say name, price and state (what an item does and a project's goal come back when it is put away) and the
+   category's note steps aside. (Up to 760 px the help also leaves out how to rotate: the block below.) */
 @media (max-height: 820px) {
-  .catalog .cat-help-turn {
-    display: none;
-  }
-
   .catalog.has-tool .cat-head {
     display: none;
   }
@@ -2448,6 +2444,11 @@ select {
 @media (max-height: 760px) {
   .hud {
     --cat-w: 400px;
+  }
+
+  /* the keys out of the tool box's help (Rotate is right under it) */
+  .catalog .cat-help-turn {
+    display: none;
   }
 
   /* the smog alarm keeps to the room left of the wider catalog while it is open, so its words and countdown stay in
