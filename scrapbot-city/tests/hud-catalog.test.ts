@@ -15,7 +15,7 @@ import type { Building, GameState } from '../src/game/state';
 import { setLang } from '../src/i18n';
 import { Hud } from '../src/ui/hud';
 import type { HudHandlers, HudView } from '../src/ui/hud';
-import { DOUBLE_PRESS_MS, PRESS_GUARD_MS } from '../src/ui/presses';
+import { DOUBLE_PRESS_MS, PRESS_GUARD_MS, forgetPresses, notePress } from '../src/ui/presses';
 
 // jsdom has no canvas, images or audio: the pictures and the sounds are not what is tested here
 vi.mock('../src/render/icons', () => ({ iconUrl: () => '', toolThumb: () => '', portraitUrl: () => '', pathColor: () => 'var(--muted)' }));
@@ -233,6 +233,43 @@ describe('catalog panel', () => {
     } finally {
       Object.defineProperty(Element.prototype, 'scrollTop', scrollDesc);
       Element.prototype.getBoundingClientRect = rectOf;
+    }
+  });
+
+  it('a double press on Done whose second press lands on a tab or a filter that moved up under it changes nothing (1024x640)', () => {
+    let now = 300_000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const { root, calls, update } = setup();
+    try {
+      update({ catalog: true, piece: { kind: 'statue', rot: 0 } });
+      const panel = q(root, '[data-catalog-panel]')!;
+      const category = () => panel.querySelector<HTMLElement>('[data-cat][aria-selected="true"], [data-cat].on')?.dataset.cat;
+      const before = category();
+      // the first press on Done at (913,212): the tool box goes, the tabs move up under the pointer
+      notePress({ t: now, x: 913, y: 212, cam: 'c', tile: '' });
+      q(panel, '[data-done]')!.click();
+      update({ catalog: true, piece: null });
+      const other = [...panel.querySelectorAll<HTMLElement>('[data-cat]')].find((b) => b.dataset.cat !== before)!;
+      for (const gap of [120, 300, 500]) {
+        now += gap;
+        notePress({ t: now, x: 914, y: 212, cam: 'c', tile: '' });
+        other.click();
+        expect(category(), `${gap} ms`).toBe(before);
+        const chip = [...panel.querySelectorAll<HTMLElement>('[data-filter]')].find((b) => !b.classList.contains('on'))!;
+        chip.click();
+        expect(panel.querySelector<HTMLElement>('[data-filter].on')!.dataset.filter, `${gap} ms`).toBe('all');
+        now += 1000;
+        notePress({ t: now, x: 913, y: 212, cam: 'c', tile: '' });
+      }
+      expect(calls).toEqual([['onPick', null]]);
+      // a press of its own on a tab, later: taken
+      now += 700;
+      notePress({ t: now, x: 400, y: 160, cam: 'c', tile: '' });
+      other.click();
+      expect(category()).toBe(other.dataset.cat);
+    } finally {
+      forgetPresses();
+      vi.restoreAllMocks();
     }
   });
 

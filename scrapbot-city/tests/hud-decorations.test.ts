@@ -150,7 +150,9 @@ describe('catalog: the Decorations section', () => {
     press(item('sign'), 950, 200);
     expect(calls.at(-1)).toEqual(['onPick', null]);
     // item, a right click on the map, the same item again within 350 ms: three presses, all meant (scripted play)
-    q(panel, '[data-cat="construction"]')!.click();
+    // (the tab is a press of its own, away from Done: a tab too ignores the second press of a double press)
+    now += 200;
+    press(q(panel, '[data-cat="construction"]')!, 300, 160);
     now += 1000;
     press(item('fence'), 900, 250);
     now += 120;

@@ -1153,10 +1153,12 @@ export class Hud {
         this.handlers.onPick(kind);
       });
     }
-    // a category or a filter: the list is drawn again at once, from its top (the tabs and chips do not move)
+    // a category or a filter: the list is drawn again at once, from its top (the tabs and chips do not move while the
+    // catalog stays as it is; Done putting a tool away does move them, up under its own double press: that second
+    // press changes nothing)
     for (const btn of panel.querySelectorAll<HTMLElement>('[data-cat]')) {
       btn.addEventListener('click', () => {
-        if (btn.dataset.cat === this.catCategory) return;
+        if (btn.dataset.cat === this.catCategory || !this.catalogSettled()) return;
         audio.play('click');
         this.catCategory = btn.dataset.cat as CatalogCategory;
         this.redrawCatalog();
@@ -1164,7 +1166,7 @@ export class Hud {
     }
     for (const btn of panel.querySelectorAll<HTMLElement>('[data-filter]')) {
       btn.addEventListener('click', () => {
-        if (btn.dataset.filter === this.catFilter) return;
+        if (btn.dataset.filter === this.catFilter || !this.catalogSettled()) return;
         audio.play('click');
         this.catFilter = btn.dataset.filter as CatalogFilter;
         this.redrawCatalog();
