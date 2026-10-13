@@ -7,6 +7,8 @@
 //            not cut; every row can be scrolled ENTIRELY into sight, nothing covers it, none of its texts is cut sideways
 //  panels:   the Recycler's and the Dock's building panels: inside the window, clear of both bars, nothing cut
 //            sideways; every module card's button can be scrolled into sight and is not covered
+//  menu:     the build stamp in the top-left corner clear of the logo's star; the hand-lettered "Different futures,
+//            same city" (when shown) clear of the path cards' labels
 // One picture per language at 1024x640 (catalog with a tool) and two at 1920x1080 (en, de).
 import { startTest } from '../lib/report.mjs';
 import { frames, launch, openGame, S, settle, until } from '../lib/page.mjs';
@@ -130,6 +132,23 @@ const panelFit = () => {
   return { bad: [...new Set(bad)], scrolls: p.scrollHeight - p.clientHeight };
 };
 
+// the main menu: the corner stamp's lines, the logo's star, the hand-lettered text, the path cards' labels
+const menuFit = () => {
+  const bad = [];
+  const lines = (el) => {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    return [...r.getClientRects()].filter((q) => q.width > 1 && q.height > 1);
+  };
+  const hit = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+  const star = document.querySelector('.logo-star').getBoundingClientRect();
+  for (const l of lines(document.querySelector('.corner-tl p'))) if (hit(l, star)) bad.push('the build stamp under the logo star');
+  const hand = document.querySelector('.hand-right');
+  if (getComputedStyle(hand).display !== 'none')
+    for (const h of lines(hand)) for (const label of document.querySelectorAll('.path-card .card-label')) for (const l of lines(label)) if (hit(h, l)) bad.push(`"Different futures" over "${label.textContent.trim()}"`);
+  return [...new Set(bad)];
+};
+
 await T.run(async () => {
   const summary = {};
   for (const lang of T.cfg.langs) {
@@ -137,6 +156,15 @@ await T.run(async () => {
     const g = await openGame(browser, server, { input: 'mouse', size: `${w0}x${h0}`, storage: seedStorage({ lang, profile: BEST }) });
     page = g.page;
     const { io, errors } = g;
+    for (const size of T.cfg.sizes) {
+      const [w, h] = size.split('x').map(Number);
+      await page.setViewportSize({ width: w, height: h });
+      await page.mouse.move(2, 2);
+      await frames(page, 3);
+      const bad = await S(page, menuFit);
+      T.ok(`${size} ${lang}: main menu: the build stamp clear of the logo, the hand-lettered text clear of the cards`, bad.length === 0, bad.join('; '));
+    }
+    await page.setViewportSize({ width: w0, height: h0 });
     // the city by the menus (setup: mouse), then: paused, money, a finished Dock and Recycler (module tools and panels)
     await G.startFreePlay(page, io, { seed: 777 });
     await S(page, () => window.scrapbot.session().setSpeed(0));

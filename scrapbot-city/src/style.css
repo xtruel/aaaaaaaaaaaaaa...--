@@ -4758,6 +4758,23 @@ body.crt-on .crt {
   }
 }
 
+/* up to 1000 px of height the logo comes up close under the build stamp: the stamp stands beside the studio's name,
+   clear of the logo's star and S */
+@media (max-height: 1000px) {
+  .corner-tl {
+    grid-auto-flow: column;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+/* on short windows the hand-lettered "Different futures, same city" would lie over the last path card's label */
+@media (max-height: 780px) {
+  .hand-right {
+    display: none;
+  }
+}
+
 @media (max-height: 720px) {
   .menu-list {
     gap: 6px;
