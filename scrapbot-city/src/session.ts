@@ -1242,8 +1242,13 @@ export class GameSession implements PadTarget {
   // While a decoration is being moved, R, Shift+wheel and the pad's Y turn it where it stands (free, as its panel's
   // Rotate before Move), or say it does not turn: never a hint (Y).
   private rotateMoving(dir: 1 | -1, say: boolean): void {
-    const info = pieceInfo(this.s, this.moving);
-    if (info?.rotatable) this.rotatePiece(this.moving, dir);
+    this.turnOrSay(this.moving, dir, say);
+  }
+
+  // The piece on tile i turns (free, as its panel's Rotate), or a short line says it does not ("Planter: does not turn").
+  private turnOrSay(i: number, dir: 1 | -1, say: boolean): void {
+    const info = pieceInfo(this.s, i);
+    if (info?.rotatable) this.rotatePiece(i, dir);
     else if (say && info) pushMessage(this.s, t('cat.noTurn', { name: catalogName(info.kind) }), 'info');
   }
 
@@ -1404,13 +1409,15 @@ export class GameSession implements PadTarget {
       else if (this.catalog) this.closeCatalog();
     }
     if (p.has('x')) this.toggleBulldoze();
-    // Y turns the piece in hand (fence, gate, lamp, a decoration with directions); with a catalog item in hand that
-    // does not turn (the floor, the planter, a module) it says so, and never asks USA-9 for a hint (that can use up a
-    // free hint or cost credits); with no catalog item in hand it asks for a hint
+    // Y turns the piece in hand (fence, gate, lamp, a decoration with directions), or the selected one as R does; with a
+    // catalog item in hand or a piece selected that does not turn (the floor, the planter, a module) it says so, and
+    // never asks USA-9 for a hint (that can use up a free hint or cost credits); with no catalog item in hand and no
+    // piece selected it asks for a hint
     if (p.has('y')) {
       if (this.moving >= 0) this.rotateMoving(1, true);
-      else if (turnKey(this.piece?.kind) === 'hint') this.askHint();
-      else this.rotateOrSay(1);
+      else if (turnKey(this.piece?.kind) !== 'hint') this.rotateOrSay(1);
+      else if (this.selectedPiece >= 0 && pieceInfo(this.s, this.selectedPiece)) this.turnOrSay(this.selectedPiece, 1, true);
+      else this.askHint();
     }
     if (p.has('lb') || p.has('rb')) {
       const dir = p.has('rb') ? 1 : -1;
