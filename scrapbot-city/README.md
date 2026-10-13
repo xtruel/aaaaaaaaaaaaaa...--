@@ -26,6 +26,8 @@ npm run dist:win     # build per Steam in release/ (anche dist:linux, dist:mac)
 
 Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, Steam Cloud, Steam Deck, upload,
 pagina del negozio, prezzo. Per i test con giocatori veri c'è **[docs/PLAYTEST.md](docs/PLAYTEST.md)**.
+Report di consegna della **0.7.0-beta.1** (le 24 voci del catalogo, test, numeri, prestazioni, problemi aperti, cosa
+non è verificato): **[docs/BETA-REPORT.md](docs/BETA-REPORT.md)**, screenshot in `docs/beta/`.
 Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
 
 ## Modalità di gioco
@@ -57,15 +59,18 @@ Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
   [docs/MODULAR-INC1.md](docs/MODULAR-INC1.md) e [docs/MODULAR-INC2.md](docs/MODULAR-INC2.md).
 - **Suggerimenti** (lampadina o tasto `Q`): USA-9 legge la città e consiglia cosa costruire, spiegando il perché.
   I primi 3 per città sono gratis e uno nuovo torna ogni 5 giorni. Poi si pagano in crediti, e il prezzo sale a ogni acquisto.
-- **18 achievement**, salvati localmente e inviati a Steam nella versione desktop.
+- **18 achievement**, salvati localmente; il ponte verso Steam c'è nella versione desktop ma non è ancora attivo né
+  provato (servono steamworks.js e un App ID: vedi docs/STEAM.md).
 - **Eventi narrativi** con USA-9, Miso, K. Kurogane (2PM Corp), i cittadini e la Pixel Planet Initiative.
 - **Finali**: Garden City, 2PM Megacity, Different Futures, Smog Over. Dopo la Guglia si può continuare a costruire
   per prendere le stelle mancanti; se la città soffoca si riparte dall'ultimo salvataggio automatico.
 - **Salvataggi** automatici a ogni nuovo giorno, alla chiusura e quando la finestra viene nascosta. In free play ci sono anche 3 slot manuali.
-  Nella versione desktop sono file `.sav` nella cartella dell'utente, sincronizzabili con **Steam Cloud**.
+  Nella versione desktop sono file `.sav` nella cartella dell'utente, pronti per **Steam Cloud** (da attivare e
+  provare in Steamworks).
 - **8 lingue**: English, Italiano, Deutsch, Français, Español, Português, Polski, Nederlands. Al primo avvio il gioco
   usa la lingua del sistema; si cambia al volo dal globo nel menu o dalle impostazioni, anche a partita in corso.
-- **Controller e Steam Deck**: menu e dialoghi col D-pad, in città un cursore virtuale (vedi Comandi).
+- **Controller** (pensato anche per lo Steam Deck): menu e dialoghi col D-pad, in città un cursore virtuale (vedi
+  Comandi). Finora provato solo con un controller simulato, mai con un controller vero né su uno Steam Deck.
 - **Musica**: 4 brani chiptune sintetizzati dal codice — *Trash Today* (menu), *Rust & Sunshine* (città di giorno),
   *Neon Hum* (città di notte), *Road Trip* (mappa della regione) — con dissolvenza da uno all'altro.
 - **Interfaccia**: chip colorate, guadagno al minuto di crediti e pezzi, pausa automatica quando la finestra è nascosta,
@@ -139,6 +144,7 @@ scripts/art/           pipeline della grafica: modelli voxel (models/), ray cast
 art/sprites/           ogni fotogramma come PNG singolo; art/contact-sheet.png li mostra tutti
 art/overrides/         PNG ritoccati a mano con lo stesso nome di uno sprite: sostituiscono quello generato
 docs/ISO-MIGRATION.md  piano tecnico del passaggio all'isometrico
+docs/BETA-REPORT.md    report di consegna della 0.7.0-beta.1 (screenshot in docs/beta/)
 docs/TEST-REPORT.md    rapporto di test della release candidate 0.6.0
 scripts/i18n-check.ts  controllo delle traduzioni
 docs/STEAM.md          guida alla pubblicazione su Steam
