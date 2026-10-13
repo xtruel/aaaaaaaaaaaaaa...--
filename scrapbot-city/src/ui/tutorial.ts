@@ -90,7 +90,8 @@ export class Tutorial {
       this.index++;
     }
     if (this.active) {
-      if (this.rendered !== this.index || this.renderedInput !== inputKind()) this.render();
+      if (this.rendered !== this.index) this.render();
+      else if (this.renderedInput !== inputKind()) this.syncInput();
       this.position(ctx);
     }
     return done && !!step.builds;
@@ -114,14 +115,14 @@ export class Tutorial {
     const last = this.index === STEPS.length - 1;
     // the lines that say how to do something name the controls of the input in use: keys in the player's keyboard
     // layout and the mouse, a finger, or the controller's buttons (A, Y, L3...)
-    const text = (part: string) => inputText(`tut.${step.id}.${part}`, { limit: SMOG_DANGER }, this.renderedInput);
+    const text = (part: string) => this.line(part);
     this.bubble.innerHTML = `
       <img class="coach-face" src="${portraitUrl('usa')}" alt="" />
       <div class="coach-body">
         <p class="coach-step">${t('tut.step', { n: this.index + 1, total: STEPS.length })}</p>
-        <h3>${text('title')}</h3>
-        <p>${text('text')}</p>
-        ${step.action ? `<p class="coach-action"><span class="dot"></span><span>${text('action')}</span></p>` : ''}
+        <h3 data-coach="title">${text('title')}</h3>
+        <p data-coach="text">${text('text')}</p>
+        ${step.action ? `<p class="coach-action"><span class="dot"></span><span data-coach="action">${text('action')}</span></p>` : ''}
         <div class="coach-buttons">
           ${
             last
@@ -146,6 +147,21 @@ export class Tutorial {
       this.dispose();
       this.onFinish(false);
     });
+  }
+
+  // A line of the step on screen, in the words of the input last shown.
+  private line(part: string): string {
+    return inputText(`tut.${STEPS[this.index].id}.${part}`, { limit: SMOG_DANGER }, this.renderedInput);
+  }
+
+  // The player switched input (the mouse after a finger, the pad): the lines are rewritten in place and the buttons
+  // stay (a bubble rebuilt between a press and its release would lose the click on Next).
+  private syncInput(): void {
+    this.renderedInput = inputKind();
+    for (const el of this.bubble.querySelectorAll<HTMLElement>('[data-coach]')) {
+      const html = this.line(el.dataset.coach!);
+      if (el.innerHTML !== html) el.innerHTML = html;
+    }
   }
 
   private ring(i: number): HTMLElement {
