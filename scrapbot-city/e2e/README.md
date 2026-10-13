@@ -42,7 +42,7 @@ Risultati in `.cache/e2e/<commit>/runs/<data>/`: per ogni test `log.txt` (una ri
 | `double-press-*` | uno per riga | doppie pressioni a 120 e 450 ms su Rimuovi, Demolisci, la conferma di rimozione, Installa dopo una rimozione, Sposta e Fatto di una decorazione |
 | `covered-*` | uno per riga | una recinzione dietro un edificio: la prima pressione seleziona l'edificio disegnato, la seconda raggiunge la recinzione, la ruspa la toglie |
 | `left-mouse` | mouse | il tasto sinistro non sposta mai la mappa, in ogni stato; destro e centrale sì |
-| `fit` | nessuno (misure nel DOM) | barra, catalogo e pannelli in 8 lingue a 1024x640, 1280x720, 1280x800, 1920x1080: niente tagliato o fuori dalla finestra, ogni riga raggiungibile e leggibile |
+| `fit` | nessuno (misure nel DOM) | barra, catalogo e pannelli in 8 lingue a 1024x640, 1280x720, 1280x800, 1920x1080: niente tagliato o fuori dalla finestra, ogni riga raggiungibile e leggibile; nel menu principale la scritta della build fuori dal logo e la scritta a mano fuori dalle etichette delle schede; una notifica sopra un finale non copre i suoi pulsanti |
 | `campaign-home` | mouse | la prima città della campagna giocata fino alla fine con soli edifici (zero oggetti del catalogo, zero moduli), con eventi della storia e tempeste |
 | `cities` | mouse | le cinque città aperte dalla build release, immagini di giorno e di notte |
 

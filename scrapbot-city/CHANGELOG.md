@@ -404,6 +404,56 @@ Tutto l'incremento 2 dopo la 0.7.0-alpha.1 (gruppi G0–G5, temi delle città, s
 - **Crediti**: Permanent Marker è indicato con la sua licenza vera, Apache 2.0; gli altri cinque font restano SIL
   Open Font License (prima la riga li dava tutti sotto OFL).
 
+### Correzioni dopo la revisione finale
+
+- **Doppie pressioni dentro i dialoghi**: la seconda pressione di un doppio clic, di un doppio tocco o di `A` `A` non
+  fa più nulla neppure sui controlli nel corpo di un dialogo, non solo sui pulsanti in fondo: lo slot «Sovrascrivi» o
+  «Carica» che compare sotto «Salva partita» / «Carica partita» del menu di pausa (prima uno slot veniva sovrascritto, o
+  la città sostituita da un caricamento), un'impostazione sotto «Impostazioni» (prima «Riduci le animazioni» cambiava),
+  «Invia» e «Preleva» del dirigibile cargo (prima due invii e due commissioni del 10 %). Un evento della storia o un
+  finale, che compaiono da soli, non prendono una pressione del mouse o di un dito cominciata nei loro primi 600 ms
+  (prima un clic o un tocco destinato alla mappa sceglieva la risposta comparsa sotto).
+- **«Ricomincia questa città»** (mappa della regione): «Sì, ricomincia» compare al suo posto e per 600 ms non prende
+  pressioni, da nessun input: un doppio clic, un doppio tocco o `A` `A` non cancellano più il salvataggio della città.
+  Una pressione a sé, dopo, ricomincia come prima.
+- **«Costruisci …» nel consiglio di USA-9**: la seconda pressione di un doppio clic, di un doppio tocco o di `A` `A` sul
+  pulsante non costruisce più l'edificio dove cade sulla mappa scoperta dal dialogo: «Troppo presto dopo la pressione
+  di prima».
+- **Allarme smog**: uscire dalla città durante il conto alla rovescia (Pausa → «Menu principale» o «Mappa della
+  regione», «Salva e torna al menu» nel gioco libero) non sostituisce più il salvataggio di inizio giornata, come già
+  i salvataggi automatici: «Carica l'ultimo salvataggio automatico — inizio della giornata» riporta davvero all'inizio
+  della giornata (prima ricaricava il conto alla rovescia e la città si perdeva di nuovo). Il menu di pausa lo dice
+  («salvata a inizio giornata»).
+- **Città di addestramento tenuta accanto alla propria** («Tieni la mia città salvata»): salvata in uno slot, quello
+  slot diventa il suo (salvataggi automatici, «Salva e torna al menu», «Continua»); finché non è salvata l'ultimo
+  pulsante della pausa dice «Menu principale — questa città di addestramento non è salvata» (prima «Salva e torna al
+  menu» non salvava nulla).
+- **Controller**: `Y` con un pezzo selezionato lo ruota come `R` o dice che non si ruota (prima chiedeva un consiglio
+  a USA-9 e ne consumava uno gratuito); su e giù raggiungono le quattro caselle delle Impostazioni; su e giù nel menu
+  principale seguono l'ordine delle voci (prima ne saltavano una a 1280×720 e 1024×640); la levetta destra scorre un
+  dialogo più alto della finestra (Extra a 1280×720 e 1024×640).
+- **Consigli**: con ogni Riciclatore messo in pausa dal giocatore e pochi pezzi, USA-9 dice di premere «Riprendi
+  produzione», gratis, invece di consigliare un altro Riciclatore o di importare pezzi.
+- **Salvataggi**: un secondo salvataggio diverso della stessa versione precedente nello stesso slot ha una copia sua
+  (`backup:save:<slot>:v<n>:<impronta>`, come già il profilo dei progetti); ricominciare una città il cui salvataggio
+  viene da una versione più nuova («Impossibile caricare») ne tiene prima una copia, come fa il gioco libero. Versione
+  desktop: un file danneggiato letto al posto della sua copia `.bak` viene prima messo da parte così com'è
+  (`<file>.damaged-<n>`, mai sovrascritto), e il profilo dei progetti aggiunge i progetti leggibili da un
+  `projects.sav` danneggiato a quelli del `.bak`, così l'ultima scoperta non torna bloccata. Verificato con lo store dei
+  file in Node e `electron/main.cjs` caricato con un modulo `electron` simulato, non con Electron vero.
+- **Catalogo**: a 1024×640, la seconda pressione di un doppio clic su «Fatto» con in mano un oggetto che si ruota non
+  cambia più categoria o filtro (le schede salivano sotto il puntatore).
+- **Tutorial**: quando il mouse prende il posto del tocco con la pressione stessa, il fumetto riscrive solo le sue
+  righe e il clic su «Avanti» non va più perso.
+- **Mappa**: ciò che una pressione prende e la casella sotto il puntatore si leggono con la camera come è disegnata,
+  su pixel interi, anche dopo una panoramica col tasto destro (prima una pressione poteva mancare il pixel esterno di
+  un oggetto). Niente cambia nel disegno né nella simulazione.
+- **Menu principale**: fino a 1000 px di altezza la scritta della build sta accanto al nome dello studio, fuori dalla
+  stella e dalla S del logo; fino a 780 px la scritta a mano «Different futures, same city» non si mostra più sopra
+  l'etichetta di «Dai forma alla città».
+- **Notifiche sopra un dialogo**: su finestre alte fino a 760 px vanno nell'angolo in alto a destra e non coprono più
+  i pulsanti di un finale.
+
 ### Numeri e test
 
 - **Nessun numero degli edifici originali è cambiato**: a ogni gruppo `npm run balance` con la stessa sequenza casuale
