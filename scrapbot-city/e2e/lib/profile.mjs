@@ -32,4 +32,4 @@ export function metaFor(raw, extra = {}) {
 
 // storage keys the game may write (the release smoke and the saves test check that nothing else appears): the
 // backups of saves (src/storage.ts) and of the projects profile (src/profile.ts) are product keys too
-export const PRODUCT_KEY = /^scrapbot:(settings|last|tutorial-done|migrated|campaign|campaign-damaged|endings|achievements|projects|(save|meta):(auto|[123]|city-\w+)|backup:(save|meta):(auto|[123]|city-\w+):v\d+|backup:projects:v\d+(:\w+)?)$/;
+export const PRODUCT_KEY = /^scrapbot:(settings|last|tutorial-done|migrated|campaign|campaign-damaged|endings|achievements|projects|(save|meta):(auto|[123]|city-\w+)|backup:(save|meta):(auto|[123]|city-\w+):v\d+(:\w+)?|backup:projects:v\d+(:\w+)?)$/;

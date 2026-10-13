@@ -160,21 +160,35 @@ export function backupKey(slot: SlotId, version: number): string {
   return `backup:save:${slot}:v${version}`;
 }
 
-// Before this version first overwrites a save written by another one (0.6 and 0.7.0-alpha.1 wrote version 2;
-// a save with no version or a damaged one counts as 0), the original text is copied aside, once per slot and
-// version, with its slot info: backup:save:<slot>:v<n> and backup:meta:<slot>:v<n>. Backups are never removed
-// or overwritten. False when the copy could not be written: the old save is then left alone.
+// A short fingerprint of a text, so two different texts get two backups.
+export function fingerprint(text: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return (h >>> 0).toString(36);
+}
+
+// Before this version first overwrites a save written by another one (0.6 and 0.7.0-alpha.1
+// wrote version 2; a save with no version or a damaged one counts as 0), the original text is copied aside, once per
+// text, with its slot info: backup:save:<slot>:v<n> and backup:meta:<slot>:v<n>, or with the text's fingerprint
+// (backup:save:<slot>:v<n>:<fingerprint>) when that key holds another city already (a second version-2 city saved in
+// the same slot by an older version, played again on a Steam beta branch). Backups are never removed or overwritten.
+// False when the copy could not be written: the old save is then left alone.
 function backupBeforeOverwrite(slot: SlotId): boolean {
   const raw = readKey(`save:${slot}`);
   if (raw === null) return true;
   const version = saveVersionOf(raw);
   if (version === SAVE_VERSION) return true;
-  const key = backupKey(slot, version);
-  if (readKey(key) !== null) return true;
-  if (!writeKey(key, raw)) return false;
-  const meta = readKey(`meta:${slot}`);
-  if (meta !== null) writeKey(`backup:meta:${slot}:v${version}`, meta);
-  return true;
+  for (const suffix of ['', `:${fingerprint(raw)}`]) {
+    const key = `${backupKey(slot, version)}${suffix}`;
+    const there = readKey(key);
+    if (there === raw) return true;
+    if (there !== null) continue;
+    if (!writeKey(key, raw)) return false;
+    const meta = readKey(`meta:${slot}`);
+    if (meta !== null) writeKey(`backup:meta:${slot}:v${version}${suffix}`, meta);
+    return true;
+  }
+  return false;
 }
 
 export function saveGame(slot: SlotId, s: GameState): boolean {

@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 // Owner brief §7: a backup before any migration. A save written by another version (0.6 and 0.7.0-alpha.1
 // wrote version 2; no version or a damaged file counts as 0) is copied aside once, as it was, before this
-// version first overwrites it, in the browser storage and in the desktop files alike. Backups are never removed.
+// version first overwrites it, in the browser storage and in the desktop files alike; a second, different city of
+// that version in the same slot gets a backup of its own. Backups are never removed.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SAVE_VERSION, createGame, deserialize } from '../src/game/state';
-import { backupKey, citySlot, clearSlot, lastPlayed, loadGame, saveGame, saveVersionOf, slotMeta } from '../src/storage';
+import { backupKey, citySlot, clearSlot, fingerprint, lastPlayed, loadGame, saveGame, saveVersionOf, slotMeta } from '../src/storage';
 import type { SlotId } from '../src/storage';
 
 const require = createRequire(import.meta.url);
@@ -109,6 +110,29 @@ describe('backup before the first overwrite', () => {
     vi.restoreAllMocks();
     expect(saveGame('auto', s)).toBe(true);
     expect(ls(backupKey('auto', 2))).toBe(FIXTURE_06);
+  });
+
+  it('a second, different city of the same old version in the same slot gets a backup of its own', () => {
+    // 0.7.0-alpha.1 (a Steam beta branch) saved AlphaOne in slot 1; this version loaded and saved it
+    const one = JSON.stringify({ ...JSON.parse(FIXTURE_07A1), cityName: 'AlphaOne' });
+    const metaOne = JSON.stringify({ city: 'AlphaOne', day: 3, alignment: 0, pop: 2, savedAt: 1 });
+    plant('1', one, metaOne);
+    expect(saveGame('1', loadGame('1')!)).toBe(true);
+    expect(ls(backupKey('1', 2))).toBe(one);
+    // back on alpha, AlphaTwo saved in the same slot; then this version again
+    const two = JSON.stringify({ ...JSON.parse(FIXTURE_07A1), cityName: 'AlphaTwo', time: 777 });
+    const metaTwo = JSON.stringify({ city: 'AlphaTwo', day: 13, alignment: 0, pop: 5, savedAt: 2 });
+    plant('1', two, metaTwo);
+    expect(saveGame('1', loadGame('1')!)).toBe(true);
+    expect(ls(backupKey('1', 2))).toBe(one);
+    expect(ls(`${backupKey('1', 2)}:${fingerprint(two)}`)).toBe(two);
+    expect(ls(`backup:meta:1:v2:${fingerprint(two)}`)).toBe(metaTwo);
+    expect(ls('backup:meta:1:v2')).toBe(metaOne);
+    // saved again, or the same text again: no third copy
+    expect(saveGame('1', loadGame('1')!)).toBe(true);
+    plant('1', two, metaTwo);
+    expect(saveGame('1', loadGame('1')!)).toBe(true);
+    expect(backups()).toHaveLength(4);
   });
 
   it('restarting or clearing a slot never removes its backup', () => {

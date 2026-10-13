@@ -9,16 +9,9 @@ import { loadCampaign } from './campaign';
 import { GOAL_STATS, discoverReached, goalValue, mergeProfile, parseProfile, profileBest, profileUnlocked } from './game/projects';
 import type { GoalStat, ProjectKind, ProjectsProfile } from './game/projects';
 import type { GameState } from './game/state';
-import { readDamaged, readKey, writeKey } from './storage';
+import { fingerprint, readDamaged, readKey, writeKey } from './storage';
 
 export const PROFILE_KEY = 'projects';
-
-// A short fingerprint of a text, so two different damaged texts get two backups.
-function fingerprint(text: string): string {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
-  return (h >>> 0).toString(36);
-}
 
 // Copies a profile text this version cannot take as it is (damaged, or another version) aside, once per text:
 // backup:projects:v<version> (v0: damaged or without a version), or with a fingerprint when that key holds another
