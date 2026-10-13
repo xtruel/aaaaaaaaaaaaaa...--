@@ -15,6 +15,7 @@ import { day } from '../game/state';
 import type { Building, GameState, Message } from '../game/state';
 import { OBJECTIVES, objectiveHint, objectiveText, objectiveTools } from '../game/story';
 import { inputKind, inputText } from '../input';
+import type { InputKind } from '../input';
 import { bName, pathLabel, t, tk } from '../i18n';
 import { keyLabel } from '../keys';
 import { iconUrl, pathColor, portraitUrl, toolThumb } from '../render/icons';
@@ -231,6 +232,9 @@ export class Hud {
   private slotChangedId = -1; // on which building
   private renderedId = -1; // the building whose panel was drawn last (a piece's panel: -1)
   private catalogKey = '';
+  // the input whose controls the help lines on screen name (the catalog's tool box, a piece's Move): when the player
+  // switches input they are rewritten in place, without rebuilding the panel under a press
+  private helpInput: InputKind = 'mouse';
   // the catalog's category and filter (kept while the city is played), the tool in hand at its last drawing, the item
   // a new project's Open asked for (scrolled to and marked at the next drawing), the projects found in this city that
   // the catalog has not shown yet (a badge on its button, a dot on their tab) and those it is showing now
@@ -980,12 +984,13 @@ export class Hud {
         if (!filterItems(s, this.catCategory, this.catFilter).includes(active)) this.catFilter = 'all';
       }
     }
-    const key = `${active}|${inputKind()}|${this.catCategory}|${this.catFilter}`;
+    const key = `${active}|${this.catCategory}|${this.catFilter}`;
     if (key === this.catalogKey) {
+      this.syncHelp();
       this.markCatalog(s);
       return;
     }
-    const sameList = this.catalogKey.split('|').slice(2).join('|') === `${this.catCategory}|${this.catFilter}`;
+    const sameList = this.catalogKey.split('|').slice(1).join('|') === `${this.catCategory}|${this.catFilter}`;
     this.catalogKey = key;
     this.renderCatalog(s, active, opening || !sameList);
   }
@@ -1161,14 +1166,43 @@ export class Hud {
   }
 
   private redrawCatalog(): void {
-    this.catalogKey = `${this.catActive}|${inputKind()}|${this.catCategory}|${this.catFilter}`;
+    this.catalogKey = `${this.catActive}|${this.catCategory}|${this.catFilter}`;
     this.renderCatalog(this.s, this.catActive, true);
+  }
+
+  // The help lines on screen (the catalog's tool box, a piece's Move) after the player switched input: rewritten in
+  // place (a rebuild of the panel between a press and its click would lose the click).
+  private syncHelp(): void {
+    const input = inputKind();
+    if (input === this.helpInput) return;
+    this.helpInput = input;
+    const kind = this.catActive;
+    const tool = kind ? this.el['catalog-panel'].querySelector<HTMLElement>('.cat-tool .cat-help') : null;
+    if (kind && tool) tool.innerHTML = this.toolHelpText(kind, input);
+    const move = this.el.inspector.querySelector<HTMLElement>('[data-move-help]');
+    if (move) move.innerHTML = this.moveHelpText(input);
+  }
+
+  private moveHelpText(input: InputKind): string {
+    return `<b>${esc(t('insp.move'))}</b> · ${inputText('move.help', undefined, input)}`;
   }
 
   // While a catalog tool is in hand: what to do with it, with the controls of the input in use (mouse and keys, a
   // finger, the controller's buttons), and the buttons a finger needs (Rotate, Done).
   private toolHelp(kind: CatalogKind): string {
-    const input = inputKind();
+    this.helpInput = inputKind();
+    return `
+      <div class="cat-tool">
+        <button type="button" class="modal-x cat-tool-x" data-close aria-label="${t('common.close')}">×</button>
+        <p class="cat-help">${this.toolHelpText(kind, this.helpInput)}</p>
+        <div class="cat-tool-btns">
+          ${isRotatable(kind) ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
+          <button type="button" class="btn" data-done>${t('common.done')}</button>
+        </div>
+      </div>`;
+  }
+
+  private toolHelpText(kind: CatalogKind, input: InputKind): string {
     const building = isModuleKind(kind) ? bName(MODULES[kind].building) : '';
     const what = isModuleKind(kind)
       ? input === 'pad'
@@ -1179,15 +1213,7 @@ export class Hud {
         : // a row is dragged with the mouse only: a finger places one tile at a time
           inputText(isRowKind(kind) && input === 'mouse' ? 'cat.help.row' : 'cat.help.place', undefined, input);
     const turn = isRotatable(kind) ? ` <span class="cat-help-turn">${inputText('cat.help.rotate', { rotate: esc(t('cat.rotate')) }, input)}</span>` : '';
-    return `
-      <div class="cat-tool">
-        <button type="button" class="modal-x cat-tool-x" data-close aria-label="${t('common.close')}">×</button>
-        <p class="cat-help"><b>${esc(catalogName(kind))}</b> · ${what}${turn}</p>
-        <div class="cat-tool-btns">
-          ${isRotatable(kind) ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
-          <button type="button" class="btn" data-done>${t('common.done')}</button>
-        </div>
-      </div>`;
+    return `<b>${esc(catalogName(kind))}</b> · ${what}${turn}`;
   }
 
   // ---------- building and piece panel ----------
@@ -1208,11 +1234,11 @@ export class Hud {
     panel.hidden = false;
     if (piece) {
       const moving = (view.moving ?? -1) >= 0 && view.moving === view.selectedPiece;
-      const key = `piece:${view.selectedPiece}:${piece.kind}:${piece.rotatable}:${piece.removable}:${moving ? `move|${inputKind()}` : ''}`;
+      const key = `piece:${view.selectedPiece}:${piece.kind}:${piece.rotatable}:${piece.removable}:${moving ? 'move' : ''}`;
       if (key !== this.inspectorKey) {
         this.inspectorKey = key;
         this.renderPiece(piece, view.selectedPiece, moving);
-      }
+      } else this.syncHelp();
       // what Remove gives back follows the storage in place (the sculpture's scrap: only as far as there is room)
       this.markPieceRefund(piece);
       return;
@@ -1512,7 +1538,7 @@ export class Hud {
     if (moving) {
       panel.innerHTML = `${head}
       <div class="cat-tool move-tool">
-        <p class="cat-help"><b>${esc(t('insp.move'))}</b> · ${inputText('move.help')}</p>
+        <p class="cat-help" data-move-help>${this.moveHelpText((this.helpInput = inputKind()))}</p>
         <div class="cat-tool-btns"><button type="button" class="btn" data-move-done>${t('common.done')}</button></div>
       </div>
       <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;

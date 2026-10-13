@@ -191,9 +191,13 @@ describe('catalog panel', () => {
     try {
       update({ catalog: true, piece: { kind: 'fence', rot: 0 } });
       expect(help().textContent).toBe('Fence · Click a tile, or drag with the left button for a row. R or Shift + wheel rotates.');
+      // the rows and buttons stay the same elements: a press that switched the input is not lost to a rebuild
+      const row = q(root, '[data-catalog-panel] [data-item="gate"]')!;
+      const done = q(root, '[data-catalog-panel] [data-done]')!;
       document.body.classList.add('touch-mode');
       update({ catalog: true, piece: { kind: 'fence', rot: 0 } });
       expect(help().textContent).toBe('Fence · Tap a tile to place it. ⟳ Rotate turns it.');
+      expect(row.isConnected && done.isConnected).toBe(true);
       document.body.classList.replace('touch-mode', 'pad-mode');
       update({ catalog: true, piece: { kind: 'fence', rot: 0 } });
       expect(help().textContent).toBe('Fence · A places it on the tile under the cursor, B puts it away. Y rotates.');

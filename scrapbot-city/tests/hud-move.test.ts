@@ -171,10 +171,12 @@ describe('the panel of a selected G3 piece', () => {
     expect(q(panel, '[data-remove-piece]')).toBeNull();
     q(panel, '[data-move-done]')!.click();
     expect(calls.at(-1)).toEqual(['onEndMove']);
-    // with a finger: taps (G5: the help names the input in use)
+    // with a finger: taps (G5: the help names the input in use), written in place (Done stays the same button)
+    const done = q(root, '[data-inspector] [data-move-done]')!;
     document.body.classList.add('touch-mode');
     update({ selectedPiece: i, moving: i });
     expect(q(root, '[data-inspector] .cat-help')!.textContent).toBe('Move · Tap a tile to move it there: free, it keeps its direction and look.');
+    expect(done.isConnected).toBe(true);
     document.body.classList.remove('touch-mode');
     // with a controller: its buttons
     document.body.classList.add('pad-mode');
