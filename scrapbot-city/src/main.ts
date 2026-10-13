@@ -246,29 +246,36 @@ const modeHandlers = {
   onTutorial: () => startTutorial(),
 };
 
-// Achievements can unlock several at once: show them one after another.
-const toastQueue: { title: string; text: string; icon: Parameters<typeof iconUrl>[0] }[] = [];
-let toastBusy = false;
+// Achievements can unlock several at once: show them one after another. The same toast again while it shows or
+// waits its turn is not queued twice: it shows once, with a count.
+type Toast = { title: string; text: string; icon: Parameters<typeof iconUrl>[0]; count: number; el?: HTMLElement };
+const toastQueue: Toast[] = [];
+let toastNow: Toast | null = null;
 
 function showToast(title: string, text: string, icon: Parameters<typeof iconUrl>[0]): void {
-  toastQueue.push({ title, text, icon });
-  if (!toastBusy) nextToast();
+  const same = [toastNow, ...toastQueue].find((x) => x && x.title === title && x.text === text);
+  if (same) {
+    same.count++;
+    const c = same.el?.querySelector('.toast-count');
+    if (c) c.textContent = ` ×${same.count}`;
+    return;
+  }
+  toastQueue.push({ title, text, icon, count: 1 });
+  if (!toastNow) nextToast();
 }
 
 function nextToast(): void {
   const next = toastQueue.shift();
-  if (!next) {
-    toastBusy = false;
-    return;
-  }
-  toastBusy = true;
+  toastNow = next ?? null;
+  if (!next) return;
   audio.play('done');
   const root = document.getElementById('toasts')!;
   // over a dialog (an ending, a story event) the toast goes to the bottom, clear of the dialog's title
   root.classList.toggle('below', isModalOpen());
   const el = document.createElement('div');
   el.className = 'toast';
-  el.innerHTML = `<span class="toast-ico"><img src="${iconUrl(next.icon, 2)}" alt="" /></span><span><small>${esc(next.title)}</small><b>${esc(next.text)}</b></span>`;
+  el.innerHTML = `<span class="toast-ico"><img src="${iconUrl(next.icon, 2)}" alt="" /></span><span><small>${esc(next.title)}</small><b>${esc(next.text)}<span class="toast-count">${next.count > 1 ? ` ×${next.count}` : ''}</span></b></span>`;
+  next.el = el;
   root.append(el);
   window.setTimeout(() => el.classList.add('out'), 2400);
   window.setTimeout(() => {

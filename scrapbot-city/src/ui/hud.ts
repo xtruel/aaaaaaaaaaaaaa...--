@@ -58,13 +58,16 @@ import {
   slotModules,
   statusLine,
 } from './catalog';
-import { fitToolNames } from './fit';
 import type { CatalogCategory, CatalogFilter, ModuleState, PieceInfo, StatusLine } from './catalog';
 import { esc } from './escape';
+import { fitToolNames } from './fit';
 import { isModalOpen } from './modal';
 import { PRESS_GUARD_MS, guarded, markSecond, secondPress } from './presses';
 import { airReport, perDayText } from './smog';
 import type { AirRow } from './smog';
+
+// How long a feed line stays after it last came (ms): it fades out over the last 0.7 s.
+export const MSG_LIFE_MS = 7200;
 
 export interface HudHandlers {
   onBuild(type: BuildingType | null): void;
@@ -550,28 +553,34 @@ export class Hud {
 
   private msgTimers = new WeakMap<HTMLElement, number[]>();
 
+  // The feed: a line repeated while it is still on screen (it stays MSG_LIFE_MS after its last time) shows once with a
+  // count ("Storage full ×3") and comes down to the newest place, instead of a stack of copies pushing other news
+  // away. Only the very same text and tone count as a repeat: a different line (another number, another name) is
+  // never folded into it. Nothing waits: every line, repeated or new, shows in the frame it arrives. (The smog
+  // countdown and the power warnings are not feed lines: they have places of their own.)
   pushMessages(list: Message[]): void {
     const feed = this.el.feed;
     for (const m of list) {
-      // the same line twice in a row becomes "text ×2" instead of pushing older news away
-      const lastMsg = feed.lastElementChild as HTMLElement | null;
-      let p: HTMLElement;
-      if (lastMsg && lastMsg.dataset.text === m.text) {
-        p = lastMsg;
+      const key = `${m.tone}|${m.text}`;
+      let p = [...feed.children].find((c): c is HTMLElement => c instanceof HTMLElement && c.dataset.key === key) ?? null;
+      if (p) {
         const count = Number(p.dataset.count ?? '1') + 1;
         p.dataset.count = String(count);
-        p.textContent = `${m.text} ×${count}`;
+        p.querySelector('.msg-count')!.textContent = ` ×${count}`;
         p.classList.remove('msg-out');
         for (const t of this.msgTimers.get(p) ?? []) window.clearTimeout(t);
+        if (p !== feed.lastElementChild) feed.append(p);
       } else {
         p = document.createElement('p');
         p.className = `msg msg-${m.tone}`;
         p.dataset.text = m.text;
-        p.textContent = m.text;
+        p.dataset.key = key;
+        p.innerHTML = `<span class="msg-text"></span><span class="msg-count"></span>`;
+        p.querySelector('.msg-text')!.textContent = m.text;
         feed.append(p);
       }
       const el = p;
-      this.msgTimers.set(el, [window.setTimeout(() => el.classList.add('msg-out'), 6500), window.setTimeout(() => el.remove(), 7200)]);
+      this.msgTimers.set(el, [window.setTimeout(() => el.classList.add('msg-out'), MSG_LIFE_MS - 700), window.setTimeout(() => el.remove(), MSG_LIFE_MS)]);
     }
     while (feed.children.length > 5) feed.firstElementChild!.remove();
   }

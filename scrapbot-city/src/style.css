@@ -1421,6 +1421,20 @@ select {
   background: var(--pink);
 }
 
+.msg-count {
+  flex: none;
+  padding: 0 6px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream);
+  background: var(--ink);
+  border-radius: 999px;
+}
+
+.msg-count:empty {
+  display: none;
+}
+
 .msg-out {
   opacity: 0;
   transform: translateX(-10px);
