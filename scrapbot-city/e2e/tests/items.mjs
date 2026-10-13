@@ -87,10 +87,18 @@ await T.run(async () => {
     await L.step(`${k}: taken in hand from its row`, ZERO);
   }
 
-  async function putAway() {
+  // the tool put away (free); the open catalog is redrawn for no tool in hand: on a window up to 820 px high its rows
+  // grow back (what an item does), and the row of the item just put away stays in sight
+  async function putAway(k) {
     await io.cancel();
     await until(page, () => !window.scrapbot.session().piece, null, { what: 'the tool put away' });
+    await until(page, () => {
+      const p = document.querySelector('[data-catalog-panel]');
+      return !p || p.hidden || !p.classList.contains('has-tool');
+    }, null, { what: 'the catalog without the tool box' });
     await L.step('tool put away', ZERO);
+    const row = await G.rowInfo(page, k);
+    if (row) T.ok(`${k}: put away, its row "${row.name}" still in sight`, row.inSight, JSON.stringify(row));
   }
 
   // ---------- 1. the 16 pieces ----------
@@ -120,7 +128,7 @@ await T.run(async () => {
     const r = await L.step(`${k}: placed with one press (${how})`, neg(it.cost), { placed: 1 });
     const ta = await G.tileAt(page, t);
     T.ok(`${k}: stands on (${t.x},${t.y})${rot !== null ? ` turned ${rot}` : ''}; the tool stays in hand`, !!ok && r.piece?.kind === k && (rot === null || ta.rot === rot), JSON.stringify({ ta, piece: r.piece }));
-    await putAway();
+    await putAway(k);
   }
   if (io.mouse) {
     // a row of 3 fences dragged with the left button: 3 laid, 3 paid
@@ -138,7 +146,7 @@ await T.run(async () => {
     io.mark();
     await frames(page, 3);
     await L.step('a row of 3 fences dragged with the left button: 3 laid', neg({ credits: 12 }), { placed: 3 });
-    await putAway();
+    await putAway('fence');
   }
 
   // ---------- 2. the 8 modules ----------
@@ -169,7 +177,7 @@ await T.run(async () => {
     const ok = await until(page, ([id, m]) => window.scrapbot.session().s.buildings.find((b) => b.id === id)?.modules?.includes(m), [id, m], { soft: true, timeout: 4000 });
     const r = await L.step(`${m}: installed with one press on its ${ITEMS[m].building}`, neg(ITEMS[m].cost), { mods: 1, world: false });
     T.ok(`${m}: on the ${ITEMS[m].building}; the tool stays in hand`, !!ok && r.piece?.kind === m, JSON.stringify(r.piece));
-    await putAway();
+    await putAway(m);
   }
   // close the catalog
   await io.cancel();

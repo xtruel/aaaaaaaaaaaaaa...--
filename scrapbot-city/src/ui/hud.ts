@@ -986,6 +986,7 @@ export class Hud {
       return;
     }
     const active = view.piece?.kind ?? null;
+    const held = this.catActive;
     // an item taken in hand shows in its own category (the tabs can still be changed while it is held)
     if (active !== this.catActive) {
       this.catActive = active;
@@ -1002,7 +1003,7 @@ export class Hud {
     }
     const sameList = this.catalogKey.split('|').slice(1).join('|') === `${this.catCategory}|${this.catFilter}`;
     this.catalogKey = key;
-    this.renderCatalog(s, active, opening || !sameList);
+    this.renderCatalog(s, active, opening || !sameList, active ? null : held);
   }
 
   // An item or Done pressed redraws the panel for the new tool (the tool box above the list comes or goes, the list
@@ -1078,7 +1079,8 @@ export class Hud {
         </button>`;
   }
 
-  private renderCatalog(s: GameState, active: CatalogKind | null, toTop: boolean): void {
+  // `putAway`: the item that was in hand until now, kept in sight when its row grows back (see below).
+  private renderCatalog(s: GameState, active: CatalogKind | null, toTop: boolean, putAway: CatalogKind | null = null): void {
     const panel = this.el['catalog-panel'];
     const cat = this.catCategory;
     const filter = this.catFilter;
@@ -1114,14 +1116,18 @@ export class Hud {
         ${empty}
       </div>`;
     this.markCatalog(s);
+    // with a tool in hand on a short window the tool box takes the head's place, with a close button of its own, and
+    // the rows are shorter: set before anything is measured
+    panel.classList.toggle('has-tool', !!active);
     const list = panel.querySelector<HTMLElement>('.cat-scroll')!;
     list.scrollTop = scrolled;
     // the item in hand stays in sight when the tool box above the list takes its room: all of it, or from its top
     // (name and price) when the list is shorter than the item (a short window: a module's effect takes lines); the
-    // item a new project's Open asked for, the same, and marked for a moment
+    // item a new project's Open asked for, the same, and marked for a moment; and the item just put away, whose row
+    // and the rows above it grow back (what an item does, a project's goal) and would push it out of sight
     const focus = this.focusKind ? panel.querySelector<HTMLElement>(`[data-item="${this.focusKind}"]`) : null;
     this.focusKind = null;
-    const chosen = focus ?? panel.querySelector<HTMLElement>('.cat-item.active');
+    const chosen = focus ?? panel.querySelector<HTMLElement>('.cat-item.active') ?? (putAway && !toTop ? panel.querySelector<HTMLElement>(`[data-item="${putAway}"]`) : null);
     if (chosen) {
       const r = chosen.getBoundingClientRect();
       const l = list.getBoundingClientRect();
@@ -1129,8 +1135,6 @@ export class Hud {
       else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
     }
     focus?.classList.add('focus');
-    // with a tool in hand on a short window the tool box takes the head's place, with a close button of its own
-    panel.classList.toggle('has-tool', !!active);
     for (const close of panel.querySelectorAll('[data-close]')) {
       close.addEventListener('click', () => {
         audio.play('click');

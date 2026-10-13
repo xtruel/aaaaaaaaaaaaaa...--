@@ -185,6 +185,57 @@ describe('catalog panel', () => {
     expect(q(panel, '.cat-help')!.textContent).toContain('Bot Dock');
   });
 
+  it('on a short window the item taken in hand, and then the item put away, stay in sight as the rows shrink and grow back (G5)', () => {
+    const { root, update } = setup();
+    // jsdom lays nothing out: a list 200 px high from y = 100, rows 40 px tall with a tool in hand (name, price, state)
+    // and 90 px without (what an item does comes back), as the catalog does up to 820 px of height
+    let scroll = 0;
+    const isList = (e: Element) => e.classList.contains('cat-scroll');
+    const scrollDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')!;
+    const rectOf = Element.prototype.getBoundingClientRect;
+    Object.defineProperty(Element.prototype, 'scrollTop', {
+      configurable: true,
+      get(this: Element) {
+        return isList(this) ? scroll : 0;
+      },
+      set(this: Element, v: number) {
+        if (isList(this)) scroll = Math.max(0, v);
+      },
+    });
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      if (isList(this)) return new DOMRect(0, 100, 300, 200);
+      if (this.classList.contains('cat-item')) {
+        const h = this.closest('[data-catalog-panel]')!.classList.contains('has-tool') ? 40 : 90;
+        const i = [...this.parentElement!.children].indexOf(this);
+        return new DOMRect(0, 100 + i * h - scroll, 300, h);
+      }
+      return rectOf.call(this);
+    };
+    try {
+      const inSight = (kind: CatalogKind) => {
+        const r = q(root, `[data-catalog-panel] [data-item="${kind}"]`)!.getBoundingClientRect();
+        return r.top >= 100 && r.bottom <= 300;
+      };
+      update({ catalog: true });
+      const kinds = [...root.querySelectorAll<HTMLElement>('[data-catalog-panel] [data-item]')].map((b) => b.dataset.item as CatalogKind);
+      const last = kinds[kinds.length - 1];
+      expect(kinds.length).toBeGreaterThanOrEqual(5);
+      update({ catalog: true, piece: { kind: last, rot: 0 } });
+      expect(q(root, '[data-catalog-panel]')!.classList.contains('has-tool')).toBe(true);
+      expect(inSight(last), 'the item in hand').toBe(true);
+      update({ catalog: true, piece: null });
+      expect(q(root, '[data-catalog-panel]')!.classList.contains('has-tool')).toBe(false);
+      expect(inSight(last), 'the item just put away').toBe(true);
+      // browsing with nothing put away keeps the list where the player left it
+      scroll = 0;
+      update({ catalog: true, piece: null });
+      expect(scroll).toBe(0);
+    } finally {
+      Object.defineProperty(Element.prototype, 'scrollTop', scrollDesc);
+      Element.prototype.getBoundingClientRect = rectOf;
+    }
+  });
+
   it('the tool help names the controls of the input in use, and changes with it while the tool is in hand (G5)', () => {
     const { root, update } = setup();
     const help = () => q(root, '[data-catalog-panel] .cat-help')!;
