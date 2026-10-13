@@ -1558,7 +1558,7 @@ export class Hud {
       <p class="insp-desc piece-desc">${esc(catalogEffect(info.kind))}</p>`;
     } else {
       panel.innerHTML = `${head}
-      <p class="insp-status piece-note">${t('insp.decoration')}</p>
+      <p class="insp-status piece-note">${t(PIECES[info.kind].decoration ? 'insp.decoration' : 'cat.construction.note')}</p>
       <div class="insp-actions">
         ${info.rotatable ? `<button type="button" class="btn btn-turn" data-rotate><span aria-hidden="true">⟳</span> ${t('cat.rotate')}</button>` : ''}
         ${info.movable ? `<button type="button" class="btn" data-move-piece>${t('insp.move')}</button>` : ''}

@@ -558,7 +558,7 @@ describe('building panel modules', () => {
 });
 
 describe('selected piece panel', () => {
-  it('names the piece, says it is decoration, offers Rotate (gate, lamp) and Remove with the refund', () => {
+  it('names the piece, says Construction for a gate as its tag does, offers Rotate (gate, lamp) and Remove with the refund', () => {
     const { s, root, calls, update } = setup();
     const p = freeTile(s);
     expect(placePiece(s, 'gate', p.x, p.y)).toBe(true);
@@ -567,7 +567,9 @@ describe('selected piece panel', () => {
     const insp = q(root, '[data-inspector]')!;
     expect(insp.hidden).toBe(false);
     expect(insp.querySelector('h3')!.textContent).toBe('Gate');
-    expect(insp.textContent).toContain('Decoration: no effect on the economy');
+    // its tag says Construction, and so does the note under it (as the catalog's caption for constructions)
+    expect(q(insp, '.tag')!.textContent).toBe('Construction');
+    expect(q(insp, '.piece-note')!.textContent).toBe('Construction: no effect on the economy');
     q(insp, '[data-rotate]')!.click();
     expect(q(insp, '[data-remove-piece]')!.textContent).toBe('Remove (+6 credits)');
     q(insp, '[data-remove-piece]')!.click();
