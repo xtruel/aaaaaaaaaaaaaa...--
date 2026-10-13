@@ -9,6 +9,7 @@
 //            sideways; every module card's button can be scrolled into sight and is not covered
 //  menu:     the build stamp in the top-left corner clear of the logo's star; the hand-lettered "Different futures,
 //            same city" (when shown) clear of the path cards' labels
+//  toast:    a toast over an ending dialog covers none of the dialog's buttons
 // One picture per language at 1024x640 (catalog with a tool) and two at 1920x1080 (en, de).
 import { startTest } from '../lib/report.mjs';
 import { frames, launch, openGame, S, settle, until } from '../lib/page.mjs';
@@ -149,6 +150,25 @@ const menuFit = () => {
   return [...new Set(bad)];
 };
 
+// a toast over the open dialog (one made here, as the game makes them): does it cover a button of the dialog?
+const toastOverDialog = () => {
+  const root = document.getElementById('toasts');
+  root.classList.add('below');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = '<span class="toast-ico"></span><span><small>Achievement unlocked</small><b>Garden City</b></span>';
+  root.append(t);
+  const T = t.getBoundingClientRect();
+  const bad = [];
+  for (const b of document.querySelectorAll('#modal-root .modal-actions > button')) {
+    const B = b.getBoundingClientRect();
+    if (Math.min(B.right, T.right) - Math.max(B.left, T.left) > 1 && Math.min(B.bottom, T.bottom) - Math.max(B.top, T.top) > 1) bad.push(`the toast over "${b.textContent.trim().slice(0, 30)}"`);
+  }
+  t.remove();
+  root.classList.remove('below');
+  return bad;
+};
+
 await T.run(async () => {
   const summary = {};
   for (const lang of T.cfg.langs) {
@@ -232,7 +252,21 @@ await T.run(async () => {
       }
       await S(page, () => window.scrapbot.session().selectBuilding(-1));
       T.ok(`${tag}: the Recycler's and the Dock's panels fit (inside, clear of the bars, every button reachable)`, panelBad.length === 0, panelBad.slice(0, 4).join('; '));
-      summary[tag] = { toolbar: bar.length, catalog: catBad.length, panels: panelBad.length };
+      // an ending (staged with the hook, as a finished Spire brings it), a toast over it; then "keep building"
+      await S(page, () => {
+        const ses = window.scrapbot.session();
+        ses.s.outcome = { kind: 'green', day: 12 };
+        ses.showEnding();
+      });
+      await until(page, () => !!document.querySelector('#modal-root .modal-ending'), null, { what: 'the ending' });
+      await settle(page);
+      const toastBad = await S(page, toastOverDialog);
+      T.ok(`${tag}: a toast over the ending covers none of its buttons`, toastBad.length === 0, toastBad.join('; '));
+      if (size === '1024x640' && lang === 'en') await T.shot(page, `ending-${lang}-${size}`);
+      await page.waitForTimeout(700); // (the dialog takes no key or button press in its first 600 ms)
+      await S(page, () => document.querySelectorAll('#modal-root .modal-actions > button')[0].click());
+      await until(page, () => !document.querySelector('#modal-root .modal') && !window.scrapbot.session().s.outcome, null, { what: 'the ending closed, the city going on' });
+      summary[tag] = { toolbar: bar.length, catalog: catBad.length, panels: panelBad.length, toast: toastBad.length };
     }
     T.ok(`${lang}: no page errors`, errors.length === 0, errors.slice(0, 2).join(' | '));
     await g.ctx.close();

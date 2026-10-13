@@ -3869,6 +3869,20 @@ body:has(.smog-panel:not([hidden])) .toasts {
   bottom: 24px;
 }
 
+/* on a short window a dialog fills the height and its buttons are at the bottom: over a dialog the toast goes to the
+   top right corner instead, over the dialog's header band (its title and eyebrow are at the left) */
+@media (max-height: 760px) {
+  .toasts.below,
+  body:has(#modal-root .modal-backdrop) .toasts {
+    top: 8px;
+    right: 8px;
+    bottom: auto;
+    left: auto;
+    align-items: flex-end;
+    transform: none;
+  }
+}
+
 .toast {
   display: flex;
   align-items: center;
