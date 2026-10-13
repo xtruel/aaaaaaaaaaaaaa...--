@@ -1,4 +1,4 @@
-# Scrapbot City — build 0.7.0-alpha.1
+# Scrapbot City — build 0.7.0-beta.1
 
 City builder in pixel art: piccoli robot raccolgono spazzatura, tu decidi cosa diventa.
 **Recycle × Build × Expand × Survive.** Un pianeta pulito o un profitto più grande?
@@ -14,8 +14,12 @@ npm run dev          # gioco nel browser: http://localhost:3001
 npm run build        # dist/index.html: un unico file con codice, CSS e font
 npm run balance      # partite automatiche su tutte le città per controllare il bilanciamento
 npm run i18n:check   # controlla che le 7 traduzioni abbiano tutte le chiavi, i {segnaposto} e i tag dell'inglese
+npm run waits        # dove va il tempo prima della Guglia, città per città, e i moduli (pilota automatico, seme fisso)
+npm run pace         # quando si scopre ogni progetto del catalogo, in minuti di gioco (pilota automatico, seme fisso)
 npm run art          # rigenera gli sprite isometrici dai modelli voxel (atlante + PNG singoli + foglio di controllo)
 npm test             # test automatici (proiezione, ordine di disegno, salvataggi, simulazione)
+npm run e2e          # test end-to-end nel browser (Chromium headless con Playwright): vedi e2e/README.md
+npm run e2e:list     # i test end-to-end, il loro input (simulato) e cosa coprono
 npm run desktop      # app desktop (Electron)
 npm run dist:win     # build per Steam in release/ (anche dist:linux, dist:mac)
 ```
@@ -43,9 +47,14 @@ Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
 
 ## Cosa c'è nel gioco
 
-- **Oggetti e moduli** (tasto `O`): pavimento industriale, recinzioni, cancelli e lampioni per dare forma ai quartieri
-  (solo decorazione), il deposito aggiuntivo per il Bot Dock e il filtro antismog per la Fonderia. Si paga alla conferma;
-  anteprima e annullamento sono gratis. Dettagli in [docs/MODULAR-INC1.md](docs/MODULAR-INC1.md).
+- **Oggetti e moduli** (tasto `O`): 24 oggetti del catalogo in tre categorie. **Costruzioni** (pavimento industriale,
+  basamento in cemento, recinzione, muro basso, pilastro d'angolo, cancello) e **Decorazioni** (lampione, panchina,
+  fioriera, insegna al neon, pergola, casetta di Miso, scultura di rottami, albero, fontana, statua di USA-9) danno forma
+  ai quartieri senza effetto sull'economia; le decorazioni si spostano gratis. **Moduli macchina** (deposito aggiuntivo,
+  filtro antismog, separatore magnetico, selezionatore di precisione, braccio doppio, capsula abitativa, pannelli
+  orientabili, ugello esteso): uno slot per edificio. I 18 oggetti dell'incremento 2 sono progetti da scoprire con un
+  traguardo raggiunto in una città. Si paga alla conferma; anteprima e annullamento sono gratis. Dettagli in
+  [docs/MODULAR-INC1.md](docs/MODULAR-INC1.md) e [docs/MODULAR-INC2.md](docs/MODULAR-INC2.md).
 - **Suggerimenti** (lampadina o tasto `Q`): USA-9 legge la città e consiglia cosa costruire, spiegando il perché.
   I primi 3 per città sono gratis e uno nuovo torna ogni 5 giorni. Poi si pagano in crediti, e il prezzo sale a ogni acquisto.
 - **18 achievement**, salvati localmente e inviati a Steam nella versione desktop.
@@ -83,9 +92,9 @@ i testi di aiuto mostrano i nomi dei tasti della tastiera del giocatore (per ese
 | Zoom | rotella, pinch su trackpad e touch, `+` / `-` |
 | Scegliere un edificio | `1`–`0`, `M` per la Scrap Spire |
 | Ruspa (macerie, oggetti) | `X` |
-| Oggetti e moduli (pavimento, recinzione, cancello, lampione, moduli) | `O` |
+| Oggetti e moduli (costruzioni, decorazioni, moduli) | `O` |
 | Ruotare l'oggetto in mano o quello selezionato | `R` / `Shift+R`, `Shift` + rotella |
-| Posare una fila di pavimento o recinzione | trascinare col tasto sinistro |
+| Posare una fila di pavimento, basamento, recinzione o muro | trascinare col tasto sinistro |
 | Suggerimento | `Q` |
 | Annullare | clic destro, `Esc` |
 | Pausa / velocità | `Space` / `Tab` |
@@ -93,8 +102,8 @@ i testi di aiuto mostrano i nomi dei tasti della tastiera del giocatore (per ese
 | Schermo intero (desktop) | `F11` |
 
 Con il **controller**: stick sinistro = cursore, stick destro = mappa, `A` costruisce o seleziona, `B` annulla,
-`LB`/`RB` scelgono l'edificio, `LT`/`RT` zoom, `X` ruspa, `Y` suggerimento (con una recinzione, un cancello o un
-lampione in mano `Y` lo ruota), `Start` menu,
+`LB`/`RB` scelgono l'edificio, `LT`/`RT` zoom, `X` ruspa, `Y` suggerimento (con un oggetto del catalogo in mano `Y`
+lo ruota, o dice che non si ruota), `Start` menu,
 D-pad = una casella alla volta, `View` pausa, `L3` velocità, `R3` torna all'HQ. Nei menu: D-pad o stick, `A` conferma, `B` indietro.
 
 ## Struttura
@@ -116,7 +125,7 @@ src/
     cities.ts          le 5 città della campagna e i loro obiettivi a stelle
     hints.ts           i consigli di USA-9
     sim.ts             simulazione a passo fisso
-    state.ts           stato e salvataggi (versione 2, legge anche la 1)
+    state.ts           stato e salvataggi (versione 3, legge anche la 1 e la 2)
     actions.ts, story.ts, world.ts
   render/              renderer isometrico, icone, menu e mappa della regione
     renderer.ts        il mondo in 2.5D: terreno in cache, ordine di disegno, ombre, luci, clic sugli sprite
@@ -124,6 +133,7 @@ src/
   assets/iso/          atlante generato da npm run art (atlas.png + atlas.json con gli ancoraggi)
   ui/                  menu, HUD, tutorial, regione, finestre di dialogo
 electron/              app desktop per Steam
+e2e/                   test end-to-end nel browser (npm run e2e), guida in e2e/README.md
 scripts/balance.ts     pilota automatico per il bilanciamento
 scripts/art/           pipeline della grafica: modelli voxel (models/), ray casting (voxel.ts), PNG, atlante
 art/sprites/           ogni fotogramma come PNG singolo; art/contact-sheet.png li mostra tutti
