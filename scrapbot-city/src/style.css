@@ -923,6 +923,8 @@ select {
 }
 
 .hud {
+  /* the catalog's width (wider on short windows): the smog panel keeps clear of it */
+  --cat-w: 360px;
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -1641,6 +1643,18 @@ select {
   text-shadow: 1px 1px 0 var(--ink);
 }
 
+/* The catalog open as well: the smog panel keeps to the room between the goal card (up to 330 px from the left, and a
+   gap) and the catalog (its width, its 10 px margin and a gap), narrower if it must (1024 px wide windows: 264 or
+   304 px), so neither covers the other; centred as before where there is room (1280 px and wider). Not below 240 px:
+   on a window narrower than 1024 px it reaches over the goal card's edge instead. */
+@media (min-width: 641px) {
+  .hud:has(.catalog:not([hidden])) .smog-panel {
+    --smog-w: clamp(240px, calc(100% - 360px - var(--cat-w)), 330px);
+    width: var(--smog-w);
+    left: clamp(calc(10px + var(--smog-w) / 2), 50%, calc(100% - 20px - var(--cat-w) - var(--smog-w) / 2));
+  }
+}
+
 /* short windows: a tighter smog panel, so the lists fit between the top bar and the build bar */
 @media (max-height: 720px) {
   .smog-panel .insp-head {
@@ -1849,7 +1863,7 @@ select {
   --path: var(--pink);
   display: flex;
   flex-direction: column;
-  width: 360px;
+  width: var(--cat-w);
   overflow: hidden;
 }
 
@@ -2432,8 +2446,8 @@ select {
 /* A short window (1280x720, 1024x640): the catalog gives its list the room. A little wider (fewer lines per row), a
    slimmer head; tabs, filters and rows tighter (with an item in hand: the block above). */
 @media (max-height: 760px) {
-  .catalog {
-    width: 400px;
+  .hud {
+    --cat-w: 400px;
   }
 
   /* the smog alarm keeps to the room left of the wider catalog while it is open, so its words and countdown stay in
