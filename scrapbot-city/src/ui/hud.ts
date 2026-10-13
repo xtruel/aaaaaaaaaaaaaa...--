@@ -259,8 +259,14 @@ export class Hud {
   private smogOpen = false; // the smog panel (a click on the smog meter opens and closes it)
   private smogKey = '';
   private s: GameState;
-  private layout = new ResizeObserver(() => {
-    this.placePanels();
+  private layout = new ResizeObserver(() => this.placePanels());
+  // the toolbar's names fitted to their cards again when the bar's width changes (the window's: the cards are
+  // narrower below 1280 px); not when the top bar's numbers change width, which happens every few seconds
+  private fittedWidth = -1;
+  private toolbarWidth = new ResizeObserver((entries) => {
+    const w = Math.round(entries[entries.length - 1].contentRect.width);
+    if (w === this.fittedWidth) return;
+    this.fittedWidth = w;
     fitToolNames(this.el.toolbar);
   });
   // a press anywhere but on the smog panel or its meter closes the panel (and goes on doing what it does)
@@ -289,6 +295,7 @@ export class Hud {
 
   dispose(): void {
     this.layout.disconnect();
+    this.toolbarWidth.disconnect();
     document.removeEventListener('pointerdown', this.pressOutside, true);
     document.documentElement.style.removeProperty('--toast-top');
     document.documentElement.style.removeProperty('--note-bottom');
@@ -520,6 +527,9 @@ export class Hud {
     this.layout.disconnect();
     for (const el of this.root.querySelectorAll('.hud-top, .hud-top > *, [data-toolbar], [data-smog-alert]')) this.layout.observe(el);
     // a long one-word name fits its card (measured again once the game's fonts are in: they change the widths)
+    this.toolbarWidth.disconnect();
+    this.fittedWidth = -1;
+    this.toolbarWidth.observe(toolbar);
     fitToolNames(toolbar);
     document.fonts?.ready.then(() => {
       if (toolbar.isConnected) fitToolNames(toolbar);
