@@ -111,6 +111,17 @@ function move(dir: 'up' | 'down' | 'left' | 'right'): void {
   }
   // sliders and pickers take left/right as "change the value"
   if ((dir === 'left' || dir === 'right') && nudgeValue(from, dir === 'right' ? 1 : -1)) return;
+  // the main menu's entries go up and down in their order, as the arrow keys do: the highlighted entry grows, which
+  // would throw the nearest-centre search off by one entry on a short window
+  const menuList = from.closest<HTMLElement>('.menu-list');
+  if (menuList && (dir === 'up' || dir === 'down')) {
+    const entries = list.filter((el) => menuList.contains(el));
+    const next = entries[entries.indexOf(from) + (dir === 'down' ? 1 : -1)];
+    if (next) {
+      focusEl(next);
+      return;
+    }
+  }
   const a = from.getBoundingClientRect();
   const ax = a.left + a.width / 2;
   const ay = a.top + a.height / 2;

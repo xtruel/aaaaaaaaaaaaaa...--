@@ -57,3 +57,24 @@ describe('pad in dialogs', () => {
     expect(back).toEqual(['set-full', 'set-motion', 'set-edge', 'set-crt', 'set-music', 'set-sfx', 'set-lang']);
   });
 });
+
+describe('pad on the main menu', () => {
+  it('up and down go through the entries in their order, the highlighted (grown) entry too (1280x720)', () => {
+    // the entries as measured at 1280x720: the highlighted one is drawn larger, reaching over its neighbours
+    const entries = ['new', 'continue', 'load', 'settings', 'extras', 'credits', 'quit'];
+    const html = (sel: string) =>
+      entries
+        .map((act, i) => `<button type="button" data-act="${act}" class="${act === sel ? 'selected' : ''}" ${box(act === sel ? [40, 286 + i * 44 - 12, 330, 64] : [48, 286 + i * 44, 300, 40])}>${act}</button>`)
+        .join('');
+    const walk = (from: string, dir: 'up' | 'down') => {
+      document.body.innerHTML = `<section class="screen menu" id="menu"><nav class="menu-list">${html(from)}</nav>
+        <button type="button" class="lang-pill" ${box([1100, 20, 140, 36])}>English</button></section><div id="modal-root"></div>`;
+      document.querySelector<HTMLElement>(`[data-act="${from}"]`)!.focus();
+      menuFrame(frame([dir]));
+      return focused();
+    };
+    layout();
+    for (let i = 1; i < entries.length; i++) expect(walk(entries[i], 'up'), `up from ${entries[i]}`).toBe(entries[i - 1]);
+    for (let i = 0; i < entries.length - 1; i++) expect(walk(entries[i], 'down'), `down from ${entries[i]}`).toBe(entries[i + 1]);
+  });
+});
