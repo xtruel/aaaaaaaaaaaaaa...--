@@ -58,6 +58,7 @@ import {
   slotModules,
   statusLine,
 } from './catalog';
+import { fitToolNames } from './fit';
 import type { CatalogCategory, CatalogFilter, ModuleState, PieceInfo, StatusLine } from './catalog';
 import { esc } from './escape';
 import { isModalOpen } from './modal';
@@ -251,7 +252,10 @@ export class Hud {
   private smogOpen = false; // the smog panel (a click on the smog meter opens and closes it)
   private smogKey = '';
   private s: GameState;
-  private layout = new ResizeObserver(() => this.placePanels());
+  private layout = new ResizeObserver(() => {
+    this.placePanels();
+    fitToolNames(this.el.toolbar);
+  });
   // a press anywhere but on the smog panel or its meter closes the panel (and goes on doing what it does)
   private pressOutside = (e: PointerEvent) => this.closeSmogUnless(e.target as Element | null);
 
@@ -508,6 +512,11 @@ export class Hud {
 
     this.layout.disconnect();
     for (const el of this.root.querySelectorAll('.hud-top, .hud-top > *, [data-toolbar], [data-smog-alert]')) this.layout.observe(el);
+    // a long one-word name fits its card (measured again once the game's fonts are in: they change the widths)
+    fitToolNames(toolbar);
+    document.fonts?.ready.then(() => {
+      if (toolbar.isConnected) fitToolNames(toolbar);
+    });
   }
 
   private showTooltip(type: BuildingType, anchor: HTMLElement): void {
