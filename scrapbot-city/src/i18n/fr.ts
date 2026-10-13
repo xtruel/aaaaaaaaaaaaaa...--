@@ -663,6 +663,8 @@ export const fr: Dict = {
   'hint.repeat': 'Celui-ci est offert : les conseils répétés et les « attends un peu » sont gratuits.',
   'hint.import.title': 'Plus de pièces',
   'hint.import.text': 'Pièces : {n}. Tu as des crédits à revendre : importe des pièces avec le + à côté du compteur de pièces ({parts} pièces pour {credits} crédits). Usines et Labos Répare-tout gardent toujours {reserve} pièces pour construire.',
+  'hint.recyclerPaused.title': "Production en pause",
+  'hint.recyclerPaused.text': "Pièces : {n}. Aucune nouvelle pièce n'arrive tant que chaque Recycleur est en pause. Sélectionne-le sur la carte et appuie sur {resume} dans son panneau : ça ne coûte rien.",
   'hint.afford.import': 'Ça coûte {cost}. Il te manque des pièces : importe-en avec le + à côté du compteur de pièces.',
   'hint.spireSave.parts': 'Usines et Labos Répare-tout transforment les pièces en crédits : mets-les en pause un moment, ou importe des pièces avec le +.',
   'import.title': 'Importer des pièces',

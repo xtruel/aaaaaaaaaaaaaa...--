@@ -664,6 +664,8 @@ export const it: Dict = {
   'hint.repeat': 'Questo è gratis: i consigli ripetuti e gli “aspetta un attimo” non si pagano.',
   'hint.import.title': 'Pezzi finiti',
   'hint.import.text': 'Pezzi: {n}. Hai crediti in abbondanza: importa pezzi con il + accanto al contatore dei pezzi ({parts} pezzi per {credits} crediti). Fabbriche e Lab Riparatutto lasciano sempre {reserve} pezzi per costruire.',
+  'hint.recyclerPaused.title': 'Produzione in pausa',
+  'hint.recyclerPaused.text': 'Pezzi: {n}. Non arrivano pezzi nuovi finché ogni Riciclatore è in pausa. Selezionalo sulla mappa e premi {resume} nel suo pannello: non costa nulla.',
   'hint.afford.import': 'Costa {cost}. Ti mancano pezzi: importane un po\' con il + accanto al contatore dei pezzi.',
   'hint.spireSave.parts': 'Fabbriche e Lab Riparatutto trasformano i pezzi in crediti: mettili in pausa per un po\', oppure importa pezzi con il +.',
   'import.title': 'Importa pezzi',

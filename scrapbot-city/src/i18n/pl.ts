@@ -666,6 +666,8 @@ export const pl: Dict = {
   'hint.repeat': 'Ta rada jest za darmo: powtórki i „poczekaj chwilę” nic nie kosztują.',
   'hint.import.title': 'Brak części',
   'hint.import.text': 'Części: {n}. Masz mnóstwo kredytów: importuj części przyciskiem + obok licznika części ({parts} części za {credits} kr). Fabryki i naprawialnie zawsze zostawiają {reserve} części na budowę.',
+  'hint.recyclerPaused.title': 'Produkcja wstrzymana',
+  'hint.recyclerPaused.text': 'Części: {n}. Nowe części nie przybywają, dopóki każdy recykler jest wstrzymany. Zaznacz go na mapie i naciśnij {resume} w jego panelu: to nic nie kosztuje.',
   'hint.afford.import': 'Koszt: {cost}. Brakuje ci części: importuj je przyciskiem + obok licznika części.',
   'hint.spireSave.parts': 'Fabryki i naprawialnie zamieniają części na kredyty: wstrzymaj je na chwilę albo importuj części przyciskiem +.',
   'import.title': 'Import części',

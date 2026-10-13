@@ -2,6 +2,7 @@
 // - no storage (Bot Dock) when credits are what is missing: a converter instead;
 // - no new Recycler without the power to run it (energy headroom) and scrap to feed it (in storage, waiting, or junk
 //   on the map for the bots);
+// - a Recycler the player paused is the bottleneck, said for free (not another Recycler, not imported parts);
 // - everything else as before.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { placeBuilding, placeCheck } from '../src/game/actions';
@@ -230,5 +231,34 @@ describe('everything else is as before', () => {
     const short = city({ buildings: ['recycler', 'recycler', 'factory', 'pods'], credits: 300, parts: 60 });
     expect(short.derived.efficiency).toBeLessThan(1);
     expect(suggest(short).title).toBe(t('hint.power.title'));
+  });
+});
+
+describe('a paused Recycler', () => {
+  const base = { buildings: ['recycler', 'solar', 'pods', 'dock'] as BuildingType[], parts: 10, scrap: 80, pop: 3, junk: true };
+  const paused = (o: Partial<Setup> = {}) => {
+    const s = city({ ...base, credits: 300, ...o });
+    for (const b of s.buildings) if (b.type === 'recycler') b.paused = true;
+    computeDerived(s);
+    return s;
+  };
+
+  it('every Recycler paused and parts short: resume it, for free (not another Recycler, not imported parts)', () => {
+    for (const credits of [300, 600]) {
+      const hint = suggest(paused({ credits }));
+      expect(hint, `${credits} credits`).toMatchObject({ title: t('hint.recyclerPaused.title'), free: true });
+      expect(hint.build).toBeUndefined();
+      expect(hint.text).toContain(t('insp.resume'));
+    }
+    // two Recyclers, one still running: the advice is as before
+    const one = city({ ...base, buildings: ['recycler', 'recycler', 'solar', 'solar', 'pods', 'dock'], credits: 300 });
+    one.buildings.find((b) => b.type === 'recycler')!.paused = true;
+    expect(suggest(one).title).not.toBe(t('hint.recyclerPaused.title'));
+  });
+
+  it('a Recycler running, or paused on a pile of parts: the advice is as before', () => {
+    expect(suggest(city({ ...base, credits: 300 })).title).not.toBe(t('hint.recyclerPaused.title'));
+    expect(suggest(city({ ...base, credits: 600 })).title).toBe(t('hint.import.title'));
+    expect(suggest(paused({ parts: 200 })).title).not.toBe(t('hint.recyclerPaused.title'));
   });
 });

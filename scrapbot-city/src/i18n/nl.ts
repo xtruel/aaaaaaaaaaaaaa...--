@@ -663,6 +663,8 @@ export const nl: Dict = {
   'hint.repeat': 'Deze is gratis: herhaald advies en “wacht even” kosten niets.',
   'hint.import.title': 'Geen onderdelen meer',
   'hint.import.text': 'Onderdelen: {n}. Je hebt credits genoeg: importeer onderdelen met de + naast de onderdelenteller ({parts} onderdelen voor {credits} credits). Fabrieken en Repareerlabs houden altijd {reserve} onderdelen over om te bouwen.',
+  'hint.recyclerPaused.title': 'Productie gepauzeerd',
+  'hint.recyclerPaused.text': 'Onderdelen: {n}. Er komen geen nieuwe onderdelen bij zolang elke Recycler gepauzeerd is. Selecteer hem op de kaart en druk op {resume} in zijn paneel: het kost niets.',
   'hint.afford.import': 'Het kost {cost}. Je komt onderdelen tekort: importeer er een paar met de + naast de onderdelenteller.',
   'hint.spireSave.parts': 'Fabrieken en Repareerlabs maken van onderdelen credits: zet ze even op pauze of importeer onderdelen met de +.',
   'import.title': 'Onderdelen importeren',

@@ -666,6 +666,8 @@ export const es: Dict = {
   'hint.repeat': 'Este es gratis: los consejos repetidos y los «espera un momento» no se cobran.',
   'hint.import.title': 'Sin piezas',
   'hint.import.text': 'Piezas: {n}. Te sobran créditos: importa piezas con el + junto al contador de piezas ({parts} piezas por {credits} créditos). Las fábricas y los talleres siempre dejan {reserve} piezas para construir.',
+  'hint.recyclerPaused.title': 'Producción en pausa',
+  'hint.recyclerPaused.text': 'Piezas: {n}. No llegan piezas nuevas mientras cada Reciclador esté en pausa. Selecciónalo en el mapa y pulsa {resume} en su panel: no cuesta nada.',
   'hint.afford.import': 'Cuesta {cost}. Te faltan piezas: importa unas cuantas con el + junto al contador de piezas.',
   'hint.spireSave.parts': 'Las fábricas y los talleres convierten piezas en créditos: ponlos en pausa un rato o importa piezas con el +.',
   'import.title': 'Importar piezas',

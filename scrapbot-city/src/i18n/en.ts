@@ -664,6 +664,8 @@ export const en = {
   'hint.repeat': 'No charge for this one: repeated advice and “just wait” are free.',
   'hint.import.title': 'Out of parts',
   'hint.import.text': 'Parts: {n}. You have plenty of credits, so import parts with the + next to the parts counter ({parts} parts for {credits} credits). Factories and Fix-It Labs always leave {reserve} parts for building.',
+  'hint.recyclerPaused.title': 'Production paused',
+  'hint.recyclerPaused.text': 'Parts: {n}. No new parts come in while every Recycler is paused. Select it on the map and press {resume} in its panel: it costs nothing.',
   'hint.afford.import': 'It costs {cost}. You are short on parts: import some with the + next to the parts counter.',
   'hint.spireSave.parts': 'Factories and Fix-It Labs turn parts into credits: pause them for a while, or import parts with the +.',
   'import.title': 'Import parts',

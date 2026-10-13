@@ -663,6 +663,8 @@ export const de: Dict = {
   'hint.repeat': 'Dieser Tipp ist gratis: Wiederholungen und „Warte kurz“ kosten nichts.',
   'hint.import.title': 'Keine Teile mehr',
   'hint.import.text': 'Teile: {n}. Du hast Credits genug: Importiere Teile mit dem + neben der Teile-Anzeige ({parts} Teile für {credits} Credits). Fabriken und Flicklabore lassen immer {reserve} Teile zum Bauen übrig.',
+  'hint.recyclerPaused.title': 'Produktion pausiert',
+  'hint.recyclerPaused.text': 'Teile: {n}. Es kommen keine neuen Teile, solange jeder Recycler pausiert ist. Wähle ihn auf der Karte und drücke {resume} in seinem Fenster: Das kostet nichts.',
   'hint.afford.import': 'Das kostet {cost}. Dir fehlen Teile: Importiere welche mit dem + neben der Teile-Anzeige.',
   'hint.spireSave.parts': 'Fabriken und Flicklabore machen aus Teilen Credits: Pausiere sie eine Weile oder importiere Teile mit dem +.',
   'import.title': 'Teile importieren',

@@ -38,9 +38,9 @@ const HELP: Record<string, [string, string]> = {
 };
 // the controls reference page (Extras): every input's lines, those of the input in use first
 const REFERENCE = ['extras.controls.1', 'extras.controls.2', 'extras.controls.3', 'extras.controls.4', 'extras.controls.5', 'extras.controls.pad', 'extras.controls.pad2', 'extras.controls.pad3', 'extras.controls.touch'];
-// fit every input: "press" a button or again; the smog meter's hover title (only a mouse shows a title); the toast
-// shown when a controller connects; a browser tab
-const ANY_INPUT = ['place.double', 'hint.smogEmergency.text', 'hud.smog.more', 'pad.help', 'quit.closeTab'];
+// fit every input: "press" a button or again (Resume production in a paused Recycler's panel); the smog meter's hover
+// title (only a mouse shows a title); the toast shown when a controller connects; a browser tab
+const ANY_INPUT = ['place.double', 'hint.smogEmergency.text', 'hint.recyclerPaused.text', 'hud.smog.more', 'pad.help', 'quit.closeTab'];
 const NAMES_A_CONTROL = (v: string) => /click|mouse|wheel|\bdrag|<kbd>|WASD|\btap\b|finger|pinch|stick|\bpress\b|\bhold\b|right button|left button/i.test(v) || /\([A-Z0-9]\)|\bTab\b/.test(v);
 
 const DICTS: Record<string, Record<string, string>> = { en, it: itDict, de, fr, es, pt, pl, nl };

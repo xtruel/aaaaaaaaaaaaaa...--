@@ -134,6 +134,13 @@ function pick(s: GameState): Hint {
     return { title: t('hint.parts.title'), text: t('hint.parts.text', { afford: afford(s, 'recycler') }), build: 'recycler' };
   }
 
+  // every Recycler paused by the player, with no pile of parts: that pause is what keeps parts from coming in, and
+  // undoing it costs nothing (not another Recycler, not imported parts, not more scrap)
+  const recyclers = s.buildings.filter((b) => b.type === 'recycler' && b.built >= 1);
+  if (recyclers.length > 0 && recyclers.every((b) => b.paused) && s.res.parts < 150) {
+    return { title: t('hint.recyclerPaused.title'), text: t('hint.recyclerPaused.text', { n: Math.floor(s.res.parts), resume: t('insp.resume') }), free: true };
+  }
+
   // rich in credits but out of parts (the industrial trap): import, don't wait
   if (s.res.parts < PARTS_RESERVE + 5 && s.res.credits >= IMPORT_PARTS.credits * 3) {
     return {
