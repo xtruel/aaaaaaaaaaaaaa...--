@@ -165,6 +165,19 @@ Il file è UTF-8 con BOM, così Excel mostra bene accenti e lettere polacche.
 **Se una versione futura aggiunge achievement**: rigenera i CSV, crea in Steamworks solo le righe nuove e non cambiare
 mai l'API name di un achievement già pubblicato (chi l'ha sbloccato lo perderebbe).
 
+## Screenshot e trailer per la pagina del negozio
+
+- **Screenshot**: i 7 in `store-assets/screenshots/` sono della **0.7.0-rc.1** (build di rilascio, 13/10/2026): elenco
+  in [store-assets/README.md](store-assets/README.md), come sono stati fatti in
+  [ASSETS-PROVENANCE.md](ASSETS-PROVENANCE.md) (2.3). Se la build in vendita cambia l'aspetto del gioco, vanno rifatti.
+- **Trailer: va rigenerato con `scripts/trailer/run.sh` sulla build finale prima di caricarlo**
+  (`scripts/trailer/run.sh . /tmp/scrapbot-trailer` dal commit della build finale, fuori da git; guida in
+  [scripts/trailer/README.md](../scripts/trailer/README.md)). La pipeline è stata provata da capo a fondo l'11/10/2026
+  sulla 0.7.0-alpha.1; per la RC non è stata rieseguita, quindi oggi **non esiste un trailer della RC** (il video di
+  prova è dell'alpha e non va caricato). Prima di lanciarla leggi la nota in [STORE-COPY.md](STORE-COPY.md),
+  sezione 7 (le schede del catalogo e la scena «decorate»). Il trailer si carica a mano in Steamworks
+  (*Store Page → Trailers*).
+
 ## Se qualcosa va storto
 
 | Messaggio | Cosa fare |

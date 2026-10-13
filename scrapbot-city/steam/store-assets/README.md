@@ -5,8 +5,11 @@ del proprietario (`1.webp`–`5.webp`) e, dove Steam vuole un'immagine **senza t
 Anteprima di tutto insieme: [`_contact-sheet.png`](_contact-sheet.png).
 
 **Ricontrollo dell'11/10/2026** (regole attuali di Steamworks, file per file): tutte le dimensioni sono giuste; la
-schermata del menu è stata tolta dagli screenshot (Steam vuole solo gameplay) e spostata in `extra/`; gli screenshot
-vanno **rifatti sulla build finale**; restano tre decisioni del titolare sul logo. Dettagli, provenienza e licenze:
+schermata del menu è stata tolta dagli screenshot (Steam vuole solo gameplay) e spostata in `extra/`; restano tre
+decisioni del titolare sul logo. **Il 13/10/2026 gli screenshot sono stati rifatti sulla 0.7.0-rc.1** (build di
+rilascio, 7 file) e il foglio di controllo aggiornato; capsule, logo e icone non sono stati toccati. **Il trailer va
+rigenerato con `scripts/trailer/run.sh` sulla build finale prima di caricarlo** (non è stato rifatto per la RC: vedi
+[../STORE-COPY.md](../STORE-COPY.md), sezione 7). Dettagli, provenienza e licenze:
 **[../ASSETS-PROVENANCE.md](../ASSETS-PROVENANCE.md)**.
 
 Requisiti controllati sulla documentazione Steamworks (ottobre 2026):
@@ -27,11 +30,13 @@ preso a scala 1:1. Nessuna immagine è deformata: ogni ritaglio ha già esattame
 | `main_capsule_1232x706.png` | Store Assets → **Main Capsule** (obbligatorio) | 1232×706 PNG | `4.webp`, parte sinistra (x 10–1505, altezza intera), scala 0,82, senza lo slogan |
 | `vertical_capsule_748x896.png` | Store Assets → **Vertical Capsule** (obbligatorio) | 748×896 PNG | `3.webp`, parte alta (y 0–1227), scala 0,73, senza gli slogan |
 | `page_background_1438x810.png` | Store Assets → **Page Background** (facoltativo) | 1438×810 PNG | render del gioco, zoom 2, ore 23:16; colore 85 %, luminosità 80 % perché resti uno sfondo |
-| `screenshots/screenshot_02_region_1920x1080.png` | Store Assets → **Screenshots** (almeno 5, 16:9, almeno 1920×1080, solo gameplay) | 1920×1080 PNG | mappa della Scrap Coast (campagna a 5/15 stelle, Neon Heights selezionata) |
-| `screenshots/screenshot_03_day_1920x1080.png` | Screenshots | 1920×1080 PNG | città grande di giorno, zoom 2, Pixel Garden in mano |
-| `screenshots/screenshot_04_night_1920x1080.png` | Screenshots | 1920×1080 PNG | la stessa città di notte, zoom 3, luci accese |
-| `screenshots/screenshot_05_inspect_1920x1080.png` | Screenshots | 1920×1080 PNG | pannello di un edificio (Recycler) aperto, zoom 3 |
-| `screenshots/screenshot_06_event_1920x1080.png` | Screenshots | 1920×1080 PNG | evento con K. Kurogane (2PM Corp): scelta industriale o verde |
+| `screenshots/screenshot_01_districts_1920x1080.png` | Store Assets → **Screenshots** (almeno 5, 16:9, almeno 1920×1080, solo gameplay), in quest'ordine | 1920×1080 PNG | 0.7.0-rc.1: Scrapbot City di giorno, zoom 3, con una piazza verde e un cortile industriale costruiti dal catalogo |
+| `screenshots/screenshot_02_night_1920x1080.png` | Screenshots | 1920×1080 PNG | gli stessi quartieri di notte, zoom 4: lampioni, pilastri, insegna al neon accesi |
+| `screenshots/screenshot_03_catalog_1920x1080.png` | Screenshots | 1920×1080 PNG | catalogo «Objects & modules», scheda Modules: stati «Can be bought», «Not now», «To discover» col traguardo |
+| `screenshots/screenshot_04_module_1920x1080.png` | Screenshots | 1920×1080 PNG | Neon Heights: pannello di una Fonderia col filtro antismog installato (a piena energia / ora) |
+| `screenshots/screenshot_05_smog_1920x1080.png` | Screenshots | 1920×1080 PNG | 2PM Company Town: nuvole di smog e il pannello «da dove viene e dove va» |
+| `screenshots/screenshot_06_greenvale_1920x1080.png` | Screenshots | 1920×1080 PNG | il tema di Greenvale, zoom 2 |
+| `screenshots/screenshot_07_region_1920x1080.png` | Screenshots | 1920×1080 PNG | mappa della Scrap Coast (13/15 stelle, 2PM Company Town selezionata) |
 | `extra/menu_1920x1080.png` | **non** come screenshot di Steam ("menu solo se parte unica del gioco"): stampa, eventi | 1920×1080 PNG | menu principale (ex `screenshot_01`) |
 | `library_capsule_600x900.png` | Library Assets → **Library Capsule** (obbligatorio) | 600×900 PNG | `3.webp` intera (già 2:3), scala 0,59, senza gli slogan |
 | `library_header_920x430.png` | Library Assets → **Library Header Capsule** (obbligatorio) | 920×430 PNG | copia di `header_capsule_920x430.png` |
@@ -78,16 +83,16 @@ Icone dell'applicazione (fuori da questa cartella, usate da `electron-builder` e
 - **Hero**: la città sta tutta dentro l'immagine e al centro (80–90 px liberi sopra e sotto), dove Steam non
   taglia mai. Con il logo in basso a sinistra (posizione predefinita) il logo copre strade e prati e appena il
   bordo sinistro della città; posizione e grandezza del logo si scelgono nell'anteprima di Steamworks.
-- **Screenshot**: della **0.6.0**, da una build di debug con città allestite da uno script (risorse e popolazione
-  impostate, edifici completati d'ufficio): vanno **sostituiti** con schermate della build finale, che
-  `scripts/trailer/run.sh` produce in `rec/stills/` senza toccare lo stato del gioco. Veri, con l'interfaccia; filtro CRT spento (opzione del gioco) perché le righe del CRT fanno
-  moiré nelle miniature di Steam; notifiche degli achievement nascoste; portafoglio da metà partita (~5 000 crediti).
-  La città è la stessa per 03–06: per più varietà conviene aggiungere una città verde e una industriale con lo
-  smog (non ancora fatte).
+- **Screenshot** (13/10/2026): della **0.7.0-rc.1**, presi dalla **build di rilascio** con l'interfaccia, gioco in
+  inglese, filtro CRT spento (opzione del gioco: le righe del CRT fanno moiré nelle miniature di Steam). Città giocate
+  dal pilota automatico del gioco (nessuna risorsa aggiunta), quartieri e filtro antismog comprati dall'interfaccia con
+  i soldi della città; quattro città diverse (Scrapbot City, Neon Heights, 2PM Company Town, Greenvale) e la mappa.
+  Tutti i passi, e che cosa li rende diversi da una partita di una persona: ASSETS-PROVENANCE.md, sezione 2.3.
+  Il primo screenshot è quello che Steam mostra di più: l'ordine dei numeri è una proposta.
 - **Icone piccole**: a 16, 24 e 32 px l'immagine intera diventa una macchia, quindi si usa un primo piano del muso
   di USA-9 (occhi rosa leggibili) nella stessa cornice rosa. La cornice originale è un po' più larga che alta:
   in `icon.png` tocca i bordi a destra e sinistra e lascia 16–17 px trasparenti sopra e sotto.
 - Non inclusi (non obbligatori o non grafica di questa consegna): immagini dei bundle, Artwork Override, icone
-  degli achievement (64×64), trailer.
+  degli achievement (64×64), trailer (da rigenerare con `scripts/trailer/run.sh` sulla build finale).
 - **Mac Icon** (.icns, campo delle icone community): serve solo per i collegamenti sul desktop di macOS, quindi solo
   con una build Mac, che oggi non c'è. Se arriverà, il file pronto è `build/icon.icns`.

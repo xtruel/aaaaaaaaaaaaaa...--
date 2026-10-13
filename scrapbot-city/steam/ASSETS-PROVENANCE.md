@@ -3,7 +3,9 @@
 Inventario dei file in `steam/store-assets/` e delle icone dell'applicazione (`build/`, `electron/icon.png`), con
 **da dove vengono**, **con che cosa sono stati fatti**, le **licenze** di ciò che il gioco contiene e **che cosa deve
 confermare il titolare**. Scritto l'11 ottobre 2026 sul ramo `steam-package`; i file sono quelli del commit `3629ffa`
-(costruiti dalla 0.6.0), salvo dove indicato. Gli hash sono i primi 12 caratteri dello sha256.
+(costruiti dalla 0.6.0), salvo dove indicato. **Aggiornato il 13 ottobre 2026 sul ramo `rc-0.7.0`**: gli screenshot in
+`screenshots/` e il foglio di controllo sono nuovi, della **0.7.0-rc.1** (sezione 2.3); capsule, logo, icone e le
+immagini del titolare **non sono stati toccati**. Gli hash sono i primi 12 caratteri dello sha256.
 
 ## 1. Le cinque immagini del titolare (origine prima del progetto: da dichiarare)
 
@@ -32,8 +34,9 @@ Strumenti usati per tutto ciò che è derivato: Python 3 con Pillow e NumPy (rit
 pulizia della trasparenza, cancellatura degli slogan per interpolazione), Chromium + Playwright per i render e le
 schermate del gioco. Nessun file è stato ingrandito; ogni ritaglio ha già le proporzioni finali (nessuna deformazione).
 Script e registro delle operazioni sono nello scratchpad della sessione che li ha prodotti (`make_assets.py`,
-`clean_art.py`, `inpaint.py`, `icons.py`, `patch_atlas.py`, `render-city2.mjs`, `shots.mjs`, `assets-log.json`):
-**non sono nel repository**, e i ritagli esatti sono riportati qui sotto.
+`clean_art.py`, `inpaint.py`, `icons.py`, `patch_atlas.py`, `render-city2.mjs`, `shots.mjs`, `assets-log.json`; per
+gli screenshot della RC `make-saves-media.mjs`, `prep.mjs`, `finals.mjs`, `contact_sheet.py` e i loro registri):
+**non sono nel repository**, e i ritagli e i passi esatti sono riportati qui sotto.
 
 ### 2.1 Capsule e libreria (dalle immagini del titolare)
 
@@ -62,22 +65,72 @@ Script e registro delle operazioni sono nello scratchpad della sessione che li h
 | `electron/icon.png`, `shortcut_icon_256x256.png` | `f42d75689f11` | `build/icons/256x256.png` | copia |
 | favicon in `index.html` (64×64, data URL) | — | primo piano a 64 px | 256 colori |
 
-### 2.3 Render e schermate del gioco (dal gioco stesso, versione 0.6.0)
+### 2.3 Render del gioco (0.6.0) e screenshot (0.7.0-rc.1)
 
 | File | Hash | Come è stato fatto |
 |---|---|---|
-| `library_hero_3840x1240.png` | `d8257ebf5df3` | **render del gioco 0.6.0** (build di debug del ramo `steam-package`), zoom 3, ore 20:52; città messa in scena da uno script con le regole di piazzamento del gioco (103 edifici, tutti completati); usata una **copia dell'atlante solo per il marketing** in cui le scritte dipinte ("2PM" su HQ e Inceneritore, stampigliature dei container) sono state cancellate; HUD nascosto. L'atlante del gioco non è stato toccato |
+| `library_hero_3840x1240.png` | `d8257ebf5df3` | **render del gioco 0.6.0** (build di debug del ramo `steam-package`), zoom 3, ore 20:52; città messa in scena da uno script con le regole di piazzamento del gioco (103 edifici, tutti completati); usata una **copia dell'atlante solo per il marketing** in cui le scritte dipinte ("2PM" su HQ e Inceneritore, stampigliature dei container) sono state cancellate; HUD nascosto. L'atlante del gioco non è stato toccato. **Non rifatto per la 0.7** (mostra solo edifici e terreno, senza gli oggetti del catalogo né i temi) |
 | `page_background_1438x810.png` | `e3656f7e5168` | come sopra, zoom 2, ore 23:16; colore 85 %, luminosità 80 % |
-| `screenshots/screenshot_02_region_1920x1080.png` | `bc70382e424d` | schermata vera della mappa della regione (0.6.0, build di debug); il **profilo della campagna** (stelle, banca) è stato scritto a mano nello storage prima di aprire il gioco |
-| `screenshots/screenshot_03_day_…`, `04_night_…`, `05_inspect_…`, `06_event_…` | `de1d9d71ef10`, `b9a2bdd566e2`, `e9a5121d10db`, `55bfba2a94e1` | schermate vere dell'interfaccia (0.6.0, build di debug), ma di una città **messa in scena**: edifici piazzati da script con le regole del gioco, poi completati d'ufficio; popolazione, crediti, pezzi, smog e ora del giorno impostati dallo script; l'evento di `06` forzato; notifiche degli achievement nascoste; filtro CRT spento |
-| `extra/menu_1920x1080.png` (prima `screenshot_01_menu…`) | `58fcfbf1d94c` | schermata vera del menu principale (0.6.0). **Spostata fuori da `screenshots/` l'11/10/2026**: Steam vuole screenshot "esclusivamente di gameplay" e il menu "solo se è una parte unica del gioco" ([Store Graphical Assets](https://partner.steamgames.com/doc/store/assets/standard), letto l'11/10/2026). Si può usare per stampa o eventi |
-| `_contact-sheet.png` | `f422f8ee732c` | foglio di controllo di tutti i file sopra, ridotti; **non va caricato** |
+| `screenshots/screenshot_01_districts_1920x1080.png` | `cfc572eff593` | **0.7.0-rc.1**, vedi sotto |
+| `screenshots/screenshot_02_night_1920x1080.png` | `dfcd923760bf` | idem |
+| `screenshots/screenshot_03_catalog_1920x1080.png` | `26cad5f9b42c` | idem |
+| `screenshots/screenshot_04_module_1920x1080.png` | `ac89966d4d1b` | idem |
+| `screenshots/screenshot_05_smog_1920x1080.png` | `a116c0bdde52` | idem |
+| `screenshots/screenshot_06_greenvale_1920x1080.png` | `95766c99b853` | idem |
+| `screenshots/screenshot_07_region_1920x1080.png` | `1b5070b85cb3` | idem |
+| `extra/menu_1920x1080.png` (prima `screenshot_01_menu…`) | `58fcfbf1d94c` | schermata vera del menu principale (**0.6.0**, non rifatta). **Spostata fuori da `screenshots/` l'11/10/2026**: Steam vuole screenshot "esclusivamente di gameplay" e il menu "solo se è una parte unica del gioco" ([Store Graphical Assets](https://partner.steamgames.com/doc/store/assets/standard), letto l'11/10/2026). Si può usare per stampa o eventi |
+| `_contact-sheet.png` | `ce156e72fb7d` | foglio di controllo di tutti i file sopra (screenshot della RC compresi), ridotti, rifatto il 13/10/2026 con lo stesso script; **non va caricato** |
 
-**Giudizio onesto sugli screenshot**: mostrano il vero motore e la vera interfaccia, ma della **0.6.0** e di città
-allestite con uno script (risorse e popolazione impostate, edifici completati d'ufficio). Per la pagina della 0.7
-vanno **rifatti sulla build finale**: `scripts/trailer/run.sh` produce anche `rec/stills/*.png`, schermate senza
-perdita della build filmata, con città giocate dal pilota automatico del gioco e azioni fatte solo dall'interfaccia
-(nessuna risorsa aggiunta). Vedi `scripts/trailer/README.md`.
+Gli screenshot 0.6.0 di prima (`screenshot_02_region`, `03_day`, `04_night`, `05_inspect`, `06_event`, città allestite
+con risorse impostate) sono stati **tolti** il 13/10/2026 e sostituiti da questi.
+
+**Gli screenshot della 0.7.0-rc.1 (13/10/2026).** Tutti presi dalla **build di rilascio** della RC, senza aggancio di
+debug (`npx vite build` del commit `d976dc9`; `index.html` sha256 `d9f5a6d870ef…`, lo stesso file che è dentro le
+build Steam rifatte lo stesso giorno, [README.md](README.md) passo 4), in Chromium headless con Playwright, finestra
+1920×1080 a densità 1, gioco in inglese, filtro CRT spento (opzione del gioco: le sue righe fanno moiré nelle
+miniature), suoni a zero. Nessun ritocco: PNG della pagina, solo ricompresso senza perdita (pixel identici). Input
+**simulato** (mouse e tastiera di Playwright), nessun hardware vero.
+
+Come sono state preparate le città:
+1. **Partite del pilota automatico**, come per il trailer (`scripts/trailer/make-saves.mjs`, copia nello scratchpad):
+   il pilota automatico del gioco (`scripts/autopilot.ts`) gioca le 5 città della campagna con la simulazione del
+   gioco, due partite per città (piano verde e piano industriale) fino al finale, e di ogni città resta un salvataggio
+   a metà partita. Nessuna risorsa aggiunta. Le stelle della mappa (13 su 15) sono quelle di quelle dieci partite,
+   tenute insieme come fa il gioco; il profilo ha già tutti gli achievement (perché nessuna notifica copra una scena).
+   **Unica aggiunta rispetto al trailer**: il profilo dei progetti con i progetti che quelle dieci partite hanno
+   raggiunto, letti con le funzioni del gioco (`goalReached`, `goalValue` di `src/game/projects.ts`) a ogni secondo di
+   gioco, come il gioco li registra mentre si gioca: 14 su 18. La scultura l'ha aggiunta il gioco stesso all'apertura
+   (Guglie finite nel profilo della campagna); casetta di Miso, ugello esteso e pilastro d'angolo restavano da scoprire.
+2. **Preparazione sulla build di debug, solo dall'interfaccia** (mouse e tastiera simulati; l'aggancio di debug è
+   servito solo a **leggere** dove stanno caselle ed edifici): Scrapbot City aperta con «Continue», orologio in pausa;
+   la piazza verde e il cortile industriale comprati dal catalogo pezzo per pezzo con i soldi della città (73 pezzi:
+   363 crediti, 23 pezzi, 72 rottami, su 452 crediti, 310 pezzi e 361 rottami che la città aveva; ogni acquisto
+   registrato: le risorse sono scese esattamente del prezzo, 27/27 controlli); al 20° pezzo posato la città ha scoperto
+   da sé il pilastro d'angolo, poi usato nel cortile. A Neon Heights il filtro antismog installato dal pannello di una
+   Fonderia, pagato 45 crediti e 20 pezzi. Uscita con «Region map» (la città della campagna si salva).
+3. **Scatti sulla build di rilascio**, con lo storage del browser lasciato dal passo 2: menu → «New game» → campagna →
+   mappa → città → «Continue». L'orologio portato all'ora voluta con i pulsanti della velocità; inquadrature con i tasti
+   dello zoom, `H` e trascinamenti col tasto destro misurati sulla build di debug; gli eventi della storia comparsi
+   intanto hanno avuto una risposta, come da un giocatore. 01, 02 e 06 sono presi con l'orologio a ×1 (tre scatti a un
+   secondo l'uno dall'altro; scelto quello senza scritte di produzione sopra gli edifici: in 06 resta una scritta
+   «+… PARTS» appena visibile sull'HQ); 03, 04, 05 e 07 con il gioco in pausa (pannelli aperti).
+
+| Screenshot | Città e momento | Cosa mostra |
+|---|---|---|
+| `01_districts` | Scrapbot City (partita verde del pilota), giorno 8, 12:06, zoom 3 | la città con i due quartieri costruiti dal catalogo: la piazza verde (pavimento, recinzione con entrata, alberi, panchine, fioriere, fontana, statua di USA-9, pergola, insegna al neon) e il cortile industriale (pilastri d'angolo, cancello, muri bassi, basamenti in cemento, due lampioni, scultura di rottami) |
+| `02_night` | Scrapbot City, giorno 8, 00:09, zoom 4 | gli stessi quartieri di notte: lampioni, luci in cima ai pilastri, insegna e occhi della scultura accesi, finestre della città |
+| `03_catalog` | Scrapbot City, giorno 8, 12:10, in pausa | il catalogo «Objects & modules», scheda Modules, filtro All (All 8, Available 7, To discover 1): righe «Can be bought», «Not now · Only on a finished 2PM Factory» e «To discover · Clean up 10 sludge tiles · 0 / 10 in this city · best 5», con i compromessi scritti; accanto, la piazza e il cortile |
+| `04_module` | Neon Heights (partita industriale), giorno 5, 10:09, in pausa | il pannello di una Fonderia col filtro antismog installato: colonne «Full power / Now», smog al giorno +2,1 → +0,8, energia −2 → −3, «Remove» col rimborso; il tema di Neon Heights e le nuvole di smog sopra chi inquina |
+| `05_smog` | 2PM Company Town (partita industriale), giorno 5, 10:06, in pausa | smog al 57%: nuvole sopra Inceneritori e Fonderie e il pannello «Where it comes from and where it goes» (fonti, pulizia, totale al giorno, la regola del 95% per 30 secondi); il tema della città aziendale |
+| `06_greenvale` | Greenvale (partita verde), giorno 6, 11:28, zoom 2 | il tema di Greenvale: erba e terra, il fiume e la scenografia di contorno al bordo della mappa, la città al centro |
+| `07_region` | mappa della regione | le 5 città della Scrap Coast con le loro stelle (13 su 15) e la scheda di 2PM Company Town (regole, obiettivi delle stelle, «Continue») |
+
+**Giudizio onesto sugli screenshot**: sono la vera build di rilascio della RC con la sua interfaccia, senza risorse
+messe a mano e senza stato ritoccato. Restano diversi da una partita di una persona: le città le ha giocate il pilota
+automatico; le stelle vengono da due partite per città; il profilo dei progetti l'ha scritto lo script (passo 1, con
+le regole del gioco); i due quartieri li ha costruiti uno script attraverso l'interfaccia, non una persona; il profilo
+ha già tutti gli achievement. Non dicono niente su bilanciamento, durata o divertimento. Se la build in vendita cambia
+l'aspetto del gioco, vanno rifatti.
 
 ### 2.4 Trailer e schermate della pipeline (fuori dal repository)
 
@@ -87,6 +140,9 @@ perdita della build filmata, con città giocate dal pilota automatico del gioco 
 | `rec/stills/*.png` | stessa cartella | schermate senza perdita degli stessi momenti (candidate per gli screenshot del negozio) |
 
 La prova dell'11/10/2026 mostra la **0.7.0-alpha.1** (ramo principale `04d782e`), non la build finale: non va caricata.
+**Il trailer va rigenerato con `scripts/trailer/run.sh` sulla build finale prima di caricarlo**: per la 0.7.0-rc.1 la
+pipeline non è stata rieseguita (scelta del titolare), quindi un trailer della RC non c'è. Nota sulle schede del
+catalogo e la scena «decorate» in [STORE-COPY.md](STORE-COPY.md), sezione 7.
 
 ## 3. Il gioco: chi ha fatto che cosa
 
@@ -152,7 +208,7 @@ centrale 860×380; logo solo logotipo su sfondo trasparente, 1280 px di larghezz
 | Library hero 3840×1240 | ✔ PNG | solo artwork, nessuna parola (controllato al 50 %) | **conforme** |
 | Library logo 1280×720 | ✔ PNG RGBA, sfondo trasparente | logotipo + targa "2PM" + titolo in katakana | **da decidere** (sotto) |
 | Page background 1438×810 | ✔ | scuro, "ambient" | **conforme** |
-| Screenshot 02–06 | ✔ 1920×1080, 5 file (il minimo) | gameplay della 0.6.0, città allestite | dimensioni conformi; **da rifare sulla build finale** |
+| Screenshot 01–07 | ✔ 1920×1080 PNG, 7 file (minimo 5) | gameplay della 0.7.0-rc.1, build di rilascio, con l'interfaccia (sezione 2.3) | **conforme**; da rifare solo se la build in vendita cambia l'aspetto |
 | ex screenshot 01 (menu) | ✔ | menu principale | **corretto**: tolto da `screenshots/` (vedi 2.3) |
 | Community icon 184×184 JPG | ✔ | icona | **conforme** |
 | Shortcut icon 256×256 PNG / .ico | ✔ | icona | **conforme** |
@@ -182,4 +238,6 @@ Nessuna dimensione era sbagliata: l'unica correzione fatta è lo spostamento del
       personaggi altrui (la verifica legale dei nomi è già nella lista di docs/STEAM.md).
 - [ ] Le decisioni dei punti 1–4 della sezione 5.
 - [ ] Origine di `docs/mockup-main-menu.png` (non è nel gioco: solo per completezza).
-- [ ] Che le schermate per la pagina saranno rifatte sulla build finale (sezione 2.3).
+- [ ] Che gli screenshot della 0.7.0-rc.1 vanno bene così come sono stati preparati (sezione 2.3: città del pilota
+      automatico, profilo dei progetti scritto dallo script, quartieri costruiti da uno script dall'interfaccia).
+- [ ] Il trailer, da rigenerare sulla build finale con `scripts/trailer/run.sh` prima di caricarlo (sezione 2.4).
