@@ -82,3 +82,17 @@ antismog in tedesco, circa 715 px a zoom 5, accanto al catalogo largo 400 px su 
 promette dalla 0.7.0-alpha.1 che le scritte sulla mappa restano fuori dai pannelli "quando nella finestra c'è posto"
 e che a zoom alto su una finestra piccola una scritta lunga può restarci sotto (CHANGELOG): lo script chiedeva una cosa
 che il gioco non promette. Andare a capo su due righe sarebbe una decisione di prodotto, non un difetto.
+
+Ritirati anche gli altri vecchi script con fallimenti noti prima della 0.7.0-beta.1 (stavano nelle cartelle di lavoro
+delle verifiche, non nel repository). Rieseguiti sulla build finale, nessuno mostra un difetto del gioco; quello che
+controllavano lo controlla ora la suite:
+
+| vecchio script | perché falliva | lo copre ora |
+|---|---|---|
+| `saves-v4` | pressioni a meno di 600 ms l'una dall'altra, che il gioco ora ignora di proposito (con pressioni a 700 ms: 74/74) | `saves`, `double-press-*` |
+| `ui-saves` | il clic su Rimuovi non diventava mai «stabile» per lo script (48/1, uguale su 97248dd) | `saves`, `items-*` |
+| `release-keys` | il suo elenco di chiavi non conosce la copia di sicurezza con l'impronta (`backup:save:<slot>:v<n>:<impronta>`) | `release-smoke` |
+| `fixture-07a1`, `fixture-06-release` | si aspettavano salvataggi in versione 2 (ora 3); il secondo controllo di `fixture-06-release` leggeva i crediti in un solo fotogramma (stesso stato della simulazione su 97248dd e sulla beta) | `saves`, `tests/saves.test.ts` |
+| `hidden-fence` | schede del catalogo cambiate, pressioni dentro i 600 ms | `covered-*` |
+| `dbl-mouse` | pressioni dentro i 600 ms | `double-press-*`, `comfort-*` |
+| `play.mjs` su `campaign-home` | si fermava su un dialogo comparso da solo | `campaign-home` |

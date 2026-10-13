@@ -10,15 +10,16 @@ Questa guida va dal repository alla pagina Steam pubblicata.
 | App desktop (finestra, F11 fullscreen, uscita, link esterni) | `electron/main.cjs` |
 | Ponte sicuro gioco ↔ desktop (`window.scrapbotDesktop`) | `electron/preload.cjs` |
 | **Salvataggi su file** (uno per città, scrittura atomica + copia `.bak`), pronti per Steam Cloud | `electron/main.cjs`, `src/storage.ts` |
-| **Controller** (Steam Deck, Xbox, PlayStation): menu col D-pad, cursore virtuale in città | `src/gamepad.ts`, `src/session.ts` |
+| **Controller** (pensato per Steam Deck, Xbox, PlayStation; provato solo con un controller simulato): menu col D-pad, cursore virtuale in città | `src/gamepad.ts`, `src/session.ts` |
 | **8 lingue**: inglese, italiano, tedesco, francese, spagnolo, portoghese, polacco, olandese | `src/i18n/` |
 | 18 achievement già nel gioco, inviati a Steam se disponibile | `src/achievements.ts` |
 | Build per Steam (cartella, non installer) | `npm run dist:win` / `dist:linux` / `dist:mac` → `release/` |
 | Prova locale dell'app desktop | `npm run desktop` |
 
-Testato: l'app si apre a 1280×800 (la risoluzione dello **Steam Deck**), il menu funziona, "Quit" chiude l'app,
-il pacchetto Linux generato da `electron-builder` si avvia, i salvataggi finiscono nella cartella `saves`
-e la lingua scelta resta dopo il riavvio.
+Provato su Linux, senza client Steam (mai su Windows né su uno Steam Deck vero): l'app si apre a 1280×800 (la
+risoluzione dello **Steam Deck**), il menu funziona, "Quit" chiude l'app, il pacchetto Linux generato da
+`electron-builder` si avvia (0.6.0), i salvataggi finiscono nella cartella `saves` e la lingua scelta resta dopo il
+riavvio. Per la 0.7.0-beta.1 l'app è stata riprovata con Electron 33 sotto Xvfb: vedi `docs/BETA-REPORT.md`.
 
 ### Stato dell'integrazione Steam (build 0.6.0) — verificato
 
@@ -29,7 +30,7 @@ e la lingua scelta resta dopo il riavvio.
 | Salvataggi su file (scrittura atomica + `.bak`, ripresa dalla copia se il file è rovinato) | ✔ fatto e testato | `tests/storage.test.ts`, `tests/saves.test.ts` |
 | **Steam Cloud** | ⏳ **IN SOSPESO** | il gioco scrive già i file nella cartella giusta; resta da attivare **Auto-Cloud** in Steamworks (sezione 4). Non si può provare senza l'app su Steam |
 | Overlay Steam e tastiera a schermo del Deck | ⏳ in sospeso | dipendono da `steamworks.js`; senza, il gioco usa la propria tastiera e i propri campi |
-| Controller / Steam Deck (1280×800) | ✔ testato | D-pad, cursore virtuale, menu, pausa |
+| Controller / Steam Deck (1280×800) | ⏳ **da provare su hardware vero** | c'è nel gioco (D-pad, cursore virtuale, menu, pausa) e passa le prove con un controller **simulato** (Gamepad API simulata in Chromium headless, finestra 1280×800); mai provato con un controller vero né su uno Steam Deck |
 
 ## 2. Account e app su Steamworks
 
@@ -103,15 +104,17 @@ Chi aveva già giocato con la 0.4 desktop non perde niente: al primo avvio i vec
 
 ## 5. Steam Deck e controller
 
-Per il badge **Steam Deck Verified** Valve controlla queste cose; lo stato attuale:
+Per il badge **Steam Deck Verified** Valve controlla queste cose; lo stato attuale. **Nessuna riga è stata provata su
+uno Steam Deck vero**: ✔ vuol dire «c'è nel gioco e passa le prove con il controller simulato (Gamepad API simulata in
+Chromium headless) a 1280×800», non che Valve o uno Steam Deck l'abbiano confermato.
 
 | Requisito | Stato |
 |---|---|
-| Tutto il gioco usabile col controller, senza mouse | ✔ menu, dialoghi, regione e città (cursore virtuale) |
+| Tutto il gioco usabile col controller, senza mouse | ✔ menu, dialoghi, regione e città (cursore virtuale), con il controller simulato |
 | Glifi dei pulsanti del controller nei testi | ✔ A, B, X, Y, LB/RB, LT/RT, Start, View, L3, R3 |
 | Risoluzione 1280×800 o 16:10 | ✔ finestra di partenza 1280×800 |
-| Testi leggibili (minimo 9 px a 1280×800) | ✔ verificato sugli screenshot, da ricontrollare nelle lingue lunghe (DE, PL) |
-| Tastiera a schermo per i campi di testo | ✔ con steamworks.js (`showFloatingGamepadTextInput`), altrimenti Steam + X |
+| Testi leggibili (minimo 9 px a 1280×800) | ✔ verificato sugli screenshot, da ricontrollare nelle lingue lunghe (DE, PL) e sullo schermo del Deck |
+| Tastiera a schermo per i campi di testo | ⏳ da provare sul Deck: `showFloatingGamepadTextInput` richiede steamworks.js, che non è installato (sezione 1); senza, resta la tastiera di sistema con Steam + X |
 | Nessun launcher esterno | ✔ |
 
 Configurazione in Steamworks → *Steam Input*: imposta il supporto controller a **"Supporto completo"**
@@ -160,8 +163,9 @@ al primo avvio; si cambia dal pulsante col globo nel menu o dalle impostazioni.
 
 ## 9. Cosa manca prima di vendere (onestamente)
 
-Fatto nella 0.5: salvataggi su file con Steam Cloud, controller e Steam Deck, 8 lingue, 4 brani di musica
-(menu, città di giorno, città di notte, mappa della regione), font giapponese per il logo.
+Fatto nella 0.5: salvataggi su file pronti per Steam Cloud (da attivare e provare in Steamworks), supporto del
+controller pensato anche per lo Steam Deck (provato finora solo con un controller simulato), 8 lingue, 4 brani di
+musica (menu, città di giorno, città di notte, mappa della regione), font giapponese per il logo.
 
 1. **Più contenuti** (è il punto più importante): ci sono solo 10 eventi narrativi in tutto, che si ripetono
    in tutte e 5 le città, e una città si completa in 12–20 minuti. Per un gioco a pagamento servono almeno
