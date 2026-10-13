@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SETTINGS, clock, dialogButtons, handlers, page, pressButton, savedTime } from './session-harness';
 import { createGame } from '../src/game/state';
 import { GameSession } from '../src/session';
+import { saveGame } from '../src/storage';
 import { closeModal } from '../src/ui/modal';
 
 beforeEach(() => {
@@ -62,6 +63,46 @@ describe('leaving a city during the smog countdown', () => {
     (session as unknown as { openPause(): void }).openPause();
     pressButton(c, 'Main menu');
     expect(savedTime('city-home')).toBe(60);
+    session.dispose();
+  });
+});
+
+describe('the training city kept beside the player\'s free play city', () => {
+  it('is not saved until the player saves it in a slot; then that slot is its own (autosaves, Save & main menu, Continue)', () => {
+    const c = clock();
+    const h = handlers();
+    // the player's own free play city in the autosave
+    const old = createGame({ seed: 9, cityName: 'Old Town' });
+    old.time = 200.2;
+    expect(saveGame('auto', old)).toBe(true);
+    const s = createGame({ seed: 4242, cityName: 'Training Yard', tutorial: true });
+    const session = new GameSession(page(), s, SETTINGS, h);
+    // Pause > Skip the tutorial > "Keep my saved city"
+    (session as unknown as { endTutorial(finished: boolean, campaign: boolean): void }).endTutorial(false, false);
+    pressButton(c, 'Keep my saved city');
+    const pause = () => (session as unknown as { openPause(): void }).openPause();
+    pause();
+    expect(dialogButtons().at(-1)).toEqual({ label: 'Main menu', hint: 'this training city is not saved' });
+    // Save game > slot 1, at 21 s
+    s.time = 21.3;
+    pressButton(c, 'Save game');
+    pressButton(c, 'Save');
+    expect(savedTime('1')).toBe(21.3);
+    closeModal();
+    // the next day's autosave goes to slot 1, never to the player's own city
+    s.time = 71.3;
+    (session as unknown as { autosave(): void }).autosave();
+    expect(savedTime('1')).toBe(71.3);
+    expect(savedTime('auto')).toBe(200.2);
+    // Save & main menu saves it there, and Continue opens it
+    s.time = 80;
+    pause();
+    expect(dialogButtons().at(-1)).toEqual({ label: 'Save & main menu', hint: '' });
+    pressButton(c, 'Save & main menu');
+    expect(h.onExitToMenu).toHaveBeenCalledTimes(1);
+    expect(savedTime('1')).toBe(80);
+    expect(savedTime('auto')).toBe(200.2);
+    expect(localStorage.getItem('scrapbot:last')).toBe('1');
     session.dispose();
   });
 });

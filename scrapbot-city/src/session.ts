@@ -1534,6 +1534,17 @@ export class GameSession implements PadTarget {
     });
   }
 
+  // A free play city saved in a slot from the pause menu (the projects' maxima go with it). The training city kept
+  // beside the player's own city (unsaved) belongs to that slot from then on: its autosaves, Save & main menu and
+  // Continue go there, never to the free play autosave it was kept apart from.
+  private savedIn(slot: SlotId): void {
+    this.projects.flush();
+    if (!this.unsaved) return;
+    this.unsaved = false;
+    this.homeSlot = slot;
+    setLastPlayed(slot);
+  }
+
   // ---------- dialogs ----------
 
   private showIntro(): void {
@@ -1725,12 +1736,13 @@ export class GameSession implements PadTarget {
     } else {
       actions = [
         { label: t('pause.resume'), primary: true, onClick: closeModal },
-        { label: t('pause.save'), onClick: () => openSlots('save', { state: s, onBack: () => this.openPause(), onSaved: () => this.projects.flush() }) },
+        { label: t('pause.save'), onClick: () => openSlots('save', { state: s, onBack: () => this.openPause(), onSaved: (slot) => this.savedIn(slot) }) },
         { label: t('pause.load'), onClick: () => openSlots('load', { onLoad: (slot) => this.handlers.onLoadSlot(slot), onBack: () => this.openPause() }) },
         settings,
         {
-          label: canAutosave(s) ? t('pause.saveMenu') : t('pause.mainMenu'),
-          hint: canAutosave(s) ? undefined : kept,
+          // the training city kept beside the player's own city is not saved until they save it in a slot
+          label: this.slot && canAutosave(s) ? t('pause.saveMenu') : t('pause.mainMenu'),
+          hint: !this.slot ? t('pause.trainingNotSaved') : canAutosave(s) ? undefined : kept,
           onClick: () => {
             this.save();
             this.handlers.onExitToMenu();

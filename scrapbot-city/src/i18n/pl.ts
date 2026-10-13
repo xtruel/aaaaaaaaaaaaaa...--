@@ -460,6 +460,7 @@ export const pl: Dict = {
   'pause.skipTutorial': 'Pomiń samouczek',
   'pause.tutorialNotSaved': 'samouczek nie jest zapisywany',
   'pause.smogKept': 'alarm smogowy: zostaje zapis z początku dnia',
+  'pause.trainingNotSaved': 'to miasto treningowe nie jest zapisane',
 
   // ---------- hints ----------
   'hint.eyebrow': 'USA-9 · Podpowiedź',

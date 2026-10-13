@@ -460,6 +460,7 @@ export const es: Dict = {
   'pause.skipTutorial': 'Saltar el tutorial',
   'pause.tutorialNotSaved': 'el tutorial no se guarda',
   'pause.smogKept': 'alarma de smog: se queda la partida del inicio del día',
+  'pause.trainingNotSaved': 'esta ciudad de entrenamiento no está guardada',
 
   // ---------- hints ----------
   'hint.eyebrow': 'USA-9 · Pista',

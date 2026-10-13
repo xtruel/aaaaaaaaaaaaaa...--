@@ -116,7 +116,7 @@ function refocus(root: HTMLElement, selector: string): void {
   scope.querySelector<HTMLButtonElement>('.modal-body button:not(:disabled), .modal-actions button:not(:disabled)')?.focus();
 }
 
-export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLoad?: (slot: SlotId) => void; onBack?: () => void; onSaved?: () => void }): void {
+export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLoad?: (slot: SlotId) => void; onBack?: () => void; onSaved?: (slot: SlotId) => void }): void {
   const body = el('div', 'slots');
   const render = () => {
     body.innerHTML = '';
@@ -137,7 +137,7 @@ export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLo
         if (mode === 'save' && opts.state) {
           const ok = saveGame(slot, opts.state);
           // (the session writes the projects' maxima with every save: src/profile.ts)
-          if (ok) opts.onSaved?.();
+          if (ok) opts.onSaved?.(slot);
           audio.play(ok ? 'done' : 'error');
           if (!ok) row.querySelector('span')!.textContent = t('slots.failed');
           else {
