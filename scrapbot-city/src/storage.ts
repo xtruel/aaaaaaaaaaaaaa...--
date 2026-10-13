@@ -167,7 +167,7 @@ export function fingerprint(text: string): string {
   return (h >>> 0).toString(36);
 }
 
-// Before this version first overwrites a save written by another one (0.6 and 0.7.0-alpha.1
+// Before this version first overwrites (or a restart clears) a save written by another one (0.6 and 0.7.0-alpha.1
 // wrote version 2; a save with no version or a damaged one counts as 0), the original text is copied aside, once per
 // text, with its slot info: backup:save:<slot>:v<n> and backup:meta:<slot>:v<n>, or with the text's fingerprint
 // (backup:save:<slot>:v<n>:<fingerprint>) when that key holds another city already (a second version-2 city saved in
@@ -203,7 +203,10 @@ export function saveGame(slot: SlotId, s: GameState): boolean {
   return writeKey(`save:${slot}`, serialize(s)) && writeKey(`meta:${slot}`, JSON.stringify(meta));
 }
 
+// Restarting a city: a save of another version (one this version cannot load, from a newer one) is first copied
+// aside as saveGame does; when that copy cannot be written the save is left alone (the next save is refused too).
 export function clearSlot(slot: SlotId): void {
+  if (!backupBeforeOverwrite(slot)) return;
   removeKey(`save:${slot}`);
   removeKey(`meta:${slot}`);
 }

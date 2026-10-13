@@ -2,7 +2,8 @@
 // Owner brief §7: a backup before any migration. A save written by another version (0.6 and 0.7.0-alpha.1
 // wrote version 2; no version or a damaged file counts as 0) is copied aside once, as it was, before this
 // version first overwrites it, in the browser storage and in the desktop files alike; a second, different city of
-// that version in the same slot gets a backup of its own. Backups are never removed.
+// that version in the same slot gets a backup of its own; restarting a city whose save this version cannot load keeps
+// it aside too. Backups are never removed.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -133,6 +134,21 @@ describe('backup before the first overwrite', () => {
     plant('1', two, metaTwo);
     expect(saveGame('1', loadGame('1')!)).toBe(true);
     expect(backups()).toHaveLength(4);
+  });
+
+  it('restarting a city whose save is from a newer version keeps it aside (as a save over it would)', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const newer = JSON.stringify({ ...JSON.parse(FIXTURE_07A1), version: SAVE_VERSION + 1 });
+    plant(citySlot('home'), newer);
+    expect(loadGame(citySlot('home'))).toBeNull(); // "Could not load": Restart is the way on
+    clearSlot(citySlot('home'));
+    expect(slotMeta(citySlot('home'))).toBeNull();
+    expect(ls(backupKey(citySlot('home'), SAVE_VERSION + 1))).toBe(newer);
+    expect(ls(`backup:meta:${citySlot('home')}:v${SAVE_VERSION + 1}`)).toBe(META_06);
+    // a save of this version is cleared as before, with no copy (the player said "Yes, start over")
+    expect(saveGame(citySlot('home'), createGame({ seed: 44 }))).toBe(true);
+    clearSlot(citySlot('home'));
+    expect(backups()).toHaveLength(2);
   });
 
   it('restarting or clearing a slot never removes its backup', () => {
