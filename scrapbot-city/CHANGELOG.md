@@ -1,5 +1,89 @@
 # Changelog
 
+## 0.7.0-rc.1 — release candidate: il pacchetto Steam unito al gioco, l'ultimo problema basso della beta chiuso
+
+La 0.7.0-beta.1 verificata (`c199a4f`, [docs/BETA-REPORT.md](docs/BETA-REPORT.md)) unita al pacchetto Steam preparato
+a parte sul ramo `steam-package`, sul ramo `rc-0.7.0`. Il gioco è quello della beta, con una sola correzione
+dell'interfaccia (l'avviso sopra «Rimuovi», sotto): stessi 24 oggetti del catalogo, stessi numeri (bilanciamento e
+attese identici con gli stessi semi), stessi salvataggi (versione 3, `projects.sav`).
+**Una release candidate non è un via libera commerciale**: niente è stato caricato, pubblicato o configurato su Steam;
+Steam, Windows, lo Steam Deck e un controller veri restano da provare (vedi sotto, «Cosa non è verificato»).
+
+### Pacchetto Steam unito
+
+- **App desktop**: `electron/main.cjs` tiene insieme le due parti. Dalla beta: i salvataggi su file in
+  `electron/file-store.cjs` (scrittura atomica, copia `.bak`, un file rovinato copiato a parte come `.damaged-<n>`
+  prima di usare la `.bak`, `storage:getDamaged` per i progetti scoperti). Dal pacchetto: steamworks.js 0.4.0 (overlay,
+  achievement `ACH_<ID>`, tastiera a schermo dello Steam Deck), schermo intero sullo Steam Deck ricordato in
+  `steam-deck.json` (fuori da `saves/`, quindi non va nel Cloud), icona della finestra su Linux, correttore
+  ortografico spento senza scaricare dizionari. Senza Steam il gioco gira come prima.
+- **Build per Steam**: `npm run dist:steam` (Windows + Linux in `release/` e `steam/content/`), icone in `build/`, dati
+  di versione dell'exe e licenze di terzi scritti da `scripts/after-pack.cjs`; controlli `npm run steam:check` e
+  `npm run steam:launch-check`; App ID per le prove locali con `npm run steam:appid`.
+- **`steam/`**: script SteamPipe (`sdk/*.vdf`, `upload.sh`, `upload.bat`, `prepare-upload.cjs`) con i segnaposto di
+  App ID e depot da riempire, i 18 achievement in CSV (8 lingue), grafica e testi del negozio, provenienza e licenze,
+  bozza del questionario sui contenuti; `scripts/trailer/`: il trailer registrato dalla build di rilascio.
+- **[docs/STEAM.md](docs/STEAM.md)**: la guida passo per passo del pacchetto, con i fatti della beta: controller e
+  Steam Deck provati solo con un controller simulato, mai su hardware vero; la tastiera a schermo arriva solo da
+  steamworks.js con Steam aperto su uno Steam Deck vero e non è mai stata provata; `projects.sav`, le copie di
+  sicurezza e come riaprirle nella sezione su Steam Cloud. Le build in `steam/content/` (fuori da git) sono ancora
+  quelle della 0.6.0: vanno rifatte da questa versione prima di caricarle.
+- **Unione**: conflitti in `.gitignore`, `package.json` e `docs/STEAM.md`, risolti tenendo le due parti (gli script
+  della beta e quelli di Steam, le dipendenze e la configurazione delle build di Steam); `electron/main.cjs` e il
+  `package-lock.json` uniti senza conflitti. Nessuna dipendenza nuova oltre a quelle già sul ramo `steam-package`
+  (steamworks.js, resedit).
+- I Crediti dicevano già, dalla beta, la licenza giusta di Permanent Marker (Apache 2.0): segnato in
+  `steam/ASSETS-PROVENANCE.md`.
+
+### Pannello di un pezzo: l'avviso «Non ancora scoperto» sopra «Rimuovi»
+
+- Un pezzo che la città ha già ma il cui progetto il profilo non ha scoperto (una città portata da un altro computer o
+  da una copia vecchia) dice «Non ancora scoperto: una volta rimosso, non potrai ricomprarlo finché non lo scopri.».
+  Prima l'avviso stava sotto il pulsante Rimuovi e a 1024×640 in tedesco, francese e portoghese (la scultura anche in
+  italiano) restava fuori dal pannello: Rimuovi si vedeva, l'avviso no. Ora sta nella colonna dei pulsanti, **subito
+  sopra Rimuovi**: in vista quando il pannello si apre e ogni volta che lo è Rimuovi, nelle 8 lingue a 1024×640,
+  1280×720, 1280×800 e 1920×1080.
+- Il prezzo, a 1024×640: per le decorazioni che si ruotano e si spostano (panchina, insegna, pergola, casetta di Miso,
+  scultura, statua) in italiano, tedesco, francese, portoghese e polacco, per insegna, scultura e statua in olandese e
+  per la scultura in spagnolo, ora è Rimuovi a chiedere di scorrere il pannello (rotella, trascinamento, stick destro
+  del controller): 34 pannelli su 384 tra lingue, misure e pezzi. Si legge prima l'avviso. Nient'altro cambia
+  nell'interfaccia.
+- Test: `tests/hud-projects.test.ts` (i 12 pezzi da scoprire in 8 lingue: l'avviso subito prima di Rimuovi, nessun
+  avviso quando il progetto è scoperto) e il test end-to-end `fit` (i 12 pannelli misurati in 8 lingue × 4 misure:
+  avviso sopra Rimuovi, in vista all'apertura, con Rimuovi portato in vista e a fine scorrimento, né tagliato né
+  coperto). Sulla build di prima i 32 controlli nuovi di `fit` falliscono tutti; con la correzione passano.
+
+### Versione
+
+- 0.7.0-rc.1 in `package.json`, nel menu (`Build_0.7.0-rc.1`, `Version 0.7.0-rc.1`), nei Crediti e nel README.
+
+### Verifiche (13/10/2026, Linux x64, senza client Steam)
+
+- `tsc --noEmit`, `npm test` (47 file, 429 test) e `npm run i18n:check` verdi su `f50670c`.
+- Numeri del gioco: `balance` con i semi 42, 7, 1 e 99 identici byte per byte a quelli della 0.7.0-beta.1 (`c199a4f`);
+  `waits` con i semi 5, 42 e 3 e senza seme identici (314 righe ciascuno). Sia sul merge sia su `f50670c`.
+- `npm run e2e`, l'intera suite (Chromium headless, input simulati): **22/22** su `f50670c` in 22,3 minuti (build di
+  rilascio sha256 `d9f5a6d870ef…`). Sul merge `a3fa059`: 21 test verdi e `fit` con i suoi 168 controlli di prima tutti
+  verdi; i 32 controlli nuovi dell'avviso, aggiunti mentre girava, falliscono lì come devono (è la build di prima).
+- App desktop unita, avviata con Electron 33.4.11 sotto Xvfb **senza client Steam** (cartella non impacchettata con la
+  stessa build di rilascio): steamworks.js e `libsteam_api.so` caricati nel processo principale; `Steam not available:
+  Failed to load module '…/steamclient.so'` nel log, senza App ID e con 480, e il gioco continua; un `projects.sav`
+  rovinato con la sua `.bak`: il gioco legge la `.bak`, il testo rovinato resta in `projects.sav.damaged-1` e in
+  `backup_projects_v0.sav`, il progetto ancora leggibile nel testo rovinato resta scoperto; scrittura con `.bak` e
+  rimozione dal ponte; tastiera a schermo «no», achievement ignorato; una città di gioco libero gira; il menu dice
+  0.7.0-rc.1; «Quit» chiude con codice 0.
+- `npm run steam:check`: nessun FAIL (Windows solo con controlli statici; le build impacchettate in `release/`
+  controllate qui sono ancora quelle della 0.6.0).
+
+### Cosa non è verificato
+
+- Niente su Windows, su uno Steam Deck, con un controller o uno schermo touch veri: gli input delle prove sono
+  simulati (mouse e tastiera di Playwright, tocchi CDP, un gamepad finto in Chromium headless).
+- Niente con il client Steam: achievement, overlay, Steam Cloud, tastiera a schermo del Deck. Nessun App ID esiste.
+- Le build Steam non sono state rifatte da questa versione (`npm run dist:steam` non eseguito qui).
+- Durata, divertimento e disponibilità a pagare non sono misurati: servono i playtest di
+  [docs/PLAYTEST.md](docs/PLAYTEST.md).
+
 ## 0.7.0-beta.1 — costruzione modulare, incremento 2: 24 oggetti, progetti da scoprire, smog leggibile
 
 Tutto l'incremento 2 dopo la 0.7.0-alpha.1 (gruppi G0–G5, temi delle città, salvataggi), secondo

@@ -135,10 +135,11 @@ chiede password e codice **Steam Guard**, poi ricorda il login: nessuna password
 npm run dist:steam
 ```
 
-Dal commit della **0.7.0-rc.1** sul ramo `rc-0.7.0` (la 0.7.0-beta.1 verificata unita al pacchetto Steam), o da
-quello della versione che deciderai di vendere, dopo averlo verificato. Crea `release/win-unpacked/` e `release/linux-unpacked/` (anche da Linux, senza
-wine) e li copia in `steam/content/windows` e `steam/content/linux`. `steam_appid.txt` non viene mai copiato. Fai la
-build su **Linux o macOS**: Windows non conserva il permesso "eseguibile" dei file Linux.
+Dal commit della **0.7.0-rc.1** sul ramo `rc-0.7.0` (la 0.7.0-beta.1 verificata unita al pacchetto Steam), o da quello
+della versione che deciderai di vendere, dopo averlo verificato. Crea `release/win-unpacked/` e
+`release/linux-unpacked/` (anche da Linux, senza wine) e li copia in `steam/content/windows` e `steam/content/linux`.
+`steam_appid.txt` non viene mai copiato. Fai la build su **Linux o macOS**: Windows non conserva il permesso
+"eseguibile" dei file Linux.
 
 ### 2.5 Prova a vuoto, poi il ramo beta
 
@@ -339,14 +340,15 @@ Per riaprire una copia di sicurezza, a gioco chiuso, copiala (non rinominarla, c
 `save_<slot>.sav`, e `backup_meta_<slot>_v2.sav` sopra `meta_<slot>.sav`.
 
 **Non** si sincronizzano: `*.sav.bak`, `*.sav.tmp` e `*.sav.damaged-<n>` (il pattern `*.sav` non li prende: restano sul
-PC per riparare un file rovinato) e `steam-deck.json` (fuori da `saves/`: la scelta "finestra o schermo intero" del Deck resta sul Deck).
+PC per riparare un file rovinato) e `steam-deck.json` (fuori da `saves/`: la scelta "finestra o schermo intero" del Deck
+resta sul Deck).
 
 **Quanti file e quanto spazio.** Chiavi fisse: 9. Slot: 9 (4 gioco libero + 5 campagna) × 2 file = 18. Copie di
 sicurezza: di solito una per slot (v2) × 2 = 18; al massimo 3 versioni vecchie × 18 = 54. Totale: circa 45 file di
-solito, **81** nel caso peggiore previsto, più le rare copie con impronta e `backup_projects_v<N>.sav` (la quota di
-200 file della sezione 8.3 lascia margine). Dimensioni misurate l'11/10 sulla build del ramo principale: una città della campagna a
-metà partita 10–13 KB (+ 80 byte di riepilogo), profilo della campagna 0,5 KB, impostazioni 0,1 KB. Anche con città
-grandi (stimate fino a 50 KB) e tutte le copie si resta sotto **2 MB**.
+solito, **81** nel caso peggiore previsto, più le rare copie con impronta e `backup_projects_v<N>.sav` (la quota di 200
+file della sezione 8.3 lascia margine). Dimensioni misurate l'11/10 sulla build del ramo principale: una città della
+campagna a metà partita 10–13 KB (+ 80 byte di riepilogo), profilo della campagna 0,5 KB, impostazioni 0,1 KB. Anche con
+città grandi (stimate fino a 50 KB) e tutte le copie si resta sotto **2 MB**.
 
 ### 8.3 Configurazione in Steamworks
 
@@ -404,13 +406,14 @@ LB/RB = edificio precedente/successivo, LT/RT = zoom, X = ruspa, Y = suggeriment
 ruota), Start = menu, D-pad = una casella alla volta, View = pausa, L3 = velocità, R3 = torna all'HQ.
 
 **Revisione Steam Deck**: dalla pagina dell'app → *Technical Tools* → **Steam Hardware Compatibility Review** (dopo la
-normale revisione della build). Valve prova la build Linux; se va male prova quella Windows con Proton. **Nessun requisito è
-stato provato su uno Steam Deck vero né con un controller vero.** Requisiti e stato: tutto usabile col controller (fatto, provato solo con Gamepad API simulata), glifi dei pulsanti nei testi
-(fatto), 1280×800 (finestra di partenza 1280×800), testi leggibili a 800p (da ricontrollare in tedesco e polacco e sullo schermo del Deck),
-tastiera a schermo per i campi di testo (solo tramite steamworks.js, con Steam aperto su uno Steam Deck vero: codice
-fatto, **mai provata**; senza Steam il gioco usa i suoi campi e resta la tastiera di sistema con Steam + X), 30 fps a 800p (**da misurare sul
-Deck**), nessun launcher (fatto), schermo intero sul Deck (fatto, provato solo con la variabile `SteamDeck=1`).
-**Non scrivere "Steam Deck Verified" da nessuna parte**: il badge lo assegna Valve.
+normale revisione della build). Valve prova la build Linux; se va male prova quella Windows con Proton. **Nessun
+requisito è stato provato su uno Steam Deck vero né con un controller vero.** Requisiti e stato: tutto usabile col
+controller (fatto, provato solo con Gamepad API simulata), glifi dei pulsanti nei testi (fatto), 1280×800 (finestra di
+partenza 1280×800), testi leggibili a 800p (da ricontrollare in tedesco e polacco e sullo schermo del Deck), tastiera a
+schermo per i campi di testo (solo tramite steamworks.js, con Steam aperto su uno Steam Deck vero: codice fatto, **mai
+provata**; senza Steam il gioco usa i suoi campi e resta la tastiera di sistema con Steam + X), 30 fps a 800p (**da
+misurare sul Deck**), nessun launcher (fatto), schermo intero sul Deck (fatto, provato solo con la variabile
+`SteamDeck=1`). **Non scrivere "Steam Deck Verified" da nessuna parte**: il badge lo assegna Valve.
 
 ## 10. Dichiarazione dei contenuti fatti con l'IA
 
