@@ -9,6 +9,8 @@ const PREFIX = 'scrapbot:';
 
 interface FileStore {
   get(key: string): string | null;
+  // the main file's text when it is damaged and get gave its .bak instead (electron/file-store.cjs)
+  getDamaged?(key: string): string | null;
   set(key: string, value: string): boolean;
   remove(key: string): void;
 }
@@ -19,6 +21,16 @@ const files = desktop?.storage ?? null;
 export function readKey(key: string): string | null {
   try {
     return files ? files.get(key) : window.localStorage.getItem(PREFIX + key);
+  } catch {
+    return null;
+  }
+}
+
+// Desktop only: the stored text that readKey passed over because it is damaged (it read the file's previous good copy,
+// its .bak, instead), or null. In the browser readKey gives the damaged text itself, so this is always null there.
+export function readDamaged(key: string): string | null {
+  try {
+    return files?.getDamaged?.(key) ?? null;
   } catch {
     return null;
   }

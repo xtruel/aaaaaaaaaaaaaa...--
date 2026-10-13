@@ -4,7 +4,7 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { usable } = require('./storage-utils.cjs');
+const { createFileStore } = require('./file-store.cjs');
 
 let steam = null;
 
@@ -12,56 +12,23 @@ let steam = null;
 app.setPath('userData', path.join(app.getPath('appData'), 'Scrapbot City'));
 const saveDir = () => path.join(app.getPath('userData'), 'saves');
 
-// One small file per storage key: save_city-home.sav, campaign.sav, settings.sav...
-function fileFor(key) {
-  return path.join(saveDir(), `${String(key).replace(/[^a-zA-Z0-9-]/g, '_')}.sav`);
-}
-
-function readText(file) {
-  try {
-    const text = fs.readFileSync(file, 'utf8');
-    return text.length ? text : null;
-  } catch {
-    return null;
-  }
-}
-
-// Write next to the file, then rename over it: a crash mid-save never leaves half a city behind.
-// The previous good version stays as .bak and is used if the main file is ever missing or damaged;
-// a damaged file is never copied over a good backup.
-function writeAtomic(key, file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, value, 'utf8');
-  if (usable(key, readText(file))) fs.copyFileSync(file, `${file}.bak`);
-  fs.renameSync(tmp, file);
-}
+// Saves as files (see file-store.cjs).
+const files = createFileStore(saveDir);
 
 ipcMain.on('storage:get', (event, key) => {
-  const file = fileFor(key);
-  const main = readText(file);
-  if (usable(key, main)) {
-    event.returnValue = main;
-    return;
-  }
-  const bak = readText(`${file}.bak`);
-  event.returnValue = usable(key, bak) ? bak : main;
+  event.returnValue = files.get(key);
+});
+
+ipcMain.on('storage:getDamaged', (event, key) => {
+  event.returnValue = files.getDamaged(key);
 });
 
 ipcMain.on('storage:set', (event, key, value) => {
-  try {
-    writeAtomic(key, fileFor(key), String(value));
-    event.returnValue = true;
-  } catch (err) {
-    console.log(`Could not save ${key}: ${err.message}`);
-    event.returnValue = false;
-  }
+  event.returnValue = files.set(key, value);
 });
 
 ipcMain.on('storage:remove', (event, key) => {
-  const file = fileFor(key);
-  for (const f of [file, `${file}.bak`]) fs.rmSync(f, { force: true });
-  event.returnValue = true;
+  event.returnValue = files.remove(key);
 });
 
 ipcMain.on('saves:open', () => {

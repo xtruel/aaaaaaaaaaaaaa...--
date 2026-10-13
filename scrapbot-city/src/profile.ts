@@ -9,7 +9,7 @@ import { loadCampaign } from './campaign';
 import { GOAL_STATS, discoverReached, goalValue, mergeProfile, parseProfile, profileBest, profileUnlocked } from './game/projects';
 import type { GoalStat, ProjectKind, ProjectsProfile } from './game/projects';
 import type { GameState } from './game/state';
-import { readKey, writeKey } from './storage';
+import { readDamaged, readKey, writeKey } from './storage';
 
 export const PROFILE_KEY = 'projects';
 
@@ -33,9 +33,15 @@ function backupProfile(raw: string, version: number): boolean {
   return false;
 }
 
-// What the profile holds now (an empty one when there is none or storage is blocked).
+// What the profile holds now (an empty one when there is none or storage is blocked). On the desktop a damaged
+// projects.sav is read in place of its .bak (the copy before the last write): the projects that can be read from the
+// damaged text are added to it, so the latest discovery is not locked again.
 export function loadProfile(): ProjectsProfile {
-  return parseProfile(readKey(PROFILE_KEY)).profile;
+  return withDamaged(parseProfile(readKey(PROFILE_KEY)).profile, readDamaged(PROFILE_KEY));
+}
+
+function withDamaged(profile: ProjectsProfile, damaged: string | null): ProjectsProfile {
+  return damaged === null ? profile : mergeProfile(profile, parseProfile(damaged).profile);
 }
 
 // Adds projects found and maxima reached to the stored profile: what is stored is read again first and only grows
@@ -44,12 +50,15 @@ export function loadProfile(): ProjectsProfile {
 export function recordProfile(add: { discovered?: Iterable<string>; best?: Partial<Record<GoalStat, number>> }): ProjectsProfile {
   const raw = readKey(PROFILE_KEY);
   const parsed = parseProfile(raw);
-  const next = mergeProfile(parsed.profile, add);
+  // (desktop: a damaged projects.sav passed over for its .bak, see loadProfile)
+  const damaged = readDamaged(PROFILE_KEY);
+  const next = mergeProfile(withDamaged(parsed.profile, damaged), add);
   // nothing new: the stored text is not touched (not even rewritten in another form)
-  if (JSON.stringify(next) === JSON.stringify(parsed.profile)) return next;
+  if (damaged === null && JSON.stringify(next) === JSON.stringify(parsed.profile)) return next;
   // a text that is not a version-1 profile is kept aside before it is first written over; without that copy it is
   // left alone (the game goes on with the projects in memory)
   if (raw !== null && raw !== '' && parsed.status !== 'ok' && !backupProfile(raw, parsed.version)) return next;
+  if (damaged !== null && !backupProfile(damaged, 0)) return next;
   writeKey(PROFILE_KEY, JSON.stringify(next));
   return next;
 }
