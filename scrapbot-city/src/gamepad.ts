@@ -10,6 +10,7 @@ const REPEATS: PadButton[] = ['up', 'down', 'left', 'right'];
 const DEAD_ZONE = 0.22;
 const REPEAT_DELAY = 0.38;
 const REPEAT_EVERY = 0.11;
+const DIALOG_SCROLL = 700; // right stick over a dialog taller than the window, px per second (a city's side panels too)
 
 export interface PadFrame {
   dt: number;
@@ -182,10 +183,26 @@ function back(): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
 }
 
+// The open dialog, or the part of it, that scrolls and has more to show (Extras on a short window), or null.
+function scrollBox(): HTMLElement | null {
+  const modal = document.querySelector<HTMLElement>('#modal-root .modal');
+  if (!modal) return null;
+  for (const el of [modal, ...modal.querySelectorAll<HTMLElement>('.modal-body')]) {
+    if (el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY)) return el;
+  }
+  return null;
+}
+
 export function menuFrame(f: PadFrame): void {
   for (const dir of ['up', 'down', 'left', 'right'] as const) if (f.pressed.has(dir)) move(dir);
   if (f.pressed.has('a')) press();
   if (f.pressed.has('b') || f.pressed.has('start')) back();
+  // the right stick scrolls a dialog taller than the window: its texts (the achievements, how to play) hold no control
+  // the focus could stop on, as it does over a long side panel in a city
+  if (f.ry) {
+    const scroll = scrollBox();
+    if (scroll) scroll.scrollTop += f.ry * DIALOG_SCROLL * f.dt;
+  }
 }
 
 // ---------- polling ----------

@@ -78,3 +78,28 @@ describe('pad on the main menu', () => {
     for (let i = 0; i < entries.length - 1; i++) expect(walk(entries[i], 'down'), `down from ${entries[i]}`).toBe(entries[i + 1]);
   });
 });
+
+describe('pad in a dialog taller than the window', () => {
+  it('the right stick scrolls it (Extras at 1280x720: the achievements hold no control to stop on)', () => {
+    document.body.innerHTML = `<div id="modal-root"><div class="modal" style="overflow-y: auto" ${box([200, 8, 880, 704])}>
+      <button class="modal-x" ${box([1030, 20, 30, 30])}>×</button>
+      <div class="modal-body"><ul class="ach-grid"><li>Both Ways</li><li>Superstar</li></ul></div>
+      <div class="modal-actions"><button class="btn btn-primary" id="back" ${box([220, 650, 840, 48])}>Back</button></div>
+    </div></div>`;
+    layout();
+    const modal = document.querySelector<HTMLElement>('#modal-root .modal')!;
+    Object.defineProperty(modal, 'scrollHeight', { value: 1538 });
+    Object.defineProperty(modal, 'clientHeight', { value: 704 });
+    document.getElementById('back')!.focus();
+    modal.scrollTop = 0;
+    // the stick pushed down for half a second, then up for a quarter
+    for (let i = 0; i < 30; i++) menuFrame(frame([], { ry: 1 }));
+    expect(modal.scrollTop).toBeGreaterThan(300);
+    const down = modal.scrollTop;
+    for (let i = 0; i < 15; i++) menuFrame(frame([], { ry: -1 }));
+    expect(modal.scrollTop).toBeLessThan(down);
+    expect(modal.scrollTop).toBeGreaterThan(0);
+    // the focus stays where it was
+    expect(focused()).toBe('back');
+  });
+});
