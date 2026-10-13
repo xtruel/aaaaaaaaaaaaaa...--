@@ -307,9 +307,10 @@ export function paintCardScene(canvas: HTMLCanvasElement, scene: CardScene): voi
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
-  // the half-size isometric sprites, like the toolbar (old art only while the atlas is still decoding)
+  // the half-size isometric sprites, like the toolbar (the menu paints the cards once the atlas is decoded; the old
+  // flat art only if it never is)
+  const img = atlasImage();
   const draw = (type: BuildingType, x: number, groundY: number) => {
-    const img = atlasImage();
     const f = frame(`b/${type}/icon`);
     if (img && f) {
       ctx.drawImage(img, f.x, f.y, f.w, f.h, x, groundY - f.h + 2, f.w, f.h);
@@ -317,6 +318,13 @@ export function paintCardScene(canvas: HTMLCanvasElement, scene: CardScene): voi
     }
     const sp = buildingSprite(type);
     ctx.drawImage(sp.canvas, x, groundY - sp.canvas.height);
+  };
+  // a bot or the cat as the map shows them, at the buildings' half size (every other pixel, still hard-edged)
+  const sprite = (name: string, x: number, y: number): boolean => {
+    const f = frame(name);
+    if (!img || !f) return false;
+    ctx.drawImage(img, f.x, f.y, f.w, f.h, x, y, Math.round(f.w / 2), Math.round(f.h / 2));
+    return true;
   };
   const fill = (col: string, y = 0, hh = h) => {
     ctx.fillStyle = col;
@@ -366,9 +374,10 @@ export function paintCardScene(canvas: HTMLCanvasElement, scene: CardScene): voi
       for (let x = 0; x < w; x += 8) ctx.fillRect(x, 33, 4, 1);
       draw('pods', 2, 34);
       draw('dock', 60, 40);
-      ctx.drawImage(botSprite(0, 1), 40, 26);
-      ctx.drawImage(botSprite(1, -1), 50, 30);
-      ctx.drawImage(catSprite(true, 1), 84, 30);
+      // two bots flying over the road, Miso sitting on it
+      if (!sprite('bot/se/carry/0', 38, 9)) ctx.drawImage(botSprite(0, 1), 40, 26);
+      if (!sprite('bot/sw/fly/1', 50, 14)) ctx.drawImage(botSprite(1, -1), 50, 30);
+      if (!sprite('cat/se/sit/0', 45, 29)) ctx.drawImage(catSprite(true, 1), 84, 30);
       break;
   }
 }

@@ -2,6 +2,7 @@
 import { audio } from '../audio';
 import { LANGS, lang, t, tList, tk } from '../i18n';
 import { iconUrl } from '../render/icons';
+import { whenAtlasReady } from '../render/iso/atlas';
 import type { IconName } from '../render/icons';
 import { MenuBackground, paintCardScene } from '../render/menuBg';
 import type { CardScene } from '../render/menuBg';
@@ -113,7 +114,10 @@ export class MainMenu {
         <span class="question">${esc(t('menu.question'))} ▶</span>
       </footer>
     `;
-    this.ui.querySelectorAll<HTMLCanvasElement>('canvas[data-scene]').forEach((c) => paintCardScene(c, c.dataset.scene as CardScene));
+    // the path cards show the game's isometric pictures: painted once the sprite atlas is decoded (the menu is first
+    // drawn a few milliseconds before that, and painted then they would keep the old flat sprites)
+    const cards = [...this.ui.querySelectorAll<HTMLCanvasElement>('canvas[data-scene]')];
+    whenAtlasReady(() => cards.forEach((c) => paintCardScene(c, c.dataset.scene as CardScene)));
     this.ui.querySelectorAll<HTMLButtonElement>('.path-card').forEach((c) =>
       c.addEventListener('click', () => {
         audio.unlock();
