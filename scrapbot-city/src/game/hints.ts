@@ -1,7 +1,11 @@
-// USA-9's advice: reads the city and recommends the single most useful next step.
+// USA-9's advice: reads the city and recommends the single most useful next step, aimed at the real bottleneck
+// (docs/MODULAR-INC2.md §4b): no extra storage when credits are what is missing, no new Recycler without the power
+// to run it and scrap to feed it.
 import { bName, t } from '../i18n';
 import { buildCost, canAfford, costText } from './actions';
 import { BUILDINGS, IMPORT_PARTS, PARTS_RESERVE, SMOG_DANGER, T } from './defs';
+import { energyGoingUp, energySpare, scrapAvailable } from './economy';
+import { buildingStats } from './piecedefs';
 import type { BuildingType } from './defs';
 import { FREE_HINTS } from './state';
 import type { GameState } from './state';
@@ -40,6 +44,55 @@ function afford(s: GameState, type: BuildingType): string {
   return t('hint.afford.no', { cost: costText(cost) });
 }
 
+// Credits are what the city lacks, rather than storage, parts or scrap: it is saving for the Spire and the credits are
+// not there yet; or it sits on a pile of parts (150+) with few credits (under 400), the line the "turn parts into
+// credits" advice uses; or a Bot Dock is out of reach for its credits alone.
+export function creditsShort(s: GameState): boolean {
+  if (s.pop >= 30 && !has(s, 'spire') && s.res.credits < (buildCost(s, 'spire').credits ?? 0)) return true;
+  if (s.res.parts > 150 && s.res.credits < 400) return true;
+  const dock = buildCost(s, 'dock');
+  return s.res.credits < (dock.credits ?? 0) && s.res.parts >= (dock.parts ?? 0) && s.res.scrap >= (dock.scrap ?? 0);
+}
+
+// Can the city run one more Recycler? Power: its use must fit in the power to spare, `spare` (energyHeadroom): the
+// power to spare now as the HUD shows it, `now`, and what the buildings going up will do to it, `going`. Scrap: one
+// cycle in storage, or junk on the map for the bots (scrapAvailable).
+export interface RecyclerCheck {
+  power: boolean;
+  scrap: boolean;
+  need: number;
+  spare: number;
+  now: number;
+  going: number;
+}
+
+export function recyclerCheck(s: GameState): RecyclerCheck {
+  const need = -buildingStats({ type: 'recycler' }).energy;
+  const now = energySpare(s);
+  const going = energyGoingUp(s);
+  const spare = now + going;
+  return { power: spare >= need, scrap: scrapAvailable(s), need, spare, now, going };
+}
+
+// Power first: what to build so a new Recycler does not slow every machine down. The power to spare it names is the
+// HUD's (made minus used); when the buildings going up will take some of it, it says how much, so the advice and the
+// top bar never disagree.
+function recyclerPower(s: GameState, rc: RecyclerCheck): Hint {
+  const solarOk = canAfford(s, buildCost(s, 'solar'));
+  const pick: BuildingType = s.alignment >= 0 || solarOk ? 'solar' : 'burner';
+  const what = pick === 'solar' ? t('hint.power.solar') : t('hint.power.burner');
+  const spare = Math.max(0, Math.floor(rc.now));
+  const going = Math.round(-rc.going); // what the buildings going up will use, net of the plants going up
+  return {
+    title: t('hint.recyclerPower.title'),
+    text:
+      going > 0
+        ? t('hint.recyclerPower.going', { need: rc.need, spare, going, what, afford: afford(s, pick) })
+        : t('hint.recyclerPower.text', { need: rc.need, spare, what, afford: afford(s, pick) }),
+    build: pick,
+  };
+}
+
 // USA-9 never asks for a building that is already going up: it says to wait for it instead.
 export function suggest(s: GameState): Hint {
   const hint = pick(s);
@@ -75,7 +128,17 @@ function pick(s: GameState): Hint {
   }
 
   if (!has(s, 'recycler')) {
+    const rc = recyclerCheck(s);
+    if (!rc.scrap) return { title: t('hint.noScrap.title'), text: t('hint.noScrap.text'), build: 'pods' };
+    if (!rc.power) return recyclerPower(s, rc);
     return { title: t('hint.parts.title'), text: t('hint.parts.text', { afford: afford(s, 'recycler') }), build: 'recycler' };
+  }
+
+  // every Recycler paused by the player, with no pile of parts: that pause is what keeps parts from coming in, and
+  // undoing it costs nothing (not another Recycler, not imported parts, not more scrap)
+  const recyclers = s.buildings.filter((b) => b.type === 'recycler' && b.built >= 1);
+  if (recyclers.length > 0 && recyclers.every((b) => b.paused) && s.res.parts < 150) {
+    return { title: t('hint.recyclerPaused.title'), text: t('hint.recyclerPaused.text', { n: Math.floor(s.res.parts), resume: t('insp.resume') }), free: true };
   }
 
   // rich in credits but out of parts (the industrial trap): import, don't wait
@@ -113,6 +176,18 @@ function pick(s: GameState): Hint {
 
   // full storage only matters while parts are short; with a pile of parts it is fine
   if (s.res.scrap >= d.storage * 0.9 && s.res.parts < 150) {
+    // (the scrap is right there; a second Recycler still needs the power to run)
+    const rc = recyclerCheck(s);
+    if (count(s, 'recycler') <= 1 && !rc.power) return recyclerPower(s, rc);
+    // more storage does not help a city that is short of credits: something that turns the scrap into credits does
+    if (count(s, 'recycler') > 1 && creditsShort(s)) {
+      const conv: BuildingType = leansGreen ? 'fixlab' : 'smelter';
+      return {
+        title: t('hint.storageCredits.title'),
+        text: t(conv === 'fixlab' ? 'hint.storageCredits.fixlab' : 'hint.storageCredits.smelter', { n: Math.floor(s.res.scrap), cap: d.storage, afford: afford(s, conv) }),
+        build: conv,
+      };
+    }
     const pick: BuildingType = count(s, 'recycler') <= 1 ? 'recycler' : 'dock';
     return {
       title: t('hint.storage.title'),
@@ -157,8 +232,8 @@ function pick(s: GameState): Hint {
     const partsMakersOn = s.buildings.some((b) => (b.type === 'factory' || b.type === 'fixlab') && !b.paused);
     let extra = missing.parts > 0 && partsMakersOn ? ` ${t('hint.spireSave.parts')}` : '';
     if (missing.credits > 0 && s.res.parts > 150) extra += ` ${t('hint.spireSave.credits')}`;
-    // waiting on parts with a full scrap store: a second Recycler doubles the pace
-    if (missing.parts > 0 && s.res.scrap >= d.storage * 0.9) extra += ` ${t('hint.storage.recycler')}`;
+    // waiting on parts with a full scrap store: a second Recycler doubles the pace, if there is power to run it
+    if (missing.parts > 0 && s.res.scrap >= d.storage * 0.9 && recyclerCheck(s).power) extra += ` ${t('hint.storage.recycler')}`;
     return { title: t('hint.spireSave.title'), text: t('hint.spireSave.text', { cost: costText(missing) }) + extra };
   }
 
@@ -184,12 +259,18 @@ function pick(s: GameState): Hint {
     return { title: t('hint.sludge.title'), text: t('hint.sludge.text', { n: sludge, afford: afford(s, 'purifier') }), build: 'purifier' };
   }
 
-  if (junk > 300 && s.pop >= 6 && s.bots.length < 5 + s.pop / 4) {
+  // (a Dock is storage too: not the advice when credits are what is missing)
+  if (junk > 300 && s.pop >= 6 && s.bots.length < 5 + s.pop / 4 && !creditsShort(s)) {
     return { title: t('hint.hands.title'), text: t('hint.hands.text', { junk, bots: s.bots.length, afford: afford(s, 'dock') }), build: 'dock' };
   }
 
   if (s.res.parts < 25 && count(s, 'recycler') < 3) {
-    return { title: t('hint.partsShort.title'), text: t('hint.partsShort.text', { n: Math.floor(s.res.parts), afford: afford(s, 'recycler') }), build: 'recycler' };
+    const rc = recyclerCheck(s);
+    // no scrap to feed it: another Recycler would stand idle, so this advice is skipped
+    if (rc.scrap && !rc.power) return recyclerPower(s, rc);
+    if (rc.scrap) {
+      return { title: t('hint.partsShort.title'), text: t('hint.partsShort.text', { n: Math.floor(s.res.parts), afford: afford(s, 'recycler') }), build: 'recycler' };
+    }
   }
 
   if (spire && spire.built < 1) {

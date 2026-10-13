@@ -74,4 +74,35 @@ describe('tutorial', () => {
     expect(action(root)).toContain('<kbd>A</kbd>');
     expect(action(root)).not.toContain('(2)');
   });
+
+  it('a switch of input rewrites the lines in place: the buttons stay, so a press on Next is not lost', () => {
+    const { root, tut, s, ctx } = setup();
+    document.body.classList.add('touch-mode');
+    ctx.cameraMoved = true;
+    tut.update(ctx);
+    for (const type of ['recycler', 'pods', 'solar'] as const) {
+      build(s, type);
+      tut.update(ctx);
+    }
+    ctx.speed = 2;
+    tut.update(ctx);
+    expect(stepTitle(root)).toContain('6/7');
+    // step 6/7 ("Green or Industry?") has Next; the mouse takes over from a finger with the press itself
+    tut.update(ctx);
+    const next = root.querySelector<HTMLElement>('[data-next]')!;
+    expect(next).not.toBeNull();
+    const title = root.querySelector('[data-coach="title"]')!;
+    document.body.classList.remove('touch-mode');
+    tut.update(ctx); // a frame between the press and its release
+    expect(root.querySelector('[data-next]')).toBe(next);
+    expect(root.querySelector('[data-coach="title"]')).toBe(title);
+    next.click();
+    expect(stepTitle(root)).toContain('7/7');
+    // and the pad's words come in place too
+    const campaign = root.querySelector('[data-campaign]');
+    document.body.classList.add('pad-mode');
+    tut.update(ctx);
+    expect(root.querySelector('[data-campaign]')).toBe(campaign);
+    expect(root.querySelector('[data-coach="text"]')!.innerHTML).toContain('<kbd>Y</kbd>');
+  });
 });

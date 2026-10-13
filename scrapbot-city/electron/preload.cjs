@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('scrapbotDesktop', {
   // saves as files in the user folder, synced by Steam Cloud (see electron/main.cjs)
   storage: {
     get: (key) => ipcRenderer.sendSync('storage:get', String(key)),
+    getDamaged: (key) => ipcRenderer.sendSync('storage:getDamaged', String(key)),
     set: (key, value) => ipcRenderer.sendSync('storage:set', String(key), String(value)),
     remove: (key) => ipcRenderer.sendSync('storage:remove', String(key)),
   },

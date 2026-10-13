@@ -2,6 +2,7 @@
 import { audio } from '../audio';
 import { LANGS, lang, t, tList, tk } from '../i18n';
 import { iconUrl } from '../render/icons';
+import { whenAtlasReady } from '../render/iso/atlas';
 import type { IconName } from '../render/icons';
 import { MenuBackground, paintCardScene } from '../render/menuBg';
 import type { CardScene } from '../render/menuBg';
@@ -70,10 +71,10 @@ export class MainMenu {
     this.ui.innerHTML = `
       <header class="corner corner-tl">
         <div class="studio">${GLOBE}<span>Qwerty3D<br />Games</span></div>
-        <p>Build_0.6.0<br />Oct 10 2026</p>
+        <p>Build_0.7.0-beta.1<br />Oct 13 2026</p>
       </header>
       <div class="corner-right">
-        <p class="corner corner-tr">Version 0.6.0<br />Pixel Planet Initiative<br />© 2026 Qwerty3D<br />All rights reserved</p>
+        <p class="corner corner-tr">Version 0.7.0-beta.1<br />Pixel Planet Initiative<br />© 2026 Qwerty3D<br />All rights reserved</p>
         <button type="button" class="lang-pill" data-lang-open aria-label="${t('menu.language')}">${GLOBE}<span>${langName}</span></button>
       </div>
       <div class="menu-left">
@@ -113,7 +114,10 @@ export class MainMenu {
         <span class="question">${esc(t('menu.question'))} ▶</span>
       </footer>
     `;
-    this.ui.querySelectorAll<HTMLCanvasElement>('canvas[data-scene]').forEach((c) => paintCardScene(c, c.dataset.scene as CardScene));
+    // the path cards show the game's isometric pictures: painted once the sprite atlas is decoded (the menu is first
+    // drawn a few milliseconds before that, and painted then they would keep the old flat sprites)
+    const cards = [...this.ui.querySelectorAll<HTMLCanvasElement>('canvas[data-scene]')];
+    whenAtlasReady(() => cards.forEach((c) => paintCardScene(c, c.dataset.scene as CardScene)));
     this.ui.querySelectorAll<HTMLButtonElement>('.path-card').forEach((c) =>
       c.addEventListener('click', () => {
         audio.unlock();

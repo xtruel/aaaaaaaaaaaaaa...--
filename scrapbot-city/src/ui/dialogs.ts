@@ -9,6 +9,7 @@ import type { GameState, OutcomeKind } from '../game/state';
 import { choiceLabel, endingSubtitle, endingText, endingTitle, eventText, eventTitle, speakerName, speakerRole } from '../game/story';
 import type { StoryEvent } from '../game/story';
 import { LANGS, bName, lang, t } from '../i18n';
+import { inputKind } from '../input';
 import { localizeKeys } from '../keys';
 import type { Key, Lang } from '../i18n';
 import { buildingThumb, iconUrl, portraitUrl } from '../render/icons';
@@ -115,7 +116,7 @@ function refocus(root: HTMLElement, selector: string): void {
   scope.querySelector<HTMLButtonElement>('.modal-body button:not(:disabled), .modal-actions button:not(:disabled)')?.focus();
 }
 
-export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLoad?: (slot: SlotId) => void; onBack?: () => void }): void {
+export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLoad?: (slot: SlotId) => void; onBack?: () => void; onSaved?: (slot: SlotId) => void }): void {
   const body = el('div', 'slots');
   const render = () => {
     body.innerHTML = '';
@@ -135,6 +136,8 @@ export function openSlots(mode: 'save' | 'load', opts: { state?: GameState; onLo
         audio.play('click');
         if (mode === 'save' && opts.state) {
           const ok = saveGame(slot, opts.state);
+          // (the session writes the projects' maxima with every save: src/profile.ts)
+          if (ok) opts.onSaved?.(slot);
           audio.play(ok ? 'done' : 'error');
           if (!ok) row.querySelector('span')!.textContent = t('slots.failed');
           else {
@@ -167,9 +170,9 @@ export function openCredits(): void {
     body: `
       <dl class="credits">
         <dt>${t('credits.design')}</dt><dd>Qwerty3D Games</dd>
-        <dt>${t('credits.build')}</dt><dd>0.6.0 · Pixel Planet Initiative</dd>
+        <dt>${t('credits.build')}</dt><dd>0.7.0-beta.1 · Pixel Planet Initiative</dd>
         <dt>${t('credits.music')}</dt><dd>${t('credits.musicValue')}</dd>
-        <dt>${t('credits.fonts')}</dt><dd>Bungee, Lilita One, Nunito, Silkscreen, Permanent Marker, DotGothic16 (SIL Open Font License)</dd>
+        <dt>${t('credits.fonts')}</dt><dd>Bungee, Lilita One, Nunito, Silkscreen, DotGothic16 (SIL Open Font License); Permanent Marker (Apache License 2.0)</dd>
         <dt>${t('credits.morale')}</dt><dd>${t('credits.moraleValue')}</dd>
       </dl>
       <p class="fine">${t('credits.rights')}</p>`,
@@ -199,6 +202,14 @@ export function openExtras(): void {
   ).join('');
   const list = (prefix: string, n: number) =>
     Array.from({ length: n }, (_, i) => `<li>${t(`${prefix}.${i + 1}` as Key)}</li>`).join('');
+  // every input's controls, those of the input in use first (keys in the player's keyboard layout)
+  const byInput = {
+    mouse: localizeKeys(list('extras.controls', 5)),
+    pad: `<li>${t('extras.controls.pad')}</li><li>${t('extras.controls.pad2')}</li><li>${t('extras.controls.pad3')}</li>`,
+    touch: `<li>${t('extras.controls.touch')}</li>`,
+  };
+  const now = inputKind();
+  const controls = [byInput[now], ...(['mouse', 'touch', 'pad'] as const).filter((k) => k !== now).map((k) => byInput[k])];
   openModal({
     title: t('extras.title'),
     eyebrow: t('extras.eyebrow', { e: unlocked.length, a: got.length, total: ACHIEVEMENTS.length }),
@@ -210,7 +221,7 @@ export function openExtras(): void {
       <h3 class="extras-h">${t('extras.howto')}</h3>
       <ul class="howto">${list('extras.howto', 7)}</ul>
       <h3 class="extras-h">${t('extras.controls')}</h3>
-      <ul class="howto keys">${localizeKeys(list('extras.controls', 4))}<li>${t('extras.controls.pad')}</li><li>${t('extras.controls.pad2')}</li></ul>`,
+      <ul class="howto keys">${controls.join('')}</ul>`,
     actions: [{ label: t('common.back'), primary: true, onClick: closeModal }],
   });
 }
@@ -237,6 +248,8 @@ export function openStoryEvent(ev: StoryEvent, s: GameState, onDone: (result: st
     portrait: portraitUrl(ev.speaker),
     body: `<p class="story">${eventText(ev)}</p>`,
     dismissable: false,
+    // it comes up by itself, maybe under a press meant for the map: a press that began right after is no answer
+    unprompted: true,
     className: `modal-story speaker-${ev.speaker}`,
     actions: ev.choices.map((c, i) => ({
       label: choiceLabel(ev, i),

@@ -1,4 +1,4 @@
-# Scrapbot City — build 0.6.0
+# Scrapbot City — build 0.7.0-beta.1
 
 City builder in pixel art: piccoli robot raccolgono spazzatura, tu decidi cosa diventa.
 **Recycle × Build × Expand × Survive.** Un pianeta pulito o un profitto più grande?
@@ -14,14 +14,20 @@ npm run dev          # gioco nel browser: http://localhost:3001
 npm run build        # dist/index.html: un unico file con codice, CSS e font
 npm run balance      # partite automatiche su tutte le città per controllare il bilanciamento
 npm run i18n:check   # controlla che le 7 traduzioni abbiano tutte le chiavi, i {segnaposto} e i tag dell'inglese
+npm run waits        # dove va il tempo prima della Guglia, città per città, e i moduli (pilota automatico, seme fisso)
+npm run pace         # quando si scopre ogni progetto del catalogo, in minuti di gioco (pilota automatico, seme fisso)
 npm run art          # rigenera gli sprite isometrici dai modelli voxel (atlante + PNG singoli + foglio di controllo)
 npm test             # test automatici (proiezione, ordine di disegno, salvataggi, simulazione)
+npm run e2e          # test end-to-end nel browser (Chromium headless con Playwright): vedi e2e/README.md
+npm run e2e:list     # i test end-to-end, il loro input (simulato) e cosa coprono
 npm run desktop      # app desktop (Electron)
 npm run dist:steam   # build Windows + Linux per Steam: release/ e steam/content/ (guida: docs/STEAM.md)
 ```
 
 Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, Steam Cloud, Steam Deck, upload,
 pagina del negozio, prezzo. Per i test con giocatori veri c'è **[docs/PLAYTEST.md](docs/PLAYTEST.md)**.
+Report di consegna della **0.7.0-beta.1** (le 24 voci del catalogo, test, numeri, prestazioni, problemi aperti, cosa
+non è verificato): **[docs/BETA-REPORT.md](docs/BETA-REPORT.md)**, screenshot in `docs/beta/`.
 Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
 
 ## Modalità di gioco
@@ -43,17 +49,28 @@ Risultati dei test della 0.6.0: **[docs/TEST-REPORT.md](docs/TEST-REPORT.md)**.
 
 ## Cosa c'è nel gioco
 
+- **Oggetti e moduli** (tasto `O`): 24 oggetti del catalogo in tre categorie. **Costruzioni** (pavimento industriale,
+  basamento in cemento, recinzione, muro basso, pilastro d'angolo, cancello) e **Decorazioni** (lampione, panchina,
+  fioriera, insegna al neon, pergola, casetta di Miso, scultura di rottami, albero, fontana, statua di USA-9) danno forma
+  ai quartieri senza effetto sull'economia; le decorazioni si spostano gratis. **Moduli macchina** (deposito aggiuntivo,
+  filtro antismog, separatore magnetico, selezionatore di precisione, braccio doppio, capsula abitativa, pannelli
+  orientabili, ugello esteso): uno slot per edificio. I 18 oggetti dell'incremento 2 sono progetti da scoprire con un
+  traguardo raggiunto in una città. Si paga alla conferma; anteprima e annullamento sono gratis. Dettagli in
+  [docs/MODULAR-INC1.md](docs/MODULAR-INC1.md) e [docs/MODULAR-INC2.md](docs/MODULAR-INC2.md).
 - **Suggerimenti** (lampadina o tasto `Q`): USA-9 legge la città e consiglia cosa costruire, spiegando il perché.
   I primi 3 per città sono gratis e uno nuovo torna ogni 5 giorni. Poi si pagano in crediti, e il prezzo sale a ogni acquisto.
-- **18 achievement**, salvati localmente e inviati a Steam nella versione desktop.
+- **18 achievement**, salvati localmente; il ponte verso Steam c'è nella versione desktop ma non è ancora attivo né
+  provato (servono steamworks.js e un App ID: vedi docs/STEAM.md).
 - **Eventi narrativi** con USA-9, Miso, K. Kurogane (2PM Corp), i cittadini e la Pixel Planet Initiative.
 - **Finali**: Garden City, 2PM Megacity, Different Futures, Smog Over. Dopo la Guglia si può continuare a costruire
   per prendere le stelle mancanti; se la città soffoca si riparte dall'ultimo salvataggio automatico.
 - **Salvataggi** automatici a ogni nuovo giorno, alla chiusura e quando la finestra viene nascosta. In free play ci sono anche 3 slot manuali.
-  Nella versione desktop sono file `.sav` nella cartella dell'utente, sincronizzabili con **Steam Cloud**.
+  Nella versione desktop sono file `.sav` nella cartella dell'utente, pronti per **Steam Cloud** (da attivare e
+  provare in Steamworks).
 - **8 lingue**: English, Italiano, Deutsch, Français, Español, Português, Polski, Nederlands. Al primo avvio il gioco
   usa la lingua del sistema; si cambia al volo dal globo nel menu o dalle impostazioni, anche a partita in corso.
-- **Controller e Steam Deck**: menu e dialoghi col D-pad, in città un cursore virtuale (vedi Comandi).
+- **Controller** (pensato anche per lo Steam Deck): menu e dialoghi col D-pad, in città un cursore virtuale (vedi
+  Comandi). Finora provato solo con un controller simulato, mai con un controller vero né su uno Steam Deck.
 - **Musica**: 4 brani chiptune sintetizzati dal codice — *Trash Today* (menu), *Rust & Sunshine* (città di giorno),
   *Neon Hum* (città di notte), *Road Trip* (mappa della regione) — con dissolvenza da uno all'altro.
 - **Interfaccia**: chip colorate, guadagno al minuto di crediti e pezzi, pausa automatica quando la finestra è nascosta,
@@ -76,10 +93,13 @@ i testi di aiuto mostrano i nomi dei tasti della tastiera del giocatore (per ese
 
 | Azione | Tasti |
 |---|---|
-| Muovere la camera | WASD, frecce, trascinare |
+| Muovere la camera | WASD, frecce, trascinare col tasto destro o centrale del mouse, un dito sul touch |
 | Zoom | rotella, pinch su trackpad e touch, `+` / `-` |
 | Scegliere un edificio | `1`–`0`, `M` per la Scrap Spire |
-| Ruspa (macerie) | `X` |
+| Ruspa (macerie, oggetti) | `X` |
+| Oggetti e moduli (costruzioni, decorazioni, moduli) | `O` |
+| Ruotare l'oggetto in mano o quello selezionato | `R` / `Shift+R`, `Shift` + rotella |
+| Posare una fila di pavimento, basamento, recinzione o muro | trascinare col tasto sinistro |
 | Suggerimento | `Q` |
 | Annullare | clic destro, `Esc` |
 | Pausa / velocità | `Space` / `Tab` |
@@ -87,7 +107,8 @@ i testi di aiuto mostrano i nomi dei tasti della tastiera del giocatore (per ese
 | Schermo intero (desktop) | `F11` |
 
 Con il **controller**: stick sinistro = cursore, stick destro = mappa, `A` costruisce o seleziona, `B` annulla,
-`LB`/`RB` scelgono l'edificio, `LT`/`RT` zoom, `X` ruspa, `Y` suggerimento, `Start` menu,
+`LB`/`RB` scelgono l'edificio, `LT`/`RT` zoom, `X` ruspa, `Y` suggerimento (con un oggetto del catalogo in mano `Y`
+lo ruota, o dice che non si ruota), `Start` menu,
 D-pad = una casella alla volta, `View` pausa, `L3` velocità, `R3` torna all'HQ. Nei menu: D-pad o stick, `A` conferma, `B` indietro.
 
 ## Struttura
@@ -109,7 +130,7 @@ src/
     cities.ts          le 5 città della campagna e i loro obiettivi a stelle
     hints.ts           i consigli di USA-9
     sim.ts             simulazione a passo fisso
-    state.ts           stato e salvataggi (versione 2, legge anche la 1)
+    state.ts           stato e salvataggi (versione 3, legge anche la 1 e la 2)
     actions.ts, story.ts, world.ts
   render/              renderer isometrico, icone, menu e mappa della regione
     renderer.ts        il mondo in 2.5D: terreno in cache, ordine di disegno, ombre, luci, clic sugli sprite
@@ -117,11 +138,13 @@ src/
   assets/iso/          atlante generato da npm run art (atlas.png + atlas.json con gli ancoraggi)
   ui/                  menu, HUD, tutorial, regione, finestre di dialogo
 electron/              app desktop per Steam
+e2e/                   test end-to-end nel browser (npm run e2e), guida in e2e/README.md
 scripts/balance.ts     pilota automatico per il bilanciamento
 scripts/art/           pipeline della grafica: modelli voxel (models/), ray casting (voxel.ts), PNG, atlante
 art/sprites/           ogni fotogramma come PNG singolo; art/contact-sheet.png li mostra tutti
 art/overrides/         PNG ritoccati a mano con lo stesso nome di uno sprite: sostituiscono quello generato
 docs/ISO-MIGRATION.md  piano tecnico del passaggio all'isometrico
+docs/BETA-REPORT.md    report di consegna della 0.7.0-beta.1 (screenshot in docs/beta/)
 docs/TEST-REPORT.md    rapporto di test della release candidate 0.6.0
 scripts/i18n-check.ts  controllo delle traduzioni
 docs/STEAM.md          guida alla pubblicazione su Steam

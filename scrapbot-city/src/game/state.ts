@@ -1,5 +1,8 @@
 import { BUILDINGS, DAY_LENGTH, DEFAULT_MODS, MAP_H, MAP_W, SMOG_DANGER, T, TILE } from './defs';
 import type { BuildingType, CityMods, Resource } from './defs';
+import { PIECES, modulesFor, normRot, pieceVariety, solidKind, surfaceKind } from './piecedefs';
+import type { ModuleKind } from './piecedefs';
+import type { ProjectKind } from './projects';
 import { generateMap } from './world';
 
 export type BuildingStatus = 'building' | 'ok' | 'idle' | 'noPower' | 'noInput' | 'noFuel' | 'reserve';
@@ -19,6 +22,8 @@ export interface Building {
   // path meter change this building really made when placed (after the ±100 clamp); demolishing undoes
   // exactly this. Missing in older saves: then the standard shift is used.
   align?: number;
+  // machine modules installed (absent = none; never two of the same kind; catalog order)
+  modules?: ModuleKind[];
 }
 
 export type BotState = 'idle' | 'toJunk' | 'collect' | 'toDrop';
@@ -61,6 +66,23 @@ export interface Derived {
   botTarget: number;
   happiness: number;
   pollutionRate: number;
+  air: AirBreakdown;
+}
+
+// Where the smog comes from and where it goes, per second, as the last step of the sim added it up into
+// pollutionRate (the smog panel shows it): what the buildings of each type put into the air (+) or take out of it
+// (-) and how many of them do so right now, the sludge pools, and the air renewing itself.
+export interface AirBreakdown {
+  byType: Record<BuildingType, number>;
+  count: Record<BuildingType, number>;
+  sludge: number;
+  sludgeTiles: number;
+  renewal: number; // 0 or less
+}
+
+export function emptyAir(): AirBreakdown {
+  const zero = () => Object.fromEntries(Object.keys(BUILDINGS).map((type) => [type, 0])) as Record<BuildingType, number>;
+  return { byType: zero(), count: zero(), sludge: 0, sludgeTiles: 0, renewal: 0 };
 }
 
 export type MessageTone = 'info' | 'good' | 'bad' | 'event';
@@ -90,6 +112,8 @@ export interface Stats {
   industrialBuilt: number;
   catPets: number;
   partsMade: number;
+  piecesPlaced: number; // catalog pieces bought (floors, fences, gates, lamps, decorations; a move is not a purchase)
+  modulesInstalled: number;
 }
 
 export interface Hints {
@@ -117,11 +141,21 @@ export interface GameState {
   amount: Uint16Array; // junk per tile
   occ: Int32Array; // building id per tile or -1 (derived, not saved)
   claims: Uint8Array; // bots heading to each junk tile (derived, not saved)
+  floor: Uint8Array; // surface per tile: 0 none, 1 industrial floor, 2 concrete base (stays under buildings, solids and junk)
+  solid: Uint8Array; // solid piece per tile: 0 none, 1 fence, 2 gate, 3 lamp, 4 bench, 5 planter, 6 sign, 7 pergola, 8 cathouse, 9 sculpture, 10 wall, 11 pillar, 12 tree, 13 fountain, 14 statue (never on a building's tiles)
+  rot: Uint8Array; // rotation of the solid piece on each tile (0..3)
+  // the look a moved planter, sign or tree brought along, plus 1 (0: the tile's own, pieceVariety): only where the two
+  // differ (a decoration moved keeps its flowers, motif or tree)
+  variety: Uint8Array;
   buildings: Building[];
   nextId: number;
   bots: Bot[];
   cat: Cat;
   res: Record<Resource, number>;
+  // Scrap the bots brought back that did not fit in storage: it goes in, and counts as collected, as soon as
+  // there is room (see unloadPending in sim.ts). A save turns the loads of the bots, which are not saved, into
+  // this; a bot retired with a load leaves it here too. Older saves have none.
+  scrapPending: number;
   pop: number;
   pollution: number;
   alignment: number; // -100 industrial .. +100 green
@@ -143,9 +177,15 @@ export interface GameState {
   fx: FxEvent[];
   messages: Message[];
   pendingEvent: string | null;
+  // The projects discovered (docs/MODULAR-INC2.md §4), filled from the player's profile when the city starts or is
+  // loaded (src/profile.ts): only in memory, never in the city's save. A new city starts with none; pieceCheck and
+  // moduleCheck refuse a project that is not in here (src/game/projects.ts).
+  unlocked: Set<ProjectKind>;
 }
 
-export const SAVE_VERSION = 2;
+// 3 (0.7 increment 2): saves carry scrapPending. 2: 0.6 and 0.7.0-alpha.1. 1: before 0.5. A save of an older
+// version is copied aside once before it is first overwritten (see backupBeforeOverwrite in storage.ts).
+export const SAVE_VERSION = 3;
 
 // Automatic saves skip a running smog countdown: the retry offered after a smog loss loads the last
 // autosave, so it must be a moment the city can still recover from.
@@ -176,6 +216,7 @@ export function emptyDerived(): Derived {
     botTarget: 0,
     happiness: 50,
     pollutionRate: 0,
+    air: emptyAir(),
   };
 }
 
@@ -210,6 +251,10 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     amount: map.amount,
     occ: new Int32Array(MAP_W * MAP_H).fill(-1),
     claims: new Uint8Array(MAP_W * MAP_H),
+    floor: new Uint8Array(MAP_W * MAP_H),
+    solid: new Uint8Array(MAP_W * MAP_H),
+    rot: new Uint8Array(MAP_W * MAP_H),
+    variety: new Uint8Array(MAP_W * MAP_H),
     buildings: [],
     nextId: 1,
     bots: [],
@@ -223,6 +268,7 @@ export function createGame(opts: NewGameOptions = {}): GameState {
       facing: -1,
     },
     res: { ...mods.startRes },
+    scrapPending: 0,
     pop: 0,
     pollution: mods.startPollution,
     alignment: 0,
@@ -237,13 +283,14 @@ export function createGame(opts: NewGameOptions = {}): GameState {
     eventsSeen: [],
     eventLast: {},
     objective: 0,
-    stats: { scrapCollected: 0, built: 0, cleaned: 0, creditsEarned: 0, maxPollution: mods.startPollution, industrialBuilt: 0, catPets: 0, partsMade: 0 },
+    stats: { scrapCollected: 0, built: 0, cleaned: 0, creditsEarned: 0, maxPollution: mods.startPollution, industrialBuilt: 0, catPets: 0, partsMade: 0, piecesPlaced: 0, modulesInstalled: 0 },
     outcome: null,
     derived: emptyDerived(),
     dirtyTiles: [],
     fx: [],
     messages: [],
     pendingEvent: null,
+    unlocked: new Set(),
   };
   if (s.tutorial) {
     // no surprises while learning: events and storms start after the tutorial
@@ -274,7 +321,9 @@ export function addBuilding(s: GameState, type: BuildingType, x: number, y: numb
   s.buildings.push(b);
   for (let dy = 0; dy < def.h; dy++) {
     for (let dx = 0; dx < def.w; dx++) {
-      s.occ[idx(x + dx, y + dy)] = b.id;
+      const i = idx(x + dx, y + dy);
+      s.occ[i] = b.id;
+      if (s.floor[i]) s.dirtyTiles.push(i); // the floor under it is covered now
     }
   }
   return b;
@@ -285,7 +334,9 @@ export function removeBuilding(s: GameState, b: Building): void {
   s.buildings = s.buildings.filter((o) => o.id !== b.id);
   for (let dy = 0; dy < def.h; dy++) {
     for (let dx = 0; dx < def.w; dx++) {
-      s.occ[idx(b.x + dx, b.y + dy)] = -1;
+      const i = idx(b.x + dx, b.y + dy);
+      s.occ[i] = -1;
+      if (s.floor[i]) s.dirtyTiles.push(i); // the floor under it shows again
     }
   }
 }
@@ -305,24 +356,51 @@ export function pushMessage(s: GameState, text: string, tone: MessageTone = 'inf
 // ---------- save / load ----------
 
 // Everything except the map arrays (stored compactly) and runtime-only data.
-type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages'> & {
+// Pieces (0.7) are stored sparsely: `floors` lists the tile indexes with the industrial floor, `solids` the
+// [index, kind, rot] of every solid piece (kind as in GameState.solid, codes 1-14). Both are optional: 0.6 saves have
+// neither. Increment 2 (G3) adds two optional fields, written only when there is something in them, so a city
+// without these pieces saves as before: `surfaces`, the [index, code] of the other surfaces (2 = concrete base), and
+// `varieties`, the [index, kind, look] of a moved planter, sign or tree whose look is not its tile's own.
+type SaveData = Omit<GameState, 'tiles' | 'amount' | 'occ' | 'claims' | 'floor' | 'solid' | 'rot' | 'variety' | 'bots' | 'derived' | 'dirtyTiles' | 'fx' | 'messages' | 'unlocked'> & {
   tiles: string;
   amount: number[];
+  floors?: number[];
+  solids?: [number, number, number][];
+  surfaces?: [number, number][];
+  varieties?: [number, number, number][];
 };
 
 export function serialize(s: GameState): string {
-  const { tiles, amount, occ: _occ, claims: _claims, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, ...rest } = s;
-  // bots are not saved: the scrap they carry goes into storage (as far as it fits) instead of vanishing
+  // (the projects discovered belong to the player's profile, not to the city: never saved here)
+  const { tiles, amount, occ: _occ, claims: _claims, floor, solid, rot, variety, bots: _bots, derived: _derived, dirtyTiles: _dirty, fx: _fx, messages: _messages, unlocked: _unlocked, ...rest } = s;
+  // Bots are not saved: what they carry is unloaded in the save, as if they reached a drop-off now. It goes into
+  // storage as far as it fits (and counts as collected, once: the bots in the saved city are gone); the rest is
+  // written as scrapPending, which the loaded city unloads when there is room. Nothing is lost or made up.
   const carried = s.bots.reduce((n, b) => n + b.carry, 0);
   const room = Math.max(0, (s.derived.storage || 0) - s.res.scrap);
-  const res = { ...rest.res, scrap: rest.res.scrap + Math.min(carried, room) };
-  const data: SaveData = { ...rest, res, tiles: Array.from(tiles).join(''), amount: Array.from(amount) };
+  const fit = Math.min(carried, room);
+  const res = { ...rest.res, scrap: rest.res.scrap + fit };
+  const stats = { ...rest.stats, scrapCollected: rest.stats.scrapCollected + fit };
+  const scrapPending = (rest.scrapPending || 0) + carried - fit;
+  const floors: number[] = [];
+  const solids: [number, number, number][] = [];
+  const surfaces: [number, number][] = [];
+  const varieties: [number, number, number][] = [];
+  for (let i = 0; i < floor.length; i++) {
+    if (floor[i] === 1) floors.push(i);
+    else if (floor[i]) surfaces.push([i, floor[i]]);
+    if (solid[i]) solids.push([i, solid[i], rot[i]]);
+    if (solid[i] && variety[i]) varieties.push([i, solid[i], variety[i] - 1]);
+  }
+  const data: SaveData = { ...rest, res, stats, scrapPending, tiles: Array.from(tiles).join(''), amount: Array.from(amount), floors, solids };
+  if (surfaces.length) data.surfaces = surfaces;
+  if (varieties.length) data.varieties = varieties;
   return JSON.stringify(data);
 }
 
 export function deserialize(json: string): GameState {
   const d = JSON.parse(json) as Partial<SaveData> & { version: number; tiles: string; amount: number[]; buildings: Building[]; nextId: number };
-  if (d.version !== 1 && d.version !== SAVE_VERSION) throw new Error(`Unsupported save version ${d.version}`);
+  if (!Number.isInteger(d.version) || d.version < 1 || d.version > SAVE_VERSION) throw new Error(`Unsupported save version ${d.version}`);
   const size = MAP_W * MAP_H;
   if (d.tiles.length !== size || d.amount.length !== size) throw new Error('Corrupted save: wrong map size');
   const tiles = new Uint8Array(size);
@@ -330,13 +408,17 @@ export function deserialize(json: string): GameState {
   // Start from a fresh city so fields added in newer versions get sane defaults.
   const base = createGame({ seed: 1 });
   const spireDone = d.spireDone ?? d.buildings.some((b) => b.type === 'spire' && b.built >= 1);
+  // a save never brings projects with it (a hand-edited one cannot either): the session fills them from the profile
+  const { floors, solids, surfaces, varieties, unlocked: _unlocked, ...saved } = d as typeof d & { unlocked?: unknown };
   const s: GameState = {
     ...base,
-    ...(d as Omit<SaveData, 'tiles' | 'amount'>),
+    ...(saved as Omit<SaveData, 'tiles' | 'amount' | 'floors' | 'solids' | 'surfaces' | 'varieties'>),
     version: SAVE_VERSION,
     mods: { ...DEFAULT_MODS, ...(d.mods ?? {}) },
     stats: { ...base.stats, maxPollution: d.pollution ?? 0, ...(d.stats ?? {}) },
     hints: { ...base.hints, ...(d.hints ?? {}) },
+    // saves before version 3 have no pending scrap; a damaged value is not trusted
+    scrapPending: typeof d.scrapPending === 'number' && Number.isFinite(d.scrapPending) && d.scrapPending > 0 ? d.scrapPending : 0,
     stars: d.stars ?? [false, false, false],
     spireDone,
     endingKind: d.endingKind ?? (d.outcome && d.outcome.kind !== 'smog' ? d.outcome.kind : null),
@@ -344,6 +426,10 @@ export function deserialize(json: string): GameState {
     amount: Uint16Array.from(d.amount),
     occ: new Int32Array(size).fill(-1),
     claims: new Uint8Array(size),
+    floor: new Uint8Array(size),
+    solid: new Uint8Array(size),
+    rot: new Uint8Array(size),
+    variety: new Uint8Array(size),
     buildings: [],
     bots: [],
     derived: emptyDerived(),
@@ -352,11 +438,48 @@ export function deserialize(json: string): GameState {
     messages: [],
     // an event dialog that was open when the game was saved comes back on load
     pendingEvent: d.pendingEvent ?? null,
+    unlocked: new Set(),
   };
   for (const b of d.buildings) {
     const placed = addBuilding(s, b.type, b.x, b.y, b.id);
     Object.assign(placed, { paused: false }, b);
+    // only modules that fit this building, each once (a hand-edited save cannot stack two filters)
+    const modules = modulesFor(placed.type, placed.modules);
+    if (modules.length) placed.modules = modules;
+    else delete placed.modules;
   }
   s.nextId = Math.max(d.nextId, ...s.buildings.map((b) => b.id + 1));
+  const valid = (i: unknown): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < size;
+  if (Array.isArray(floors)) for (const i of floors) if (valid(i)) s.floor[i] = 1;
+  // one surface per tile: a tile already in `floors` keeps its floor
+  if (Array.isArray(surfaces)) {
+    for (const entry of surfaces) {
+      if (!Array.isArray(entry)) continue;
+      const [i, code] = entry;
+      if (valid(i) && !s.floor[i] && Number.isInteger(code) && surfaceKind(code)) s.floor[i] = code;
+    }
+  }
+  if (Array.isArray(solids)) {
+    for (const entry of solids) {
+      if (!Array.isArray(entry)) continue;
+      const [i, code, r] = entry;
+      const kind = solidKind(Number(code));
+      // a solid piece never shares a tile with a building, junk, sludge or rubble (only ground or grass)
+      if (!valid(i) || !kind || s.occ[i] !== -1 || (s.tiles[i] !== T.GROUND && s.tiles[i] !== T.GRASS)) continue;
+      s.solid[i] = Number(code);
+      s.rot[i] = normRot(kind, Number(r));
+    }
+  }
+  // a moved decoration's look, only for the same piece on that tile, in range, and not the tile's own anyway
+  if (Array.isArray(varieties)) {
+    for (const entry of varieties) {
+      if (!Array.isArray(entry)) continue;
+      const [i, code, v] = entry;
+      const kind = valid(i) && s.solid[i] === code ? solidKind(s.solid[i]) : null;
+      if (!kind || !Number.isInteger(v) || v < 0 || v >= (PIECES[kind].varieties ?? 1)) continue;
+      const x = i % MAP_W;
+      if (v !== pieceVariety(kind, x, (i - x) / MAP_W)) s.variety[i] = v + 1;
+    }
+  }
   return s;
 }

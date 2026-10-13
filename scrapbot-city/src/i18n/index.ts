@@ -78,9 +78,7 @@ export function bName(type: BuildingType): string {
   return tk(`b.${type}`);
 }
 
-export function bDesc(type: BuildingType): string {
-  return tk(`b.${type}.desc`);
-}
+// (a building's description: buildingDesc in src/ui/catalog.ts, which fills in its numbers)
 
 export function pathLabel(path: PathKind): string {
   return tk(`path.${path}`);

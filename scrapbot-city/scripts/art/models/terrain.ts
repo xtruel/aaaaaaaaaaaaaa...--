@@ -6,9 +6,9 @@ import { hex } from '../voxel';
 import type { RGB } from '../voxel';
 import { hash } from './common';
 
-type Shader = (x: number, y: number) => RGB | null; // tile-local world coords in [0, 16)
+export type Shader = (x: number, y: number) => RGB | null; // tile-local world coords in [0, 16)
 
-function tile(shader: Shader): Image {
+export function tile(shader: Shader): Image {
   const img = createImage(32, 16);
   for (let py = 0; py < 16; py++)
     for (let px = 0; px < 32; px++) {

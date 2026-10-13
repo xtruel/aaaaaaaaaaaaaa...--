@@ -2,6 +2,7 @@
 import atlasUrl from '../../assets/iso/atlas.png';
 import data from '../../assets/iso/atlas.json';
 import type { BuildingType } from '../../game/defs';
+import type { CityId } from '../../game/cities';
 
 export interface Frame {
   x: number;
@@ -20,13 +21,37 @@ export interface BuildingArtMeta {
   points: Record<string, [number, number][]>;
 }
 
+// Scenery around the map: footprint in tiles, animation, and whether it is too tall to stand in front of the map.
+export interface DecorArtMeta {
+  w: number;
+  d: number;
+  frames: number;
+  fps: number;
+  tall: boolean;
+}
+
+// A city theme (0.7, increment 2), by theme name ('rust', 'neon', 'green', 'corp'):
+//   terrain  the terrain families with a themed twin: t/<theme>/<family>/... for t/<family>/... (same size, anchor)
+//   scenery  the theme's own border scenery, frames sc/<theme>/<name>/<f> (+ /g glow), metadata like decorArt's
+//   decor    the existing d/<name> scenery that suits the theme, to mix into its border ring
+//   light    a suggested light: day = multiply colour (255 = unchanged), night = the night veil's colour (the
+//            game's own is 16, 12, 52), dark = factor on the veil's opacity
+export interface ThemeArtMeta {
+  terrain: string[];
+  scenery: Record<string, DecorArtMeta>;
+  decor: string[];
+  light: { day: [number, number, number]; night: [number, number, number]; dark: number };
+}
+
 type RawFrame = [number, number, number, number, number, number];
 const raw = data as unknown as {
   w: number;
   h: number;
   frames: Record<string, RawFrame>;
   buildings: Record<BuildingType, BuildingArtMeta>;
-  decor?: Record<string, { w: number; d: number; frames: number; fps: number; tall: boolean }>;
+  decor?: Record<string, DecorArtMeta>;
+  variants?: Record<string, BuildingArtMeta>;
+  themes?: Record<string, ThemeArtMeta>;
 };
 
 const frames = new Map<string, Frame>();
@@ -34,6 +59,35 @@ for (const [name, [x, y, w, h, ax, ay]] of Object.entries(raw.frames)) frames.se
 
 export const buildingArt = raw.buildings;
 export const decorArt = raw.decor ?? {};
+
+// Buildings with modules installed (0.7): the same metadata as buildingArt, by variant name, e.g.
+// 'dock+dockStorage', whose frames are b/<variant>/w<f>, b/<variant>/off (+ /g glow) and b/<variant>/shadow.
+export const variantArt: Record<string, BuildingArtMeta> = raw.variants ?? {};
+
+// The variant name for a building type and its installed modules: the type alone without modules, otherwise
+// the type and the modules sorted, joined by '+' (the art pipeline's naming, scripts/art/models/modules.ts).
+export function variantKey(type: BuildingType, modules?: readonly string[]): string {
+  return modules && modules.length ? [type, ...[...modules].sort()].join('+') : type;
+}
+
+// City themes (see ThemeArtMeta). Scrapbot City has none and keeps the plain frames.
+export const themeArt: Record<string, ThemeArtMeta> = raw.themes ?? {};
+
+// The theme a city is drawn with, from its campaign id alone (nothing saved): Scrapbot City, free play and the tutorial
+// (no campaign id) have none and look exactly as before themes.
+const CITY_THEMES: Record<CityId, string | null> = { home: null, rustbay: 'rust', neon: 'neon', greenvale: 'green', company: 'corp' };
+export function cityTheme(cityId: string | null | undefined): string | null {
+  const theme = cityId && Object.prototype.hasOwnProperty.call(CITY_THEMES, cityId) ? CITY_THEMES[cityId as CityId] : null;
+  return theme && Object.prototype.hasOwnProperty.call(themeArt, theme) ? theme : null;
+}
+
+// The terrain frame to paint for a city theme: t/<theme>/<rest> when the theme has a twin of t/<rest>, otherwise the
+// frame itself (no theme, or a frame every city shares: sludge, floors, bases, junk, rubble, lamps).
+export function themedFrame(name: string, theme?: string | null): string {
+  if (!theme || !name.startsWith('t/')) return name;
+  const twin = `t/${theme}/${name.slice(2)}`;
+  return frames.has(twin) ? twin : name;
+}
 
 // how many citizen looks the atlas has (cit/<variant>/sw/0)
 export function citizenVariants(): number {

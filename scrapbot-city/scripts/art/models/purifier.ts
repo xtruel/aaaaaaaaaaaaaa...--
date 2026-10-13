@@ -3,25 +3,15 @@
 // fan; a round short tank topped by the droplet logo; pipes between them and a vented filter unit in front. While
 // working the fan spins, a pulse of light climbs the bands, the water rises in the sight-glasses and the drop glows.
 import { M } from '../palette';
-import type { Vox } from '../voxel';
-import { footprint, plate } from './common';
+import { footprint, plate, tank } from './common';
 import type { BuildingArt } from './common';
-
-// A rounded tank: a squircle prism (|dx|^p + |dy|^p <= r^p) centred on (cx, cy). p = 4 keeps the faces flat (they
-// read clean and white in the iso light, no staircase ribbing) and rounds the corners over ~3 voxels; p = 2 is a
-// plain cylinder. 'inner' > 0 keeps only the shell outside that radius.
-function tank(v: Vox, cx: number, cy: number, r: number, z0: number, z1: number, m: number, inner = -1, p = 4): void {
-  for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
-    for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
-      const d = Math.abs(x + 0.5 - cx) ** p + Math.abs(y + 0.5 - cy) ** p;
-      if (d <= r ** p && (inner < 0 || d > inner ** p)) for (let z = z0; z < z1; z++) v.set(x, y, z, m);
-    }
-}
+import { purifierNozzle } from './catalog-modules';
+import { hasModule } from './modules';
 
 export const purifier: BuildingArt = {
   frames: 4,
   fps: 6,
-  model(frame, working) {
+  model(frame, working, modules) {
     const f = working ? frame % 4 : 0;
     const v = footprint(2, 2, 50);
     plate(v);
@@ -111,6 +101,7 @@ export const purifier: BuildingArt = {
     v.sphere(29, 3.5, 5, 2.2, M.green);
     v.paint(16, 26, 7, 21, 31, 8, M.greenL);
     v.paint(27, 1, 7, 32, 6, 8, M.greenL);
+    if (hasModule(modules, 'purifierNozzle')) purifierNozzle(v, frame, working);
     return v;
   },
 };

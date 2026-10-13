@@ -1,10 +1,12 @@
 // Smelter (2×2): an orange kiln with dark steel trim and a glowing furnace mouth, a dark furnace block behind it
 // carrying a tall chimney with a hot collar, and on the right a tilted crucible pouring molten metal into moulds
 // that ride a short line to stacks of yellow ingots. Off = cold furnace: dark mouth, no pour, no glow.
+// Module: a smoke filter tower beside the chimney (modules.ts).
 import { M } from '../palette';
 import type { Vox } from '../voxel';
 import { footprint, hazardBand, plate } from './common';
 import type { BuildingArt } from './common';
+import { hasModule, smelterFilter } from './modules';
 
 // A cup (crucible) whose axis leans towards +y by `tilt` radians, bottom centre at (cx, cy, cz).
 // Walls of `wall`, filled with `melt` below the horizontal level `level` (or empty when melt is 0).
@@ -38,7 +40,7 @@ const STREAM_Y = 14;
 export const smelter: BuildingArt = {
   frames: 4,
   fps: 6,
-  model(frame, working) {
+  model(frame, working, modules) {
     const v = footprint(2, 2, 48);
     const f = working ? frame : 0;
     plate(v);
@@ -144,6 +146,7 @@ export const smelter: BuildingArt = {
 
     // status light on the kiln corner
     v.box(18, 27, 18, 20, 29, 20, working ? M.limeLit : M.steel);
+    if (hasModule(modules, 'smelterFilter')) smelterFilter(v, frame, working);
     return v;
   },
 };

@@ -1,6 +1,8 @@
 // One modal at a time, rendered into #modal-root. Keyboard: Esc closes when allowed.
 import { audio } from '../audio';
 import { t } from '../i18n';
+import { dialogKeyRefused, dialogPointerRefused, guarded, markSecond, secondPress } from './presses';
+import type { DialogPresses, Press } from './presses';
 
 export interface ModalAction {
   label: string;
@@ -23,6 +25,84 @@ export interface ModalOptions {
   onClose?: () => void;
   // a dialog opened from another one (Settings from Pause): Esc, B, × and the backdrop go back one step
   onBack?: () => void;
+  // it comes up by itself (a story event, an ending), not from a press: a press that began right after is no answer
+  unprompted?: boolean;
+}
+
+// The last press of a mouse button or a finger anywhere, seen before any handler: the press that opens a dialog is
+// known when the dialog comes up, on the main menu and the region map too (no city keeps a record there).
+let down: Press & { refused?: boolean } = { t: -Infinity, x: 0, y: 0, cam: '', tile: '' };
+window.addEventListener(
+  'pointerdown',
+  (e) => {
+    down = { t: performance.now(), x: e.clientX, y: e.clientY, cam: '', tile: '', touch: e.pointerType === 'touch' };
+  },
+  { capture: true },
+);
+
+const CONTROLS = 'button, input, select, textarea, label, a[href]';
+// (the × only closes, which is always free: it is not guarded)
+const controlOf = (target: EventTarget | null): HTMLElement | null => {
+  const c = target instanceof Element ? target.closest<HTMLElement>(CONTROLS) : null;
+  return c?.classList.contains('modal-x') ? null : c;
+};
+// the same control across a redraw (the cargo blimp's rows and the save slots are drawn again after each press, a
+// slot's Save then reads Overwrite): its id or data, else its words
+function keyOf(c: HTMLElement): string {
+  const named = `${c.id}@${c.getAttribute('for') ?? ''}:${Object.entries(c.dataset).join(';')}`;
+  return `${c.tagName}#${named === '@:' ? (c.textContent?.trim() ?? '') : named}`;
+}
+
+// The owner's comfort rules on every control of a dialog, its actions and those in its body (a save slot, a setting,
+// the cargo blimp's Send and Take): see dialogPointerRefused and dialogKeyRefused (src/ui/presses.ts). A press of a
+// mouse button or a finger is refused where it begins (a slider or a checkbox would change before any click), and its
+// click with it; a key or A where it clicks.
+function guardPresses(dialog: HTMLElement, d: DialogPresses): void {
+  dialog.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (!controlOf(e.target) || !dialogPointerRefused(d, down)) return;
+      down.refused = true;
+      e.preventDefault();
+    },
+    { capture: true },
+  );
+  // a finger moves a slider from its touch, not its pointer
+  dialog.addEventListener(
+    'touchstart',
+    (e) => {
+      if (down.refused && controlOf(e.target)) e.preventDefault();
+    },
+    { capture: true, passive: false },
+  );
+  // a label passes its click on to its checkbox, at once: that click was checked as the label's
+  let viaLabel: HTMLElement | null = null;
+  dialog.addEventListener(
+    'click',
+    (e) => {
+      const c = controlOf(e.target);
+      if (!c) return;
+      const now = performance.now();
+      if (viaLabel && e.target === viaLabel) return;
+      const refused =
+        e.detail === 0
+          ? dialogKeyRefused(d, keyOf(c), now)
+          : !!down.refused || dialogPointerRefused(d, down) || (guarded(d.openedAt, now) && secondPress());
+      if (refused) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (e.detail !== 0) markSecond();
+        return;
+      }
+      d.taken = { press: e.detail === 0 ? null : down, t: now, key: keyOf(c) };
+      const label = c instanceof HTMLLabelElement ? c : null;
+      if (label?.control) {
+        viaLabel = label.control as HTMLElement;
+        window.setTimeout(() => (viaLabel = null));
+      }
+    },
+    { capture: true },
+  );
 }
 
 let current: { el: HTMLElement; opts: ModalOptions } | null = null;
@@ -125,8 +205,13 @@ export function openModal(opts: ModalOptions): HTMLElement {
   else body.append(opts.body);
   dialog.append(body);
 
-  // Keys held when the dialog pops up (Space to pause, Enter) must not pick a story choice by accident.
+  // Keys held when the dialog pops up (Space to pause, Enter, the pad's A) must not pick a story choice by accident,
+  // nor the second press of a double press whose first press opened it (a building tool with only parts missing opens
+  // 2PM's offer to buy them and build: the second click, tap or A must not buy): for PRESS_GUARD_MS
+  // (src/ui/presses.ts) a control takes no key press and no second press of a double press (guardPresses). A press of
+  // its own works.
   const openedAt = performance.now();
+  guardPresses(dialog, { openedAt, opener: guarded(down.t, openedAt) ? down : null, unprompted: !!opts.unprompted, taken: null });
   if (opts.actions?.length) {
     const actions = document.createElement('div');
     actions.className = 'modal-actions';
@@ -136,8 +221,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
       b.className = `btn ${a.primary ? 'btn-primary' : ''} ${a.tone ? `tone-${a.tone}` : ''}`;
       b.disabled = !!a.disabled;
       b.innerHTML = `<span>${a.label}</span>${a.hint ? `<small>${a.hint}</small>` : ''}`;
-      b.addEventListener('click', (e) => {
-        if (e.detail === 0 && performance.now() - openedAt < 400) return;
+      b.addEventListener('click', () => {
         audio.play('click');
         a.onClick();
       });
@@ -157,7 +241,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
   setBackgroundInert(true);
   // Focus the dialog itself (Tab reaches the buttons) or its first text field; never pre-select a story choice.
   // With a controller, ordinary dialogs start on their main button so one press of A answers them
-  // (the 400 ms guard above still swallows a press that was meant for the screen behind).
+  // (the guard above still swallows a press that was meant for the screen behind).
   const field = dialog.querySelector<HTMLElement>('input[type="text"], input[type="number"]');
   dialog.tabIndex = -1;
   const pad = document.body.classList.contains('pad-mode') && opts.dismissable !== false;

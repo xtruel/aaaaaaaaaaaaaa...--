@@ -8,6 +8,8 @@ import { hex, mat } from '../voxel';
 import type { Vox } from '../voxel';
 import { footprint, hazardBand, plate } from './common';
 import type { BuildingArt } from './common';
+import { factoryArm } from './catalog-modules';
+import { hasModule } from './modules';
 
 // skylight glass: pale blue by day, a cyan glow at night
 const SKY = mat('factory-skylight', { rgb: hex('#86c8ff'), emit: 0.6, glow: hex('#42e2d2'), flat: true, jitter: 0 });
@@ -24,7 +26,7 @@ const SIGN = [
 type P3 = [number, number, number];
 
 // A thick straight segment between two points (robot arm links).
-function beam(v: Vox, a: P3, b: P3, r: number, m: number): void {
+export function beam(v: Vox, a: P3, b: P3, r: number, m: number): void {
   const n = Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]), Math.abs(b[2] - a[2])) * 2) + 1;
   for (let i = 0; i <= n; i++) {
     const t = i / n;
@@ -37,7 +39,7 @@ function beam(v: Vox, a: P3, b: P3, r: number, m: number): void {
 
 // A rust-brown crate with a pink 2PM tape band (it must pop against the sand plate and the yellow arm).
 // `turned` runs the band along y instead of x, so the crates of a stack alternate and each one reads.
-function crate(v: Vox, x: number, y: number, z: number, turned = false): void {
+export function crate(v: Vox, x: number, y: number, z: number, turned = false): void {
   v.box(x, y, z, x + 4, y + 4, z + 4, M.rust);
   v.paint(x, y, z, x + 4, y + 4, z + 1, M.rustD);
   if (turned) v.paint(x, y + 1, z, x + 4, y + 3, z + 4, M.pink);
@@ -47,7 +49,7 @@ function crate(v: Vox, x: number, y: number, z: number, turned = false): void {
 // Two-link arm in a vertical plane: shoulder at (0, sz), gripper target (u, z); returns the elbow (elbow up).
 const L1 = 8;
 const L2 = 7;
-function elbow(sz: number, u: number, z: number): [number, number] {
+export function elbow(sz: number, u: number, z: number): [number, number] {
   const du = u;
   const dz = z - sz;
   const d = Math.min(L1 + L2 - 0.01, Math.hypot(du, dz));
@@ -70,7 +72,7 @@ const GRIP: [number, number][] = [
 export const factory: BuildingArt = {
   frames: 4,
   fps: 6,
-  model(frame, working) {
+  model(frame, working, modules) {
     const v = footprint(3, 2, 52);
     const f = working ? frame : 0;
     plate(v);
@@ -181,23 +183,27 @@ export const factory: BuildingArt = {
     const by = 29;
     const sz = 12;
     v.box(35, 26, 3, 41, 31, 5, M.steelD); // base plate
-    v.cylZ(bx, by, 2.2, 5, 8, M.dark);
-    v.box(bx - 2, by - 2, 8, bx + 2, by + 2, sz, M.yellow);
-    const [gu, gz] = GRIP[working ? frame : 0];
-    const [eu, ez] = elbow(sz, gu, gz);
-    const sh: P3 = [bx, by, sz];
-    const el: P3 = [bx + eu, by, ez];
-    const gr: P3 = [bx + gu, by, gz];
-    beam(v, sh, el, 1, M.yellow);
-    beam(v, el, gr, 1, M.yellow);
-    const ex = Math.round(el[0]);
-    const ez0 = Math.round(el[2]);
-    v.box(bx - 1, by - 1, sz - 1, bx + 1, by + 1, sz + 1, M.ink); // shoulder joint
-    v.box(ex - 1, by - 1, ez0 - 1, ex + 1, by + 1, ez0 + 1, M.ink); // elbow joint
-    v.box(gr[0] - 2, by - 2, gz - 1, gr[0] + 2, by + 2, gz, M.steelD); // gripper and its fingers
-    v.box(gr[0] - 2, by - 2, gz - 3, gr[0] - 1, by + 2, gz - 1, M.steelD);
-    v.box(gr[0] + 1, by - 2, gz - 3, gr[0] + 2, by + 2, gz - 1, M.steelD);
-    if (working && frame > 0) crate(v, gr[0] - 2, by - 2, gz - 5); // the crate in its grip
+    // with the double arm module a twin-arm robot stands on the plate instead (catalog-modules.ts)
+    const twin = hasModule(modules, 'factoryArm');
+    if (!twin) {
+      v.cylZ(bx, by, 2.2, 5, 8, M.dark);
+      v.box(bx - 2, by - 2, 8, bx + 2, by + 2, sz, M.yellow);
+      const [gu, gz] = GRIP[working ? frame : 0];
+      const [eu, ez] = elbow(sz, gu, gz);
+      const sh: P3 = [bx, by, sz];
+      const el: P3 = [bx + eu, by, ez];
+      const gr: P3 = [bx + gu, by, gz];
+      beam(v, sh, el, 1, M.yellow);
+      beam(v, el, gr, 1, M.yellow);
+      const ex = Math.round(el[0]);
+      const ez0 = Math.round(el[2]);
+      v.box(bx - 1, by - 1, sz - 1, bx + 1, by + 1, sz + 1, M.ink); // shoulder joint
+      v.box(ex - 1, by - 1, ez0 - 1, ex + 1, by + 1, ez0 + 1, M.ink); // elbow joint
+      v.box(gr[0] - 2, by - 2, gz - 1, gr[0] + 2, by + 2, gz, M.steelD); // gripper and its fingers
+      v.box(gr[0] - 2, by - 2, gz - 3, gr[0] - 1, by + 2, gz - 1, M.steelD);
+      v.box(gr[0] + 1, by - 2, gz - 3, gr[0] + 2, by + 2, gz - 1, M.steelD);
+      if (working && frame > 0) crate(v, gr[0] - 2, by - 2, gz - 5); // the crate in its grip
+    }
     // pallet with a stack of crates (clear of the arm's base plate)
     v.box(41, 23, 3, 47, 31, 4, M.rustD);
     crate(v, 42, 23, 4);
@@ -215,6 +221,7 @@ export const factory: BuildingArt = {
       v.cylZ(x, y, 1.7, 5, 6, M.ink);
     }
     v.point('spark', 38, 29, 13); // the arm's shoulder joint
+    if (twin) factoryArm(v, frame, working);
     return v;
   },
 };

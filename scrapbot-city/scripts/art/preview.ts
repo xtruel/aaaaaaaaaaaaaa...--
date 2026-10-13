@@ -1,6 +1,6 @@
 // Quick look at one model without touching the game's atlas.
 //   npx esbuild scripts/art/preview.ts --bundle --platform=node --format=esm --outfile=<tmp>/preview.mjs --log-level=warning
-//   node <tmp>/preview.mjs <building type | citizens | cat | decor | blimp | bots> <out.png> [scale]
+//   node <tmp>/preview.mjs <building type[+module] | citizens | cat | decor | blimp | bots | scenery:<theme>> <out.png> [scale]
 // For a building: every work frame, the "off" frame, 4 construction stages and the toolbar icon, then the
 // building on a patch of ground next to the HQ (for scale) by day and with the night glow.
 import { writeFileSync } from 'node:fs';
@@ -10,14 +10,17 @@ import { blit, createImage, encodePNG } from './png';
 import type { Image } from './png';
 import { render, renderShadow } from './voxel';
 import { ART } from './models/index';
+import { withMist } from './models/catalog-modules';
 import { DIRS, botModel, facing } from './models/bot';
 import { CAT_FRAMES, CITIZEN_FRAMES, CITIZEN_VARIANTS, catModel, citizenModel } from './models/characters';
 import { DECOR } from './models/decor';
 import { BLIMP_FRAMES, blimpModel } from './models/blimp';
 import { groundTiles } from './models/terrain';
+import { THEME_SCENERY } from './models/city-scenery';
+import type { Theme } from './models/city-terrain';
 
 const [what, out, scaleArg] = process.argv.slice(2);
-if (!what || !out) throw new Error('usage: preview <type|citizens|cat|decor|blimp|bots> <out.png> [scale]');
+if (!what || !out) throw new Error('usage: preview <type|citizens|cat|decor|blimp|bots|scenery:<theme>> <out.png> [scale]');
 const SCALE = Number(scaleArg ?? 3);
 const BG: [number, number, number] = [46, 40, 65];
 
@@ -94,7 +97,7 @@ function darkenNight(img: Image, glow: Image | null, gx: number, gy: number): Im
 }
 
 // A patch of ground with the HQ and the building side by side, drawn in the right order.
-function scene(type: BuildingType, frame: number, night: boolean): Image {
+function scene(type: BuildingType, frame: number, night: boolean, modules: string[] = []): Image {
   const tiles = groundTiles();
   const tileImg = (k: number) => tiles[`t/ground/1/${k % 4}`];
   const W = 9;
@@ -104,8 +107,8 @@ function scene(type: BuildingType, frame: number, night: boolean): Image {
   const img = createImage((W + H) * 16 + 16, ((W + H) * 16) / 2 + oy + 10);
   fill(img, [15, 13, 24]);
   for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) blit(img, tileImg(tx * 7 + ty), ox + (tx - ty) * 16 - 16, oy + ((tx + ty) * 16) / 2);
-  const place = (t: BuildingType, tx: number, ty: number, f: number) => {
-    const m = ART[t].model(f, true);
+  const place = (t: BuildingType, tx: number, ty: number, f: number, mods: string[] = []) => {
+    const m = ART[t].model(f, true, mods);
     const sh = renderShadow(m);
     const r = render(m);
     const X = ox + (tx - ty) * 16;
@@ -124,7 +127,7 @@ function scene(type: BuildingType, frame: number, night: boolean): Image {
   };
   const hq = place('hq', 1, 1, 0);
   const def = BUILDINGS[type];
-  const b = place(type, 5, 1, frame);
+  const b = place(type, 5, 1, frame, modules);
   void def;
   // the HQ (x 1..3) is behind the building (x 5..) on the x axis: draw it first
   blit(img, hq.r.img, hq.X - hq.r.ax, hq.Y - hq.r.ay);
@@ -153,14 +156,16 @@ function scene(type: BuildingType, frame: number, night: boolean): Image {
 }
 
 let sheet: Image;
-if (what in BUILDINGS) {
-  const type = what as BuildingType;
+const [baseType, ...mods] = what.split('+');
+if (baseType in BUILDINGS) {
+  // <type> or <type>+<module>[+<module>]: the building with those modules installed
+  const type = baseType as BuildingType;
   const art = ART[type];
   const frames: Image[] = [];
-  for (let f = 0; f < art.frames; f++) frames.push(render(art.model(f, true)).img);
-  frames.push(render(art.model(0, false)).img);
-  const icon = render(art.model(0, true), { scale: 2 }).img;
-  sheet = stack([upscale(row([...frames, icon]), SCALE), upscale(row([scene(type, 0, false), scene(type, 0, true)]), 2)]);
+  for (let f = 0; f < art.frames; f++) frames.push((mods.includes('purifierNozzle') ? withMist(render(art.model(f, true, mods)), f) : render(art.model(f, true, mods))).img);
+  frames.push(render(art.model(0, false, mods)).img);
+  const icon = render(art.model(0, true, mods), { scale: 2 }).img;
+  sheet = stack([upscale(row([...frames, icon]), SCALE), upscale(row([scene(type, 0, false, mods), scene(type, 0, true, mods)]), 2)]);
 } else if (what === 'citizens') {
   const imgs: Image[] = [];
   for (let v = 0; v < CITIZEN_VARIANTS; v++) for (const d of DIRS) for (let f = 0; f < CITIZEN_FRAMES; f++) imgs.push(render(facing(citizenModel(v, f), d)).img);
@@ -186,6 +191,20 @@ if (what in BUILDINGS) {
   }
   if (cur.length) rows.push(row(cur));
   sheet = upscale(stack(rows.length ? rows : [row([createImage(8, 8)])]), SCALE);
+} else if (what.startsWith('scenery:')) {
+  // scenery:<rust|neon|green|corp>: a city theme's border scenery, every frame by day and at night
+  const list = THEME_SCENERY[what.slice(8) as Theme];
+  if (!list) throw new Error(`unknown theme in ${what}`);
+  const imgs: Image[] = [];
+  for (const d of list)
+    for (let f = 0; f < d.frames; f++) {
+      const r = render(d.model(f));
+      const day = createImage(r.img.w, r.img.h);
+      fill(day, BG);
+      blit(day, r.img, 0, 0);
+      imgs.push(day, darkenNight(day, r.hasGlow ? r.glow : null, 0, 0));
+    }
+  sheet = upscale(row(imgs), SCALE);
 } else if (what === 'blimp') {
   const imgs: Image[] = [];
   for (let f = 0; f < BLIMP_FRAMES; f++) imgs.push(render(blimpModel(f)).img);

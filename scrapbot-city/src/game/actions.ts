@@ -2,6 +2,7 @@
 import { t, tk } from '../i18n';
 import { ALIGN_BUILD_SHIFT, BUILDINGS, BULLDOZE_RUBBLE_COST, IMPORT_PARTS, MAP_H, MAP_W, PARTS_RESERVE, T, TILE } from './defs';
 import type { BuildingType, Cost, Resource } from './defs';
+import { buildingStats, installedModules, moduleRefund, solidKind } from './piecedefs';
 import { addBuilding, buildingCenter, idx, inBounds, pushMessage, removeBuilding } from './state';
 import type { Building, GameState } from './state';
 
@@ -11,8 +12,10 @@ export function setTile(s: GameState, i: number, kind: number, amt = 0): void {
   s.dirtyTiles.push(i);
 }
 
+// Plain ground or grass with no building and no solid piece (fence, gate, lamp, decoration): where junk, sludge,
+// waste and a gifted garden may appear (a floor does not matter).
 export function isFree(s: GameState, i: number): boolean {
-  return (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS) && s.occ[i] === -1;
+  return (s.tiles[i] === T.GROUND || s.tiles[i] === T.GRASS) && s.occ[i] === -1 && s.solid[i] === 0;
 }
 
 export function canAfford(s: GameState, cost: Cost): boolean {
@@ -31,9 +34,11 @@ export function gain(s: GameState, cost: Cost): void {
   }
 }
 
+// "12 credits + 1 part": an amount of exactly 1 takes the singular (cost.<resource>.one). Every other amount keeps
+// the plural key; in Polish 2–4 and 5+ take the same word for all three (części, złomu, kr).
 export function costText(cost: Cost): string {
   const parts = (Object.keys(cost) as Resource[]).filter((r) => (cost[r] ?? 0) > 0);
-  return parts.map((r) => tk(`cost.${r}`, { n: cost[r] ?? 0 })).join(' + ') || t('common.free');
+  return parts.map((r) => tk(cost[r] === 1 ? `cost.${r}.one` : `cost.${r}`, { n: cost[r] ?? 0 })).join(' + ') || t('common.free');
 }
 
 export function shiftAlignment(s: GameState, delta: number): void {
@@ -55,6 +60,13 @@ export interface PlaceCheck {
   costOnly?: boolean; // the spot is fine, only the price is not
 }
 
+// Why nothing can be built on a tile holding a solid piece (solid code as in GameState.solid): "A bench is in the
+// way: remove it first" (place.<kind>).
+export function solidReason(code: number): string {
+  const kind = solidKind(code);
+  return kind ? tk(`place.${kind}`) : t('place.occupied');
+}
+
 export function placeCheck(s: GameState, type: BuildingType, x: number, y: number): PlaceCheck {
   const def = BUILDINGS[type];
   if (def.minPop && s.pop < def.minPop) return { ok: false, reason: t('place.needs', { n: def.minPop }) };
@@ -66,6 +78,7 @@ export function placeCheck(s: GameState, type: BuildingType, x: number, y: numbe
       if (!inBounds(tx, ty)) return { ok: false, reason: t('place.outside') };
       const i = idx(tx, ty);
       if (s.occ[i] !== -1) return { ok: false, reason: t('place.occupied') };
+      if (s.solid[i] !== 0) return { ok: false, reason: solidReason(s.solid[i]) };
       const tile = s.tiles[i];
       if (tile === T.JUNK) {
         const full = s.res.scrap >= s.derived.storage;
@@ -99,14 +112,15 @@ export function placeBuilding(s: GameState, type: BuildingType, x: number, y: nu
   return b;
 }
 
-// Storage left after a building goes: clamp the scrap to it.
-function computeStorage(s: GameState): void {
+// Storage left after a building or a storage module goes: clamp the scrap to it.
+export function computeStorage(s: GameState): void {
   let storage = 0;
-  for (const o of s.buildings) if (o.built >= 1) storage += BUILDINGS[o.type].storage ?? 0;
+  for (const o of s.buildings) if (o.built >= 1) storage += buildingStats(o).storage;
   s.derived.storage = storage;
   s.res.scrap = Math.min(s.res.scrap, storage);
 }
 
+// What demolishing gives back for the building alone (its modules: see demolishRefund).
 export function refundFor(s: GameState, b: Building): Cost {
   const cost = buildCost(s, b.type);
   const share = b.built < 1 ? 0.8 : 0.5;
@@ -115,12 +129,25 @@ export function refundFor(s: GameState, b: Building): Cost {
   return out;
 }
 
+// What demolishing really gives back: the building plus every module on it (the modules go with it).
+// The demolish confirmation shows this.
+export function demolishRefund(s: GameState, b: Building): Cost {
+  const out = refundFor(s, b);
+  for (const m of installedModules(b)) {
+    const back = moduleRefund(m);
+    for (const r of Object.keys(back) as Resource[]) out[r] = (out[r] ?? 0) + (back[r] ?? 0);
+  }
+  return out;
+}
+
 export function demolish(s: GameState, b: Building): boolean {
+  // a building already gone (a stale reference) gives nothing back a second time
+  if (!s.buildings.includes(b)) return false;
   if (b.type === 'hq') {
     pushMessage(s, t('msg.hqStays'), 'bad');
     return false;
   }
-  const refund = refundFor(s, b);
+  const refund = demolishRefund(s, b);
   // a refund is not income: it must not count toward "credits earned" goals
   for (const r of Object.keys(refund) as Resource[]) s.res[r] += refund[r] ?? 0;
   // the city no longer has this building, so its pull on the path meter goes too: exactly the pull it

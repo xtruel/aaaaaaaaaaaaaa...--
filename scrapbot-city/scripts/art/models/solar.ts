@@ -5,6 +5,8 @@ import { M } from '../palette';
 import type { Vox } from '../voxel';
 import { footprint, plate } from './common';
 import type { BuildingArt } from './common';
+import { solarTracker } from './catalog-modules';
+import { hasModule } from './modules';
 
 // A panel tilted 45° to face +y (towards the light): the surface rises one voxel per row towards −y. 'glint'
 // shifts the diagonal sun reflection across the cells (large negative values push it off the panel).
@@ -35,17 +37,21 @@ function panel(v: Vox, x0: number, y0: number, x1: number, y1: number, z0: numbe
 export const solar: BuildingArt = {
   frames: 4,
   fps: 6,
-  model(frame, working) {
+  model(frame, working, modules) {
     const v = footprint(2, 2, 20);
     plate(v);
     // dark gravel bed under the panels
     v.box(2, 2, 3, 30, 27, 4, M.dark);
     // four panels; the glint runs from the back-left panel to the front-right one
     const g = working ? -6 + frame * 5 : -40;
-    panel(v, 3, 3, 15, 12, 6, g);
-    panel(v, 17, 3, 29, 12, 6, g - 5);
-    panel(v, 3, 15, 15, 24, 6, g - 3);
-    panel(v, 17, 15, 29, 24, 6, g - 8);
+    // with the tracking module the panels stand on its mounts instead (catalog-modules.ts)
+    if (hasModule(modules, 'solarTracker')) solarTracker(v, frame, working);
+    else {
+      panel(v, 3, 3, 15, 12, 6, g);
+      panel(v, 17, 3, 29, 12, 6, g - 5);
+      panel(v, 3, 15, 15, 24, 6, g - 3);
+      panel(v, 17, 15, 29, 24, 6, g - 8);
+    }
     // short yellow junction post in the middle with a status lamp
     v.box(15, 12, 3, 17, 15, 13, M.yellow);
     v.box(15, 12, 13, 17, 15, 14, M.steelD);

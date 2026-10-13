@@ -30,6 +30,16 @@ function blank(): DepthItem {
 }
 
 // 1 = a before b, -1 = b before a, 0 = no constraint
+// Does a building with the footprint `b` stand in front of the ground area `a` (both in world or tile units, x0 < x1,
+// y0 < y1), hiding it where they overlap on screen? The area lies behind the building on an axis, and the building
+// does not lie behind the area. The renderer draws such a building see-through over a spot being built on or
+// bulldozed, and a click can reach what it hides (src/ui/pick.ts).
+export function standsInFront(b: { x0: number; y0: number; x1: number; y1: number }, a: { x0: number; y0: number; x1: number; y1: number }): boolean {
+  const areaBehind = a.x1 <= b.x0 || a.y1 <= b.y0;
+  const buildingBehind = b.x1 <= a.x0 || b.y1 <= a.y0;
+  return areaBehind && !buildingBehind;
+}
+
 export function compareDepth(a: DepthItem, b: DepthItem): number {
   const ab = a.x1 <= b.x0 || a.y1 <= b.y0 || a.z1 <= b.z0;
   const ba = b.x1 <= a.x0 || b.y1 <= a.y0 || b.z1 <= a.z0;

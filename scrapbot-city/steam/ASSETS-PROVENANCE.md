@@ -126,10 +126,9 @@ e Apache 2.0 chiedono che avviso di copyright e testo della licenza accompagnino
 Marker l'avviso di copyright (Font Diner, Inc.) non è nel file LICENSE del pacchetto: `after-pack.cjs` lo prende dal
 README e lo mette in testa al file e nell'elenco (corretto e ricostruito l'11/10/2026 in revisione).
 
-**Da correggere nel ramo principale** (non toccato da qui): la schermata Crediti del gioco dice «Bungee, Lilita One,
-Nunito, Silkscreen, Permanent Marker, DotGothic16 (SIL Open Font License)», ma **Permanent Marker è Apache 2.0**
-(`src/ui/dialogs.ts`, chiave `credits.fonts`). Testo proposto: «… DotGothic16 (SIL Open Font License 1.1); Permanent
-Marker (Apache License 2.0)».
+**Corretto nella 0.7.0-beta.1** (e quindi nella 0.7.0-rc.1, ramo `rc-0.7.0`): la schermata Crediti diceva «Bungee,
+Lilita One, Nunito, Silkscreen, Permanent Marker, DotGothic16 (SIL Open Font License)»; ora dice «Bungee, Lilita One,
+Nunito, Silkscreen, DotGothic16 (SIL Open Font License); Permanent Marker (Apache License 2.0)» (`src/ui/dialogs.ts`).
 
 ## 5. Controllo con le regole attuali di Steamworks
 

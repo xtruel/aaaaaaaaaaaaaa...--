@@ -10,6 +10,7 @@ const REPEATS: PadButton[] = ['up', 'down', 'left', 'right'];
 const DEAD_ZONE = 0.22;
 const REPEAT_DELAY = 0.38;
 const REPEAT_EVERY = 0.11;
+const DIALOG_SCROLL = 700; // right stick over a dialog taller than the window, px per second (a city's side panels too)
 
 export interface PadFrame {
   dt: number;
@@ -43,6 +44,8 @@ function deadZone(x: number, y: number): [number, number] {
 
 export function setPadMode(on: boolean): void {
   document.body.classList.toggle('pad-mode', on);
+  // the controller takes over from a finger (src/input.ts)
+  if (on) document.body.classList.remove('touch-mode');
 }
 
 export function padMode(): boolean {
@@ -109,6 +112,17 @@ function move(dir: 'up' | 'down' | 'left' | 'right'): void {
   }
   // sliders and pickers take left/right as "change the value"
   if ((dir === 'left' || dir === 'right') && nudgeValue(from, dir === 'right' ? 1 : -1)) return;
+  // the main menu's entries go up and down in their order, as the arrow keys do: the highlighted entry grows, which
+  // would throw the nearest-centre search off by one entry on a short window
+  const menuList = from.closest<HTMLElement>('.menu-list');
+  if (menuList && (dir === 'up' || dir === 'down')) {
+    const entries = list.filter((el) => menuList.contains(el));
+    const next = entries[entries.indexOf(from) + (dir === 'down' ? 1 : -1)];
+    if (next) {
+      focusEl(next);
+      return;
+    }
+  }
   const a = from.getBoundingClientRect();
   const ax = a.left + a.width / 2;
   const ay = a.top + a.height / 2;
@@ -124,7 +138,10 @@ function move(dir: 'up' | 'down' | 'left' | 'right'): void {
     const dx = r.left + r.width / 2 - ax;
     const dy = r.top + r.height / 2 - ay;
     const main = dir === 'up' ? -dy : dir === 'down' ? dy : dir === 'left' ? -dx : dx;
-    const cross = dir === 'up' || dir === 'down' ? dx : dy;
+    // up and down: a target straight above or below (its width overlaps this one's) is in line, wherever its centre
+    // is: a checkbox at the left under a slider as wide as the dialog, the dialog's wide button under the checkbox
+    const inLine = (dir === 'up' || dir === 'down') && r.left < a.right && r.right > a.left;
+    const cross = inLine ? 0 : dir === 'up' || dir === 'down' ? dx : dy;
     const score = main + Math.abs(cross) * 2.2;
     if (score < bestScore) {
       bestScore = score;
@@ -166,10 +183,26 @@ function back(): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
 }
 
-function menuFrame(f: PadFrame): void {
+// The open dialog, or the part of it, that scrolls and has more to show (Extras on a short window), or null.
+function scrollBox(): HTMLElement | null {
+  const modal = document.querySelector<HTMLElement>('#modal-root .modal');
+  if (!modal) return null;
+  for (const el of [modal, ...modal.querySelectorAll<HTMLElement>('.modal-body')]) {
+    if (el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY)) return el;
+  }
+  return null;
+}
+
+export function menuFrame(f: PadFrame): void {
   for (const dir of ['up', 'down', 'left', 'right'] as const) if (f.pressed.has(dir)) move(dir);
   if (f.pressed.has('a')) press();
   if (f.pressed.has('b') || f.pressed.has('start')) back();
+  // the right stick scrolls a dialog taller than the window: its texts (the achievements, how to play) hold no control
+  // the focus could stop on, as it does over a long side panel in a city
+  if (f.ry) {
+    const scroll = scrollBox();
+    if (scroll) scroll.scrollTop += f.ry * DIALOG_SCROLL * f.dt;
+  }
 }
 
 // ---------- polling ----------

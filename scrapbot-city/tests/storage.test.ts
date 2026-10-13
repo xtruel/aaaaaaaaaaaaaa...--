@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Browser storage: slots, metadata and what happens with damaged or newer saves.
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createGame } from '../src/game/state';
+import { SAVE_VERSION, createGame } from '../src/game/state';
 import { citySlot, loadGame, saveGame, slotMeta } from '../src/storage';
 
 beforeEach(() => localStorage.clear());
@@ -20,7 +20,7 @@ describe('slots', () => {
     const slot = citySlot('home');
     saveGame(slot, s);
     const raw = JSON.parse(localStorage.getItem('scrapbot:save:city-home')!);
-    raw.version = 3;
+    raw.version = SAVE_VERSION + 1;
     localStorage.setItem('scrapbot:save:city-home', JSON.stringify(raw));
     expect(loadGame(slot)).toBeNull();
     expect(slotMeta(slot)).not.toBeNull();
