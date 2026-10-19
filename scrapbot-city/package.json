@@ -26,7 +26,9 @@
     "dist:steam": "npm run build && electron-builder --win dir --linux dir --x64 && node scripts/steam-content.cjs",
     "steam:appid": "node scripts/steam-appid.cjs",
     "steam:check": "node scripts/steam-native-check.cjs",
-    "steam:launch-check": "node scripts/steam-launch-check.mjs"
+    "steam:launch-check": "node scripts/steam-launch-check.mjs",
+    "ios:sync": "tsc --noEmit && vite build && cap sync ios",
+    "ios:assets": "node scripts/ios-assets.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.2",

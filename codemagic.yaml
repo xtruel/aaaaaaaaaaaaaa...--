@@ -1,0 +1,71 @@
+# Codemagic CI for Scrapbot City's App Store build (the game is in scrapbot-city/; Codemagic reads this file only from
+# the repository's root). See scrapbot-city/docs/APPSTORE.md.
+#
+# ios-testflight: the single-file web build in the Capacitor 8 iOS shell (Swift Package Manager, no CocoaPods, no
+# workspace), signed for App Store distribution and uploaded to App Store Connect, then to TestFlight. Started by hand
+# or through the Codemagic API: nothing triggers it on a push.
+#
+# The variable group appstore_credentials (secret variables, set through the Codemagic API, never in this repository):
+#   APP_STORE_CONNECT_ISSUER_ID       Issuer ID of the App Store Connect API key
+#   APP_STORE_CONNECT_KEY_IDENTIFIER  Key ID of that key (role App Manager)
+#   APP_STORE_CONNECT_PRIVATE_KEY     the key's .p8 file, whole
+#   CERTIFICATE_PRIVATE_KEY           an RSA private key (PEM) for the Apple Distribution certificate, made when missing
+#   APP_STORE_APPLE_ID                the app's Apple ID (a number: App Store Connect > App Information)
+workflows:
+  ios-testflight:
+    name: iOS TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    working_directory: scrapbot-city
+    environment:
+      groups:
+        - appstore_credentials
+      vars:
+        BUNDLE_ID: com.qwerty3d.scrapbotcity
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+      # App Store Connect takes only builds made with Xcode 26 and the iOS 26 SDK (since 28 April 2026)
+      xcode: latest
+      node: 22
+    scripts:
+      - name: Xcode 26 or later
+        script: |
+          xcodebuild -version
+          XCODE_MAJOR=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
+          if [ "$XCODE_MAJOR" -lt 26 ]; then
+            echo "Xcode $XCODE_MAJOR: App Store Connect needs Xcode 26 or later" >&2
+            exit 1
+          fi
+      - name: Install dependencies
+        script: ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci
+      - name: Unit tests
+        script: npm test
+      - name: Web build and Capacitor sync (tsc, vite build, cap sync ios)
+        script: npm run ios:sync
+      - name: Keychain for code signing
+        script: keychain initialize
+      - name: App Store distribution certificate and profile (made when missing)
+        script: app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+      - name: Certificate in the keychain
+        script: keychain add-certificates
+      - name: Profiles in the Xcode project
+        script: xcode-project use-profiles --project "$XCODE_PROJECT"
+      - name: Build number (the latest TestFlight build + 1)
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null | tail -1 || true)
+          if [[ "$LATEST" =~ ^[0-9]+$ ]]; then NEXT=$((LATEST + 1)); else NEXT="$BUILD_NUMBER"; fi
+          echo "Build number: $NEXT (latest on TestFlight: ${LATEST:-none})"
+          cd ios/App && agvtool new-version -all "$NEXT"
+      - name: Build the IPA (archive and export for App Store Connect)
+        script: xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME" --ipa-directory ios/App/output/ipa
+    artifacts:
+      - $CM_BUILD_DIR/scrapbot-city/ios/App/output/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        submit_to_app_store: false
