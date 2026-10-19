@@ -180,9 +180,12 @@ export class Tutorial {
     const step = STEPS[this.index];
     const targets = step.target ? [...this.root.querySelectorAll<HTMLElement>(step.target)].filter((el) => el.offsetParent !== null) : [];
     const b = this.bubble;
-    const vw = window.innerWidth;
+    // between the HUD's sides: the window's, or in the iOS app the safe area's (src/style.css)
+    const hud = this.root.querySelector('.hud')?.getBoundingClientRect();
+    const frame = hud && hud.width > 0 ? hud : new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+    const vw = frame.right;
     const vh = window.innerHeight;
-    const bw = Math.min(360, vw - 24);
+    const bw = Math.min(360, frame.width - 24);
     b.style.width = `${bw}px`;
     b.style.bottom = '';
     const bh = b.offsetHeight;
@@ -197,8 +200,8 @@ export class Tutorial {
     if (ctx.hq) avoid.push({ box: ctx.hq, weight: step.action ? 3 : 1 });
 
     const at = (left: number, top: number): Box => {
-      const l = Math.max(12, Math.min(vw - bw - 12, left));
-      const t = Math.max(8, Math.min(vh - bh - 8, top));
+      const l = Math.max(frame.left + 12, Math.min(vw - bw - 12, left));
+      const t = Math.max(frame.top + 8, Math.min(vh - bh - 8, top));
       return { left: l, top: t, right: l + bw, bottom: t + bh };
     };
     const spots: Box[] = [];
@@ -215,7 +218,7 @@ export class Tutorial {
     });
     this.rings.forEach((ring, i) => (ring.hidden = i >= targets.length));
     const toolbarTop = this.root.querySelector('[data-toolbar]')?.getBoundingClientRect().top ?? vh;
-    spots.push(at(12, toolbarTop - bh - 14), at(vw - bw - 12, toolbarTop - bh - 14), at((vw - bw) / 2, Math.max(80, vh * 0.2)));
+    spots.push(at(frame.left + 12, toolbarTop - bh - 14), at(vw - bw - 12, toolbarTop - bh - 14), at((frame.left + vw - bw) / 2, Math.max(80, vh * 0.2)));
     const cost = (c: Box) => avoid.reduce((sum, a) => sum + overlap(c, a.box) * a.weight, 0);
     let best = 0;
     for (let i = 1; i < spots.length; i++) if (cost(spots[i]) < cost(spots[best])) best = i;

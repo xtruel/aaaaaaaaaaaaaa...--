@@ -306,19 +306,23 @@ export class Hud {
   // so they follow both instead of covering the clock or the build buttons.
   private placePanels(): void {
     const vw = window.innerWidth;
+    // measured from the HUD's own top and bottom (the window's; in the iOS app the safe area's top, src/style.css)
+    const hud = this.root.getBoundingClientRect();
+    const top0 = hud.height > 0 ? hud.top : 0;
+    const bottom0 = hud.height > 0 ? hud.bottom : window.innerHeight;
     const bars = [...this.root.querySelectorAll('.hud-top > *')].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0);
     // how far down the top bar reaches over the left, middle and right third of the screen
-    const reach = (third: number) => Math.max(0, ...bars.filter((r) => r.right > (vw * third) / 3 && r.left < (vw * (third + 1)) / 3).map((r) => r.bottom));
+    const reach = (third: number) => Math.max(0, ...bars.filter((r) => r.right > (vw * third) / 3 && r.left < (vw * (third + 1)) / 3).map((r) => r.bottom - top0));
     const style = this.root.style;
     style.setProperty('--top-l', `${reach(0)}px`);
     style.setProperty('--top-c', `${reach(1)}px`);
     style.setProperty('--top-r', `${reach(2)}px`);
-    style.setProperty('--dock', `${window.innerHeight - this.el.toolbar.getBoundingClientRect().top}px`);
+    style.setProperty('--dock', `${bottom0 - this.el.toolbar.getBoundingClientRect().top}px`);
     // achievement toasts (outside the HUD) drop below the top bar and the smog alarm instead of covering them; so
     // does the smog panel, which keeps the alarm in sight
     const alarm = this.el['smog-alert'].getBoundingClientRect();
-    document.documentElement.style.setProperty('--toast-top', `${Math.max(reach(1), alarm.bottom) + 10}px`);
-    style.setProperty('--below-alarm', `${Math.max(reach(1), alarm.bottom) + 10}px`);
+    document.documentElement.style.setProperty('--toast-top', `${Math.max(reach(1) + top0, alarm.bottom) + 10}px`);
+    style.setProperty('--below-alarm', `${Math.max(reach(1), alarm.bottom - top0) + 10}px`);
   }
 
   private build(): void {
@@ -801,7 +805,12 @@ export class Hud {
   // moves for that, presses go through it for a moment, as when it appears.
   private placeNotice(avoid: { x: number; y: number }[]): void {
     const el = this.el['project-note'];
-    const vw = window.innerWidth;
+    // between the HUD's sides: the window's, or in the iOS app the safe area's (src/style.css); x and y here are the
+    // window's, the notice is placed in the HUD
+    const hud = this.root.getBoundingClientRect();
+    const frame = hud.width > 0 ? hud : new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+    const x0 = frame.left;
+    const vw = frame.right;
     const w = el.offsetWidth;
     const h = el.offsetHeight;
     // what is on screen: drawn boxes (not offsetParent, which is null for the tutorial's bubble: it is position: fixed)
@@ -818,7 +827,7 @@ export class Hud {
     const kept = this.noticeSpot;
     if (kept && covered(kept.x, kept.y) <= kept.cover) return;
     const soft = boxes('[data-feed] .msg');
-    const below = parseFloat(this.root.style.getPropertyValue('--below-alarm')) || 80;
+    const below = (parseFloat(this.root.style.getPropertyValue('--below-alarm')) || 80) + frame.top;
     const low = this.el.toolbar.getBoundingClientRect().top - h - 12;
     // The best place given what is on screen and the points to keep clear of: three bands (under the top bar, above the
     // build bar, between them) and, in each, the middle of every gap the panels and cards leave wide enough, then the
@@ -831,17 +840,17 @@ export class Hud {
         [Math.round((below + low) / 2), false],
       ] as const) {
         const taken = [...hard, ...toasts, ...presses].filter((r) => r.bottom > y && r.top < y + h).map((r) => [r.left, r.right] as const).sort((a, b) => a[0] - b[0]);
-        let from = 8;
+        let from = x0 + 8;
         for (const [l, r] of [...taken, [vw - 8, vw - 8] as const]) {
           if (l - from >= w) spots.push({ x: from + (l - from - w) / 2, y, top });
           from = Math.max(from, r + 8);
         }
-        for (const x of [(vw - w) / 2, 12, vw - w - 12]) spots.push({ x, y, top });
+        for (const x of [(x0 + vw - w) / 2, x0 + 12, vw - w - 12]) spots.push({ x, y, top });
       }
       let best = spots[0];
       let bestCost = Infinity;
       spots.forEach((p, i) => {
-        const x = Math.max(8, Math.min(vw - w - 8, p.x));
+        const x = Math.max(x0 + 8, Math.min(vw - w - 8, p.x));
         const cost = presses.reduce((c, r) => c + overlap(r, x, p.y) * 1e6, 0) + coveredAll(x, p.y) * 100 + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
         if (cost < bestCost) {
           bestCost = cost;
@@ -870,8 +879,8 @@ export class Hud {
       }
     }
     this.noticeSpot = { ...best, cover: covered(best.x, best.y) };
-    el.style.left = `${Math.round(best.x)}px`;
-    el.style.top = `${Math.round(best.y)}px`;
+    el.style.left = `${Math.round(best.x - x0)}px`;
+    el.style.top = `${Math.round(best.y - frame.top)}px`;
     // achievements come down under it rather than over it
     document.documentElement.style.setProperty('--note-bottom', best.top ? `${Math.round(best.y + h + 10)}px` : '0px');
   }

@@ -4847,3 +4847,54 @@ body.reduce-motion *::after {
   animation: none !important;
   transition: none !important;
 }
+
+/* ---------- the iOS app (src/platform/native.ts puts .ios-app on <html>; nothing here applies elsewhere) ----------
+   Full screen: the map and the screens' backgrounds run under the notch or the Dynamic Island, the rounded corners and
+   the home indicator; the interface keeps inside the safe area. The HUD and the main menu are inset on every side but
+   the bottom, where the build bar and the menu's footer already keep clear of the home indicator (env() above) and
+   the panels above the build bar follow it; the region map and the dialogs on every side. No page zoom (the viewport
+   too), no long-press callout, no text selection outside the text fields, no rubber-band scrolling. */
+html.ios-app {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html.ios-app body {
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html.ios-app input,
+html.ios-app textarea {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+html.ios-app .hud,
+html.ios-app .menu-ui {
+  inset: var(--safe-t) var(--safe-r) 0 var(--safe-l);
+}
+
+/* the footer's band still runs from edge to edge, its text inside the safe area */
+html.ios-app .menu-footer {
+  left: calc(-1 * var(--safe-l));
+  right: calc(-1 * var(--safe-r));
+  border-left: var(--safe-l) solid var(--ink);
+  border-right: var(--safe-r) solid var(--ink);
+}
+
+/* (a transparent border: the background, and the dialogs' dimming, still fill the screen) */
+html.ios-app .region,
+html.ios-app .modal-backdrop {
+  border: 0 solid transparent;
+  border-width: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+}
