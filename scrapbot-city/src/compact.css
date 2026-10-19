@@ -328,7 +328,7 @@
   /* ---------- the goal: a chip under the band that opens on a tap ---------- */
 
   .objective {
-    top: calc(var(--top-l, 54px) + 8px);
+    top: calc(var(--below-alarm, 64px) - 2px);
     left: calc(var(--cp-l) + 52px);
     max-width: min(340px, calc(100% - var(--cp-l) - var(--cp-r) - 60px));
     min-height: 44px;
@@ -423,7 +423,7 @@
 
   .build-info {
     position: absolute;
-    top: calc(var(--top-l, 54px) + 8px);
+    top: calc(var(--below-alarm, 64px) - 2px);
     left: calc(var(--cp-l) + 52px);
     display: flex;
     align-items: flex-start;
@@ -1217,23 +1217,33 @@
     height: 10px;
   }
 
-  /* the alarm: under the band, between the goal chip and a side panel */
+  /* the alarm (the 95% countdown): under the band in the goal chip's row, which comes down under it (the goal chip,
+     the strip of the building in hand: --below-alarm, measured by the HUD), left of a side panel */
   .smog-alert {
-    top: calc(var(--top-c, 54px) + 8px);
-    left: auto;
-    right: var(--cp-r);
-    max-width: min(420px, 50%);
+    top: calc(var(--top-l, 54px) + 8px);
+    left: calc(var(--cp-l) + 52px);
+    max-width: calc(100% - var(--cp-l) - var(--cp-r) - 60px);
     padding: 5px 12px;
     font-size: 13px;
     line-height: 1.2;
+    text-align: left;
     border-width: 2px;
+    border-radius: 14px;
     transform: none;
     animation: none;
   }
 
+  .hud:has([data-region]) .smog-alert {
+    left: calc(var(--cp-l) + 102px);
+    max-width: calc(100% - var(--cp-l) - var(--cp-r) - 110px);
+  }
+
   .hud:has(.inspector:not([hidden])) .smog-alert {
-    right: calc(var(--cp-r) + var(--cp-sheet) + 8px);
-    max-width: min(420px, calc(100% - var(--cp-sheet) - var(--cp-r) - var(--cp-l) - 160px));
+    max-width: calc(100% - var(--cp-l) - var(--cp-r) - var(--cp-sheet) - 68px);
+  }
+
+  .hud:has([data-region]):has(.inspector:not([hidden])) .smog-alert {
+    max-width: calc(100% - var(--cp-l) - var(--cp-r) - var(--cp-sheet) - 118px);
   }
 
   .proj-note {
