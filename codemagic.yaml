@@ -62,10 +62,13 @@ workflows:
       - $CM_BUILD_DIR/scrapbot-city/ios/App/output/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    # The build goes to App Store Connect and, once Apple has processed it, to TestFlight's internal testers (the
+    # account's own people, no review). submit_to_testflight would also send it to Apple's beta review, which only
+    # external testers need: left off.
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
+        submit_to_testflight: false
         submit_to_app_store: false
