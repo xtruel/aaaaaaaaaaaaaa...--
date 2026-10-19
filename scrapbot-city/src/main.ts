@@ -12,6 +12,8 @@ import '@fontsource/nunito/latin-ext-900.css';
 import '@fontsource/silkscreen/latin-ext-400.css';
 import './fonts.css';
 import './style.css';
+// phones in landscape and other short windows (up to 500 px high): see the file's header
+import './compact.css';
 
 import { achName, checkCampaign, onAchievement, syncAchievements } from './achievements';
 import { forgetCityTrades } from './campaign';
