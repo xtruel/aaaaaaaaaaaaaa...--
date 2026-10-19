@@ -45,6 +45,7 @@ Risultati in `.cache/e2e/<commit>/runs/<data>/`: per ogni test `log.txt` (una ri
 | `fit` | nessuno (misure nel DOM) | barra, catalogo e pannelli in 8 lingue a 1024x640, 1280x720, 1280x800, 1920x1080: niente tagliato o fuori dalla finestra, ogni riga raggiungibile e leggibile; nel menu principale la scritta della build fuori dal logo e la scritta a mano fuori dalle etichette delle schede; una notifica sopra un finale non copre i suoi pulsanti |
 | `campaign-home` | mouse | la prima città della campagna giocata fino alla fine con soli edifici (zero oggetti del catalogo, zero moduli), con eventi della storia e tempeste |
 | `cities` | mouse | le cinque città aperte dalla build release, immagini di giorno e di notte |
+| `ios-shell` | touch | l'app iOS **simulata**: un `window.Capacitor` finto (piattaforma ios; il plugin Filesystem risposto da una cartella in memoria che sopravvive al riavvio, gli eventi pause/resume del plugin App mandati dal test), 1024x768, 1133x744, 1180x820, 1376x1032 con DPR 2 e le safe area di un iPad emulate via CDP: niente Esci nel menu, modalità touch dalla prima schermata, niente casella Schermo intero, menu, mappa regionale, HUD e dialoghi dentro la safe area, zoom a due dita sulla mappa (la pagina resta a scala 1), pause → autosalvataggio e copia nei file, storage svuotato → riavvio con file system lento → il menu compare solo con i salvataggi tornati, Continua riapre la stessa città; poi 852x393 con le safe area di un iPhone in orizzontale (solo i bordi, non il layout compatto) |
 
 ## Cosa sono gli input (e cosa non sono)
 

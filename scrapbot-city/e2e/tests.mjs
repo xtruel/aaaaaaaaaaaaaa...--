@@ -23,4 +23,5 @@ export const TESTS = [
   { name: 'fit', file: 'fit.mjs', inputLabel: 'none (layout read from the DOM)', build: 'debug', minutes: 3, what: 'catalog, building panel and toolbar fit, the warning of an undiscovered piece right above Remove and in sight with it, main menu corners clear, a toast over an ending clear of its buttons: 8 languages x 1024x640, 1280x720, 1280x800, 1920x1080' },
   { name: 'campaign-home', file: 'campaign.mjs', input: 'mouse', build: 'debug', minutes: 5, what: 'the first campaign city played to its end with buildings only (no catalog object), through dialogs and storms' },
   { name: 'cities', file: 'cities.mjs', input: 'mouse', build: 'release', minutes: 3, what: 'the five campaign cities open from the release build, day and night pictures' },
+  { name: 'ios-shell', file: 'ios-shell.mjs', input: 'touch', build: 'debug', minutes: 2, what: 'the iOS app shell simulated (fake window.Capacitor) at 4 iPad sizes, DPR 2, emulated safe areas: no Quit, touch mode from the start, safe areas, pinch zoom, App pause autosaves, saves back from the files after the storage is cleared' },
 ];
