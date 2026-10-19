@@ -125,11 +125,14 @@ vero con l'aspetto dell'app ma disegnato da Chromium, buone come bozza. Quelli p
 
 ## 9. URL dell'informativa privacy e URL di supporto
 
-- `docs/privacy-policy.html` è un file unico, senza risorse esterne, in inglese e italiano. Prima di pubblicarlo
-  sostituisci `[CONTACT EMAIL]` (due volte; anche nel `.md`).
-- Pubblicalo dove vuoi: GitHub Pages (su un repository privato serve un piano a pagamento; altrimenti un piccolo
-  repository pubblico con il file come `index.html`), oppure qualsiasi hosting statico.
-- **URL di supporto** (obbligatorio): una pagina con il modo di contattarti (anche una pagina semplice con l'e-mail).
+- **Già online** (19/10/2026), in inglese e italiano, con il contatto truel3000lofi@gmail.com:
+  **https://claude.ai/artifact/RtuycNCpGDGdHCDPXLK5jz** — una pagina con assistenza e informativa sulla privacy.
+  - **URL dell'informativa sulla privacy**: `https://claude.ai/artifact/RtuycNCpGDGdHCDPXLK5jz#privacy`
+  - **URL di supporto**: `https://claude.ai/artifact/RtuycNCpGDGdHCDPXLK5jz#support`
+  - **Da fare una volta**: la pagina nasce privata; aprila e dal menu **Condividi** rendila visibile a chiunque abbia
+    il link (Apple e i giocatori devono poterla aprire senza account). Controlla da una finestra anonima.
+- Lo stesso testo è in `docs/privacy-policy.html` (file unico, senza risorse esterne) e `docs/privacy-policy.md`, se in
+  futuro vuoi pubblicarlo altrove (GitHub Pages, un sito tuo): in quel caso aggiorna i due URL in App Store Connect.
 
 ## 10. Classificazione per età
 

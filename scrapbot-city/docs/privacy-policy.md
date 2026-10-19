@@ -1,8 +1,8 @@
 # Scrapbot City — Privacy Policy
 
 *Last updated: 19 October 2026.* The same text, ready to put online, is in
-[privacy-policy.html](privacy-policy.html) (one self-contained file). Before publishing it, replace
-`[CONTACT EMAIL]` with the address where players can write to you (it appears in both languages).
+[privacy-policy.html](privacy-policy.html) (one self-contained file). It is online, with the support contact, at
+https://claude.ai/artifact/RtuycNCpGDGdHCDPXLK5jz (sections `#privacy` and `#support`; the page must be shared publicly).
 
 ## English
 
@@ -29,7 +29,7 @@ privacy policy; the game itself sends nothing.
 
 **Changes.** If this policy changes, the new version will be published at this address with a new date.
 
-**Contact:** [CONTACT EMAIL]
+**Contact:** truel3000lofi@gmail.com
 
 ## Italiano
 
@@ -56,4 +56,4 @@ Apple secondo la sua informativa sulla privacy; il gioco di per sé non invia nu
 
 **Modifiche.** Se questa informativa cambia, la nuova versione sarà pubblicata a questo indirizzo con una nuova data.
 
-**Contatto:** [CONTACT EMAIL]
+**Contatto:** truel3000lofi@gmail.com
