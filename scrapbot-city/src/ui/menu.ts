@@ -1,6 +1,7 @@
 // Main menu, laid out after the key-art mockup (docs/mockup-main-menu.png).
 import { audio } from '../audio';
 import { LANGS, lang, t, tList, tk } from '../i18n';
+import { nativeIOS } from '../platform/native';
 import { iconUrl } from '../render/icons';
 import { whenAtlasReady } from '../render/iso/atlas';
 import type { IconName } from '../render/icons';
@@ -27,7 +28,7 @@ const MENU_ITEMS: [string, IconName, string][] = [
   ['settings', 'gear', 'var(--orange)'],
   ['extras', 'star', 'var(--pink)'],
   ['credits', 'happy', 'var(--teal)'],
-  ['quit', 'door', 'var(--purple)'],
+  ['quit', 'door', 'var(--purple)'], // not in the iOS app: an iOS app never closes itself, the system does
 ];
 
 const CROWN = `<svg class="crown" viewBox="0 0 24 16" aria-hidden="true"><path d="M2 14 L2 4 L7 9 L12 2 L17 9 L22 4 L22 14 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
@@ -89,7 +90,7 @@ export class MainMenu {
         </h1>
         <p class="pillars">${tList('menu.pillars').map(esc).join(' <i>×</i> ')}</p>
         <nav class="menu-list">
-          ${MENU_ITEMS.map(
+          ${MENU_ITEMS.filter(([act]) => act !== 'quit' || !nativeIOS).map(
             ([act, icon, color]) => `
             <button type="button" data-act="${act}" style="--chip:${color}">
               <span class="chip" aria-hidden="true"><img src="${iconUrl(icon, 2)}" alt="" /></span>

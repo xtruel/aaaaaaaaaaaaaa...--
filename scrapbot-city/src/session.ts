@@ -20,6 +20,7 @@ import { padMode } from './gamepad';
 import type { PadFrame, PadTarget } from './gamepad';
 import { t } from './i18n';
 import { inputText } from './input';
+import { onAppPause } from './platform/native';
 import { portraitUrl } from './render/icons';
 import { Renderer } from './render/renderer';
 import type { ViewState } from './render/renderer';
@@ -777,23 +778,30 @@ export class GameSession implements PadTarget {
       this.autosave();
     });
     // pause while the game is hidden (alt-tab, minimised window), resume when it comes back
-    this.listen(document, 'visibilitychange', () => {
-      if (document.hidden) {
-        this.projects.flush();
-        audio.suspend();
-        if (this.speed > 0) {
-          this.pausedByHide = true;
-          this.setSpeed(0);
-        }
-        this.autosave();
-      } else {
-        audio.resume();
-        if (this.pausedByHide) {
-          this.pausedByHide = false;
-          this.setSpeed(this.lastSpeed || 1);
-        }
-      }
-    });
+    this.listen(document, 'visibilitychange', () => (document.hidden ? this.onHidden() : this.onShown()));
+    // the same when the iOS app goes to the background and comes back (src/platform/native.ts; nothing elsewhere)
+    this.disposers.push(onAppPause(() => this.onHidden(), () => this.onShown()));
+  }
+
+  // Hidden: the projects' maxima and the day saved (unless the smog countdown runs, see autosave), sound and clock
+  // stopped. Shown again: sound back, and the clock if hiding stopped it. A second call in a row (the iOS app can
+  // send both its own event and visibilitychange) only saves the same day again.
+  private onHidden(): void {
+    this.projects.flush();
+    audio.suspend();
+    if (this.speed > 0) {
+      this.pausedByHide = true;
+      this.setSpeed(0);
+    }
+    this.autosave();
+  }
+
+  private onShown(): void {
+    audio.resume();
+    if (this.pausedByHide) {
+      this.pausedByHide = false;
+      this.setSpeed(this.lastSpeed || 1);
+    }
   }
 
   private onKeyDown(e: KeyboardEvent): void {

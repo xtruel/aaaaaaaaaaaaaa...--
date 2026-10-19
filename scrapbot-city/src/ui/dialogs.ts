@@ -12,6 +12,7 @@ import { LANGS, bName, lang, t } from '../i18n';
 import { inputKind } from '../input';
 import { localizeKeys } from '../keys';
 import type { Key, Lang } from '../i18n';
+import { nativeIOS } from '../platform/native';
 import { buildingThumb, iconUrl, portraitUrl } from '../render/icons';
 import { isTutorialDone, openSavesFolder, saveGame, saveSettings, slotMeta, SLOTS, unlockedEndings } from '../storage';
 import type { Settings, SlotId } from '../storage';
@@ -46,7 +47,7 @@ export function openSettings(current: Settings, onChange: (s: Settings) => void,
     <label class="check" for="set-crt"><input id="set-crt" type="checkbox" ${settings.crt ? 'checked' : ''} /> ${t('settings.crt')}</label>
     <label class="check" for="set-edge"><input id="set-edge" type="checkbox" ${settings.edgeScroll ? 'checked' : ''} /> ${t('settings.edge')}</label>
     <label class="check" for="set-motion"><input id="set-motion" type="checkbox" ${settings.reducedMotion ? 'checked' : ''} /> ${t('settings.motion')}</label>
-    <label class="check" for="set-full"><input id="set-full" type="checkbox" ${settings.fullscreen ? 'checked' : ''} /> ${t('settings.fullscreen')}</label>
+    ${nativeIOS ? '' : `<label class="check" for="set-full"><input id="set-full" type="checkbox" ${settings.fullscreen ? 'checked' : ''} /> ${t('settings.fullscreen')}</label>`}
     ${openSavesFolder ? `<button type="button" class="btn btn-small" data-saves>${t('settings.openSaves')}</button>` : ''}
   `;
   body.querySelector('[data-saves]')?.addEventListener('click', () => {
@@ -59,7 +60,8 @@ export function openSettings(current: Settings, onChange: (s: Settings) => void,
     crt: (body.querySelector('#set-crt') as HTMLInputElement).checked,
     edgeScroll: (body.querySelector('#set-edge') as HTMLInputElement).checked,
     reducedMotion: (body.querySelector('#set-motion') as HTMLInputElement).checked,
-    fullscreen: (body.querySelector('#set-full') as HTMLInputElement).checked,
+    // (the iOS app is always full screen: it has no such box)
+    fullscreen: (body.querySelector('#set-full') as HTMLInputElement | null)?.checked ?? settings.fullscreen,
     lang: (body.querySelector('#set-lang') as HTMLSelectElement).value as Lang,
   });
   const outputs = (s: Settings) => {

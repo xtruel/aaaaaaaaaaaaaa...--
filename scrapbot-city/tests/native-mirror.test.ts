@@ -389,3 +389,84 @@ describe('a restore given up', () => {
     expect(local('save:auto')).toBe('day 2');
   });
 });
+
+describe('src/platform/native.ts', () => {
+  afterEach(() => {
+    delete (window as unknown as { Capacitor?: unknown }).Capacitor;
+    document.documentElement.classList.remove('ios-app');
+    document.body.classList.remove('touch-mode');
+    vi.resetModules();
+  });
+
+  it('inert outside the iOS shell: the game starts at once, no lifecycle, Quit and Fullscreen stay', async () => {
+    vi.resetModules();
+    const native = await import('../src/platform/native');
+    let booted = false;
+    native.startNative(() => (booted = true));
+    expect(booted).toBe(true);
+    expect(native.nativeIOS).toBe(false);
+    expect(document.documentElement.classList.contains('ios-app')).toBe(false);
+    const pause = vi.fn();
+    native.onAppPause(pause, pause)();
+    expect(pause).not.toHaveBeenCalled();
+  });
+
+  it('in the iOS shell: the game starts once the saves are back; pause and resume reach the game; writes reach the files', async () => {
+    const fs = new FakeFilesystem();
+    const g = game(fs);
+    await g.m.restore();
+    g.write('tutorial-done', '1');
+    g.write('settings', '{"lang":"de"}');
+    await g.m.flush();
+    localStorage.clear();
+    const listeners: Record<string, (data: unknown) => void> = {};
+    const plugins: string[] = [];
+    (window as unknown as { Capacitor: object }).Capacitor = {
+      isNativePlatform: () => true,
+      getPlatform: () => 'ios',
+      nativePromise: (plugin: string, method: string, options: Record<string, unknown>) => {
+        plugins.push(`${plugin}.${method}`);
+        return plugin === 'Filesystem' ? fs.call(method, options) : Promise.resolve({});
+      },
+      nativeCallback: (plugin: string, method: string, options: { eventName: string }, cb: (data: unknown) => void) => {
+        if (plugin === 'App' && method === 'addListener') listeners[options.eventName] = cb;
+        return '1';
+      },
+    };
+    const meta = document.createElement('meta');
+    meta.name = 'viewport';
+    meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+    document.head.append(meta);
+    Object.defineProperty(navigator, 'maxTouchPoints', { value: 5, configurable: true });
+    window.matchMedia = ((q: string) => ({ matches: q.includes('coarse'), media: q })) as unknown as typeof window.matchMedia;
+    vi.resetModules();
+    const native = await import('../src/platform/native');
+    const storage = await import('../src/storage');
+    expect(native.nativeIOS).toBe(true);
+    let seenAtBoot: string | null = 'not started';
+    native.startNative(() => (seenAtBoot = localStorage.getItem(`${PREFIX}settings`)));
+    expect(seenAtBoot).toBe('not started');
+    await vi.waitFor(() => expect(seenAtBoot).toBe('{"lang":"de"}'));
+    expect(local('tutorial-done')).toBe('1');
+    expect(document.documentElement.classList.contains('ios-app')).toBe(true);
+    expect(meta.content).toContain('user-scalable=no');
+    expect(meta.content).toContain('maximum-scale=1');
+    expect(document.body.classList.contains('touch-mode')).toBe(true);
+    expect(plugins).toContain('StatusBar.hide');
+    // the game's writes reach the files
+    storage.writeKey('last', 'auto');
+    await vi.waitFor(() => expect(envOf(fs, 'last')?.value).toBe('auto'));
+    // the App plugin's pause and resume reach the game (as visibilitychange does)
+    const pause = vi.fn();
+    const resume = vi.fn();
+    const off = native.onAppPause(pause, resume);
+    listeners.pause(undefined);
+    expect(pause).toHaveBeenCalledTimes(1);
+    listeners.resume(undefined);
+    expect(resume).toHaveBeenCalledTimes(1);
+    off();
+    listeners.pause(undefined);
+    expect(pause).toHaveBeenCalledTimes(1);
+    meta.remove();
+  });
+});

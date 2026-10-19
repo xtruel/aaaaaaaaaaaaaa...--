@@ -30,14 +30,17 @@ import { loadKeyboardLayout } from './keys';
 import type { GameState } from './game/state';
 import { lang, setLang, t } from './i18n';
 import { iconUrl } from './render/icons';
+import { startNative } from './platform/native';
 import { GameSession } from './session';
 import { citySlot, clearSlot, lastPlayed, loadGame, loadSettings, migrateToFiles, saveSettings, slotMeta } from './storage';
 import type { Settings, SlotId } from './storage';
 import { openLanguage, openModeChooser, openSettings, openSlots } from './ui/dialogs';
 import { esc } from './ui/escape';
 import { MainMenu } from './ui/menu';
+import type { MenuHandlers } from './ui/menu';
 import { closeModal, isModalOpen, openModal } from './ui/modal';
 import { RegionMap } from './ui/region';
+import type { RegionHandlers } from './ui/region';
 
 // Present only in the desktop (Electron) build, see electron/preload.cjs.
 interface DesktopBridge {
@@ -48,10 +51,11 @@ interface DesktopBridge {
 }
 const desktop = (window as unknown as { scrapbotDesktop?: DesktopBridge }).scrapbotDesktop;
 
-migrateToFiles();
-let settings = loadSettings();
+// read in boot(): in the iOS app only once the saves are back from their copy in files (src/platform/native.ts)
+let settings: Settings;
 let session: GameSession | null = null;
-setLang(settings.lang);
+let menu: MainMenu;
+let region: RegionMap;
 
 const app = document.getElementById('app')!;
 app.innerHTML = `
@@ -289,7 +293,7 @@ function nextToast(): void {
   }, 2900);
 }
 
-const menu = new MainMenu(document.getElementById('menu')!, {
+const menuHandlers: MenuHandlers = {
   onNewGame: () => openModeChooser(modeHandlers),
   onContinue: () => {
     const slot = lastPlayed();
@@ -319,31 +323,12 @@ const menu = new MainMenu(document.getElementById('menu')!, {
         { label: t('quit.stay'), onClick: closeModal },
       ],
     }),
-});
+};
 
-const region = new RegionMap(document.getElementById('region')!, {
+const regionHandlers: RegionHandlers = {
   onPlay: (city, restart) => playCity(city, restart),
   onBack: () => backToMenu(),
-});
-
-renderQuitScreen();
-
-onAchievement((a) => showToast(t('ach.toast'), achName(a), a.icon));
-
-initInputMode();
-initGamepad({
-  target: () => session,
-  onConnect: () => showToast(t('pad.connected'), t('pad.help'), 'play'),
-  onDisconnect: () => showToast(t('pad.disconnected'), '', 'play'),
-});
-
-// Development server only (npm run dev): playtest scripts and the browser console can look inside the game.
-if (import.meta.env.DEV) {
-  Object.assign(window, { scrapbot: { session: () => session, actions, defs, hints } });
-}
-
-applySettings(settings);
-if (desktop && settings.fullscreen) desktop.setFullscreen(true);
+};
 
 // Fullscreen can also change outside the settings (F11, the browser's Esc, window controls): follow it,
 // so the checkbox and the next launch match what the player sees.
@@ -356,9 +341,40 @@ function fullscreenChanged(on: boolean): void {
   saveSettings(settings);
   session?.applySettings(settings);
 }
-desktop?.onFullscreenChange?.(fullscreenChanged);
-if (!desktop) document.addEventListener('fullscreenchange', () => fullscreenChanged(!!document.fullscreenElement));
-syncAchievements();
-checkCampaign();
-void loadKeyboardLayout();
-menu.show();
+
+// Everything that reads the saves and settings, in the order the game always started in.
+function boot(): void {
+  migrateToFiles();
+  settings = loadSettings();
+  setLang(settings.lang);
+  menu = new MainMenu(document.getElementById('menu')!, menuHandlers);
+  region = new RegionMap(document.getElementById('region')!, regionHandlers);
+
+  renderQuitScreen();
+
+  onAchievement((a) => showToast(t('ach.toast'), achName(a), a.icon));
+
+  initInputMode();
+  initGamepad({
+    target: () => session,
+    onConnect: () => showToast(t('pad.connected'), t('pad.help'), 'play'),
+    onDisconnect: () => showToast(t('pad.disconnected'), '', 'play'),
+  });
+
+  // Development server only (npm run dev): playtest scripts and the browser console can look inside the game.
+  if (import.meta.env.DEV) {
+    Object.assign(window, { scrapbot: { session: () => session, actions, defs, hints } });
+  }
+
+  applySettings(settings);
+  if (desktop && settings.fullscreen) desktop.setFullscreen(true);
+  desktop?.onFullscreenChange?.(fullscreenChanged);
+  if (!desktop) document.addEventListener('fullscreenchange', () => fullscreenChanged(!!document.fullscreenElement));
+  syncAchievements();
+  checkCampaign();
+  void loadKeyboardLayout();
+  menu.show();
+}
+
+// At once on the web and on the desktop; in the iOS app once its saves are back (src/platform/native.ts).
+startNative(boot);
