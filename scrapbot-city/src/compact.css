@@ -1576,8 +1576,16 @@
     height: 36px;
   }
 
+  /* (the selected city's rings fit the smaller badge) */
+  .city-node.selected .node-badge {
+    box-shadow:
+      0 0 0 4px var(--cream),
+      0 0 0 6px var(--ink),
+      0 5px 0 4px var(--ink);
+  }
+
   .node-lock {
-    inset: auto -12px -6px auto;
+    inset: auto -14px -2px auto;
     font-size: 11px;
   }
 
@@ -1596,7 +1604,10 @@
     height: 32px;
   }
 
+  /* the name over its badge's rings (they come close to it here) */
   .node-name {
+    position: relative;
+    margin-top: 3px;
     padding: 0 7px;
     font-size: 12px;
     border-width: 2px;
