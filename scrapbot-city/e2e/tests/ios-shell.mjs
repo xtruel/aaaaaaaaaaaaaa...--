@@ -7,7 +7,8 @@
 //           selection or rubber band (computed style; the long-press callout is WebKit's and not checked here)
 //  menu:    no Quit; touch mode from the first screen (before any touch); Settings without a Fullscreen box
 //  city:    a free play city started with touches; the pause menu's tip in the touch wording; the HUD, the main menu
-//           and the dialogs inside the safe area, the map under all of it
+//           and the dialogs inside the safe area, the map under all of it (at 1180x820 also with the window resized
+//           to the app's minimum, 744x660, and back)
 //  pinch:   two fingers spread and pinch on the map: the map zooms in and out, the page does not, nothing is bought
 //  pause:   the App plugin's pause: the city saved (autosave) and paused, the save in its file; resume: running again
 //  relaunch: the app left (its pagehide autosave), iOS clears the web view's storage, the app opens again with a slow
@@ -178,6 +179,16 @@ await T.run(async () => {
     });
     T.ok(`${size}: the HUD inside the safe area, the map under all the screen`, hudOut.length === 0 && map, hudOut.slice(0, 4).join('; '));
     await T.shot(page, `${size}-city`);
+    if (size === '1180x820') {
+      // an iPadOS window resized down to the app's minimum (ios/App/App/SceneDelegate.swift) and back
+      await page.setViewportSize({ width: 744, height: 660 });
+      await settle(page);
+      const small = await S(page, outside, [HUD_PARTS, ins, false]);
+      T.ok(`${size} -> 744x660 (the minimum window): the HUD inside the safe area`, small.length === 0, small.slice(0, 4).join('; '));
+      await T.shot(page, `${size}-resized-744x660`);
+      await page.setViewportSize({ width: g.w, height: g.h });
+      await settle(page);
+    }
 
     // ---------- pinch ----------
     const before = await S(page, () => ({ zoom: window.scrapbot.session().renderer.zoom, res: { ...window.scrapbot.session().s.res }, n: window.scrapbot.session().s.buildings.length }));
