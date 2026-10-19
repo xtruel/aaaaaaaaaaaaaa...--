@@ -261,12 +261,59 @@ export class Input {
     }, sel);
   }
 
+  // a card of a bar that scrolls sideways (the build bar on a phone), if it is not all in sight: how far, and where to
+  // swipe (what stays put at the bar's end, its sticky Tools column, covers that end)
+  scrollNeedX(sel) {
+    return this.page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return { missing: true };
+      let bar = el.parentElement;
+      while (bar && !(bar.scrollWidth > bar.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(bar).overflowX))) bar = bar.parentElement;
+      if (!bar || bar === document.documentElement || bar === document.body) return null;
+      const b = bar.getBoundingClientRect();
+      let right = b.right - 2;
+      for (const c of bar.querySelectorAll('*')) if (!c.contains(el) && getComputedStyle(c).position === 'sticky') right = Math.min(right, c.getBoundingClientRect().left);
+      const left = b.left + 2;
+      const r = el.getBoundingClientRect();
+      if (r.left >= left - 0.5 && r.right <= right + 0.5) return null;
+      if (!bar.dataset.e2eList) bar.dataset.e2eList = String(Math.random()).slice(2, 8);
+      return { need: r.left < left ? r.left - left - 6 : r.right - right + 6, lsel: `[data-e2e-list="${bar.dataset.e2eList}"]`, y: b.top + b.height / 2, from: left + 12, to: right - 12 };
+    }, sel);
+  }
+
   // bring an element of a scrolling list into sight with this input: the mouse wheel, a finger swipe, the right stick
+  // (a bar that scrolls sideways: the wheel or a finger)
   async reveal(sel) {
     for (let k = 0; k < 40; k++) {
       const v = await this.scrollNeed(sel);
       if (v?.missing) throw new Error(`no ${sel} on the page`);
-      if (!v) return;
+      if (!v) {
+        const h = await this.scrollNeedX(sel);
+        if (!h || h.missing) return;
+        if (this.mouse) {
+          await this.page.mouse.move((h.from + h.to) / 2, h.y);
+          await this.page.mouse.wheel(Math.sign(h.need) * Math.min(240, Math.ceil(Math.abs(h.need)) + 2), 0);
+        } else if (this.touch) {
+          // (a finger's first ~15 px do not scroll: the swipe is longer by that much)
+          const d = Math.min(h.to - h.from, Math.ceil(Math.abs(h.need)) + 24);
+          await this.swipe(h.need > 0 ? h.to : h.from, h.y, h.need > 0 ? -d : d, 0, 12);
+        } else throw new Error(`the pad cannot scroll ${sel} sideways into sight`);
+        await until(
+          this.page,
+          (lsel) => {
+            const l = document.querySelector(lsel);
+            if (!l) return true;
+            const w = (window.__e2eScrollX ??= {});
+            const same = w[lsel] === l.scrollLeft;
+            w[lsel] = l.scrollLeft;
+            w.n = same ? (w.n ?? 0) + 1 : 0;
+            return w.n >= 4;
+          },
+          h.lsel,
+          { what: 'the bar to stop scrolling' },
+        );
+        continue;
+      }
       if (this.mouse) {
         await this.page.mouse.move(v.x, v.y);
         await this.page.mouse.wheel(0, Math.sign(v.need) * Math.min(160, Math.ceil(Math.abs(v.need)) + 2));
@@ -417,6 +464,8 @@ export class Input {
         if (vis('[data-catalog-panel] [data-done]')) return '[data-catalog-panel] [data-done]';
         if (vis('[data-inspector] [data-close]')) return '[data-inspector] [data-close]';
         if (vis('[data-catalog-panel] .cat-head [data-close]')) return '[data-catalog-panel] .cat-head [data-close]';
+        // (on a phone: the × of the strip of the building in hand)
+        if (vis('[data-build-info] [data-build-close]')) return '[data-build-info] [data-build-close]';
         if (document.querySelector('[data-doze].active, [data-doze][aria-pressed="true"]')) return '[data-doze]';
         return null;
       });

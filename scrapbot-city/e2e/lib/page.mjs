@@ -105,15 +105,27 @@ export async function stableBox(page, sel, { timeout = 8000 } = {}) {
   );
 }
 
+// A phone's safe area as iOS reports it (env(safe-area-inset-*)), emulated by Chromium for this page (CDP
+// Emulation.setSafeAreaInsetsOverride, Chromium 136+): { top, left, right, bottom } in CSS px. A reload loses it:
+// reload() below sets it again.
+export async function safeArea(page, insets) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, left: 0, right: 0, bottom: 0, ...insets } });
+  page.__e2eInsets = insets;
+  return cdp;
+}
+
 // A new browser context and page for one game: storage written on a blank page of the same origin first (no marker
-// left), the pad faked when the input is a pad, page errors and console errors collected.
-export async function openGame(browser, server, { size = '1280x800', input = 'mouse', storage = {}, hook = true, dpr = 1 } = {}) {
+// left), the pad faked when the input is a pad, page errors and console errors collected. `mobile` emulates a phone's
+// browser (Chromium's isMobile: the page's viewport meta, overlay scrollbars); `insets` its safe area (safeArea).
+export async function openGame(browser, server, { size = '1280x800', input = 'mouse', storage = {}, hook = true, dpr = 1, mobile = false, insets = null } = {}) {
   const [w, h] = size.split('x').map(Number);
-  const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: input === 'touch', deviceScaleFactor: dpr });
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: input === 'touch', isMobile: mobile, deviceScaleFactor: dpr });
   await ctx.addInitScript(PROBE_INIT);
   if (input === 'pad') await ctx.addInitScript(PAD_INIT);
   const errors = [];
   const page = await newPage(ctx, errors);
+  if (insets) await safeArea(page, insets);
   await page.goto(server.blank);
   await page.evaluate((storage) => {
     localStorage.clear();
@@ -147,6 +159,7 @@ export async function waitMenu(page, { hook = true, timeout = 30000 } = {}) {
 // The page reloaded (F5): the same storage, the main menu again.
 export async function reload(page, io, { hook = true } = {}) {
   await page.reload();
+  if (page.__e2eInsets) await safeArea(page, page.__e2eInsets);
   await waitMenu(page, { hook });
   await io.attach(page);
 }

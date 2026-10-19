@@ -455,6 +455,58 @@ export async function loadFromMenu(page, io, slot) {
 
 export { stableBox };
 
+// The point of the map nearest (x, y) that nothing covers for a finger's width round it (`margin` px every way: a
+// tap that close to a button can go to the button, as Chromium's touch adjustment and iOS's fat-finger hit testing
+// do), inside the screen's safe part (`inset` px from its sides): on a phone the HUD leaves the map in pieces (the
+// band, the goal, the build bar, the tutorial's bubble), and a finger can press any of them.
+const MAP_CLEAR = ([x, y, margin]) => {
+  const c = window.scrapbot.session().renderer.canvas;
+  const d = margin * 0.7;
+  return [[0, 0], [-margin, 0], [margin, 0], [0, -margin], [0, margin], [-d, -d], [d, -d], [-d, d], [d, d], [0, -margin - 14]].every(([dx, dy]) => document.elementFromPoint(x + dx, y + dy) === c);
+};
+export const clearSpotNear = (page, p, { inset = 70, margin = 24 } = {}) =>
+  S(
+    page,
+    ([x, y, inset, margin, clear]) => {
+      const free = (0, eval)(`(${clear})`);
+      let best = null;
+      for (let py = 40; py < innerHeight - 30; py += 8)
+        for (let px = inset; px < innerWidth - inset; px += 8) {
+          const d = Math.hypot(px - x, py - y);
+          if ((!best || d < best.d) && free([px, py, margin])) best = { x: px, y: py, d };
+        }
+      return best;
+    },
+    [p.x, p.y, inset, margin, MAP_CLEAR.toString()],
+  );
+
+// A tile brought where a finger (or the mouse, the pad) can press it: real pans of the input drag it to the nearest
+// clear spot of the map (clearSpotNear). Returns its screen point.
+export async function bringClear(page, io, t, onPan = null) {
+  for (let k = 0; k < 8; k++) {
+    // (the interface caught up with the city first: a strip or a card that is about to show is measured too)
+    await settle(page);
+    const p = await tileScreen(page, t);
+    const inside = await S(page, ([x, y]) => x >= 69.5 && x <= innerWidth - 69.5 && y >= 39.5 && y <= innerHeight - 29.5, [p.x, p.y]);
+    if (inside && (await S(page, MAP_CLEAR, [p.x, p.y, 24]))) return { x: Math.round(p.x), y: Math.round(p.y) };
+    const spot = await clearSpotNear(page, p);
+    if (!spot) throw new Error('no part of the map is clear of the interface');
+    // the drag starts on a clear spot near the one it goes to, so the finger is on the map; it is never shorter than
+    // a pan (a shorter one would be a tap: with a tool in hand, a purchase)
+    let dx = Math.round(Math.max(-260, Math.min(260, spot.x - p.x)));
+    let dy = Math.round(Math.max(-160, Math.min(160, spot.y - p.y)));
+    if (Math.hypot(dx, dy) < 24) {
+      const k = 24 / Math.max(1, Math.hypot(dx, dy));
+      dx = Math.round(dx * k) || 24;
+      dy = Math.round(dy * k);
+    }
+    const from = await clearSpotNear(page, { x: spot.x - dx, y: spot.y - dy });
+    await io.pan(dx, dy, { x: from.x, y: from.y });
+    if (onPan) await onPan(`pan by ${dx},${dy}`);
+  }
+  throw new Error(`tile ${JSON.stringify(t)} not brought clear of the interface`);
+}
+
 // Brings tiles (or screen-point getters) into the free part of the screen with REAL pans of the input (right-button
 // drag, finger swipe, right stick). onPan(label) is called after each pan (the ledger checks that a pan buys nothing).
 // Returns the number of pans made; throws when the tiles cannot be brought into sight.

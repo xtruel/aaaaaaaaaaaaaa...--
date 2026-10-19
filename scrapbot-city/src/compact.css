@@ -1,0 +1,1620 @@
+/* The compact layout: phones in landscape (iPhone SE 667x375 up to 16 Pro Max 956x440) and any window up to 500 px
+   high. Every rule is inside the one media query below (the same query as COMPACT_QUERY in src/ui/compact.ts), so
+   windows from 1024x640 up keep the layout of src/style.css exactly as it was.
+   - the map gets most of the screen: one slim band on top (resources, smog, clock and speed, hint, menu), the goal as
+     a chip under it that opens on a tap, the build bar one slim row at the bottom (picture and price; the name of the
+     building in hand in the strip under the band), scrolled sideways, its Tools column always in sight at its end
+   - side panels (building, piece, catalog) are sheets on the right, from under the band to the bottom, and scroll; the
+     build bar gives them its room; the smog panel is a sheet on the left, above the build bar
+   - dialogs, the tutorial's bubble, notices and toasts are tighter, keep their buttons in sight and fit 667x375
+   - the safe area (Dynamic Island side, home indicator: env(safe-area-inset-*)) holds no control
+   - buttons a finger must hit are at least 44x44 px (their visible part may be smaller); text is at least 11 px */
+/* the compact layout's own controls: not shown in any other layout */
+.obj-toggle {
+  display: none;
+}
+
+@media (max-height: 500px) {
+  :root {
+    /* the screen's usable edges: the safe area, or a small margin */
+    --cp-l: max(8px, env(safe-area-inset-left, 0px));
+    --cp-r: max(8px, env(safe-area-inset-right, 0px));
+    --cp-t: max(6px, env(safe-area-inset-top, 0px));
+    --cp-b: max(6px, env(safe-area-inset-bottom, 0px));
+    /* the top band: 44 px of buttons in a 2 px border */
+    --cp-band: 48px;
+    /* the side panels' width (sheets on the right) */
+    --cp-sheet: min(360px, 50vw);
+  }
+
+  /* ---------- the top band ---------- */
+
+  /* one bar: the resources, the smog and path meters, the clock with the speed buttons, the menu */
+  .hud-top {
+    top: var(--cp-t);
+    left: var(--cp-l);
+    right: var(--cp-r);
+    min-height: var(--cp-band);
+    gap: 0;
+    align-items: stretch;
+    padding: 0 2px 0 4px;
+    pointer-events: auto;
+    background: var(--panel);
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.12),
+      0 3px 0 var(--ink);
+  }
+
+  .res-group,
+  .meters,
+  .clock {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .meters,
+  .clock {
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* the resources in two rows: scrap, parts (and the import's +), credits / energy, citizens, happiness */
+  .res-group {
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    grid-template-rows: 20px 20px;
+    align-content: center;
+    gap: 2px 6px;
+    padding: 0 8px 0 2px;
+  }
+
+  [data-res='scrap'] {
+    grid-area: 1 / 1;
+  }
+
+  [data-res='parts'] {
+    grid-area: 1 / 2;
+  }
+
+  .import {
+    grid-area: 1 / 3;
+  }
+
+  [data-res='credits'] {
+    grid-area: 1 / 4;
+  }
+
+  [data-res='energy'] {
+    grid-area: 2 / 1;
+  }
+
+  [data-res='pop'] {
+    grid-area: 2 / 2;
+  }
+
+  [data-res='happy'] {
+    grid-area: 2 / 4;
+  }
+
+  .res {
+    gap: 3px;
+    padding: 0;
+    background: none;
+  }
+
+  .res-ico {
+    width: 18px;
+    height: 18px;
+    border-width: 1px;
+    box-shadow: none;
+  }
+
+  .res-num {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 1px;
+  }
+
+  .res b {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .res small {
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  .res small:empty {
+    display: none;
+  }
+
+  .res-sub {
+    gap: 3px;
+  }
+
+  /* the income per minute: on wide phones only (the numbers keep one row on an iPhone SE) */
+  [data-res='parts'] [data-cap],
+  [data-res='credits'] [data-cap] {
+    display: none;
+  }
+
+  /* the import's + is small to see and 44 px to hit (the numbers around it take no press) */
+  .import {
+    position: relative;
+    z-index: 1;
+    align-self: center;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    font-size: 14px;
+  }
+
+  /* (an absolute box is placed from inside the border: 2 px of border + 12 px = 44 px in all) */
+  .import::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+
+  /* the smog meter over the path: one button 44 px high (the smog panel), its level in words and a bar */
+  .meters {
+    position: relative;
+    gap: 3px;
+    padding: 0 8px;
+  }
+
+  .meter-smog {
+    position: static;
+    margin: 0;
+    padding: 0;
+    gap: 4px;
+    border-radius: 0;
+  }
+
+  .meter-smog::after {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    border-radius: 10px;
+  }
+
+  .meter-smog:hover,
+  .meter-smog.active {
+    background: none;
+  }
+
+  .meter-smog:hover::after,
+  .meter-smog.active::after {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .meter-smog .meter-label {
+    display: none;
+  }
+
+  .meters .meter-ico {
+    width: 18px;
+    height: 18px;
+    border-width: 1px;
+  }
+
+  .meters .bar {
+    width: 40px;
+    height: 10px;
+  }
+
+  .meter b {
+    min-width: 0;
+    font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* the path: its track and knob, the leaf and the gear for words */
+  .meter-path {
+    gap: 3px;
+  }
+
+  .meter-path .path-g,
+  .meter-path .path-i {
+    font-size: 0;
+    gap: 0;
+  }
+
+  .meter-path img {
+    width: 12px;
+    height: 12px;
+  }
+
+  .meters .track {
+    width: 40px;
+    height: 10px;
+  }
+
+  .meters .knob {
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    border-width: 2px;
+  }
+
+  .clock {
+    gap: 3px;
+    margin-left: auto;
+    padding: 0 0 0 6px;
+  }
+
+  .clock-time {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .clock-time b {
+    padding: 0 6px;
+    font-size: 11px;
+    line-height: 15px;
+    white-space: nowrap;
+  }
+
+  .clock-time small {
+    padding-left: 2px;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  /* the four speeds: 44 x 44 each */
+  .speed {
+    align-self: stretch;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .speed button {
+    min-width: 0;
+    width: 44px;
+    height: 100%;
+    padding: 0;
+    font-size: 12px;
+    border-radius: 12px;
+  }
+
+  .speed button.active {
+    box-shadow: inset 0 0 0 3px var(--panel), inset 0 -5px 0 rgba(26, 16, 51, 0.25);
+  }
+
+  .menu-btn {
+    align-self: center;
+    height: 44px;
+    padding: 0 10px;
+    font-size: 15px;
+    border-width: 2px;
+    box-shadow: 0 2px 0 var(--ink);
+  }
+
+  /* the hint and the cargo blimp under the band, at the left, with the goal chip after them */
+  .hint-btn,
+  .region-btn {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: -2px;
+    width: 44px;
+    height: 44px;
+    border-width: 2px;
+  }
+
+  .region-btn {
+    left: 48px;
+  }
+
+  .hint-btn img,
+  .region-btn img {
+    width: 16px;
+    height: 16px;
+  }
+
+  .hint-badge {
+    top: -6px;
+    right: -8px;
+  }
+
+  /* ---------- the goal: a chip under the band that opens on a tap ---------- */
+
+  .objective {
+    top: calc(var(--below-alarm, 64px) - 2px);
+    left: calc(var(--cp-l) + 52px);
+    max-width: min(340px, calc(100% - var(--cp-l) - var(--cp-r) - 60px));
+    min-height: 44px;
+    gap: 6px;
+    align-items: center;
+    padding: 3px 10px 3px 4px;
+    border-width: 2px;
+    border-radius: 12px;
+    box-shadow: 0 3px 0 var(--ink);
+  }
+
+  .hud:has([data-region]) .objective {
+    left: calc(var(--cp-l) + 102px);
+  }
+
+  .objective > div {
+    min-width: 0;
+  }
+
+  .obj-face {
+    width: 32px;
+    height: 32px;
+    border-width: 2px;
+    border-radius: 9px;
+  }
+
+  .objective small {
+    padding: 0 6px;
+    font-size: 11px;
+    line-height: 14px;
+  }
+
+  .objective p {
+    margin: 1px 0 0;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .objective em,
+  .objective .obj-stars {
+    display: none;
+  }
+
+  /* opened: all of it (what to do, the star goals of a campaign city) */
+  .objective.open {
+    align-items: flex-start;
+    padding: 6px 10px 8px 6px;
+  }
+
+  .objective.open p {
+    white-space: normal;
+    font-size: 15px;
+  }
+
+  .objective.open em {
+    display: block;
+    font-size: 12px;
+  }
+
+  .objective.open .obj-stars {
+    display: grid;
+  }
+
+  /* the chip is one button (it opens and closes the card); a small arrow says so */
+  .obj-toggle {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: inherit;
+  }
+
+  .objective::after {
+    content: '▾';
+    flex: none;
+    align-self: center;
+    font-size: 13px;
+  }
+
+  .objective.open::after {
+    content: '▴';
+    align-self: flex-start;
+  }
+
+  /* ---------- the building in hand: its strip in the goal chip's place ---------- */
+
+  .build-info {
+    position: absolute;
+    top: calc(var(--below-alarm, 64px) - 2px);
+    left: calc(var(--cp-l) + 52px);
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    max-width: min(460px, calc(100% - var(--cp-l) - var(--cp-r) - 60px));
+    padding: 4px 4px 6px 4px;
+    color: var(--ink);
+    background: var(--cream);
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    box-shadow: 0 3px 0 var(--ink);
+  }
+
+  .hud:has([data-region]) .build-info {
+    left: calc(var(--cp-l) + 102px);
+  }
+
+  .hud:has(.build-info:not([hidden])) .objective {
+    display: none;
+  }
+
+  /* (in the tutorial its bubble says it, and the map needs the room) */
+  #game:has(.coach) .build-info {
+    display: none;
+  }
+
+  .build-info .tool-plate {
+    width: 36px;
+    height: 36px;
+    background: var(--panel-hi);
+    border: 2px solid var(--ink);
+    border-radius: 9px;
+  }
+
+  .build-info .tool-plate img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .bi-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .bi-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    margin: 0;
+  }
+
+  .bi-title b {
+    font-family: var(--f-display);
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.15;
+  }
+
+  .bi-title .tag {
+    padding: 0 6px;
+    font-size: 11px;
+    color: var(--ink);
+    background: var(--path);
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+  }
+
+  .bi-title .tool-cost {
+    margin: 0;
+    color: var(--fg);
+  }
+
+  .bi-desc,
+  .bi-stats,
+  .bi-help {
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .bi-stats {
+    color: var(--ink-soft);
+  }
+
+  .bi-help {
+    font-weight: 900;
+  }
+
+  .bi-help kbd {
+    font-size: 11px;
+    padding: 0 4px;
+  }
+
+  /* its ×: 44 px to hit */
+  .build-info .modal-x {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    margin: 2px 4px 0 2px;
+    font-size: 20px;
+    border-width: 2px;
+  }
+
+  .build-info .modal-x::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+
+  /* (the cards' tooltip: the strip says it, and a finger has no hover) */
+  .hud .tooltip {
+    display: none;
+  }
+
+  /* ---------- side panels: sheets ---------- */
+
+  /* the building or piece panel and the catalog: on the right, from under the band down to the bottom, their content
+     scrolling; the build bar gives them its room (all of it still reachable, sideways) */
+  .hud {
+    --cat-w: var(--cp-sheet);
+  }
+
+  .inspector {
+    top: calc(var(--top-r, 54px) + 8px);
+    right: var(--cp-r);
+    width: var(--cp-sheet);
+    max-height: calc(100% - var(--top-r, 54px) - 8px - var(--cp-b));
+    padding-bottom: 10px;
+    border-width: 2px;
+    border-radius: 14px;
+    overscroll-behavior: contain;
+  }
+
+  .hud:has(.inspector:not([hidden])) .toolbar {
+    right: calc(var(--cp-r) + var(--cp-sheet) + 6px);
+  }
+
+  .insp-head {
+    gap: 8px;
+    padding: 4px 4px 4px 8px;
+  }
+
+  .insp-head .tool-plate {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+  }
+
+  .insp-head .tool-plate img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .insp-head .cat-plate img {
+    width: 48px;
+    height: 33px;
+  }
+
+  .insp-head h3 {
+    font-size: 17px;
+    line-height: 1.05;
+  }
+
+  .insp-head .tag {
+    font-size: 11px;
+  }
+
+  /* a panel's ×: 36 px to see, 44 px to hit */
+  .inspector .modal-x,
+  .smog-panel .modal-x {
+    position: relative;
+    align-self: center;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+
+  .inspector .modal-x::after,
+  .smog-panel .modal-x::after {
+    content: '';
+    position: absolute;
+    inset: -7px;
+  }
+
+  .inspector > :not(.insp-head) {
+    margin-inline: 10px;
+  }
+
+  .inspector > .insp-mod {
+    margin-inline: 6px;
+  }
+
+  .insp-status {
+    margin-block: 8px 5px;
+    font-size: 14px;
+  }
+
+  .inspector dl {
+    margin-block: 8px;
+    font-size: 13px;
+  }
+
+  .insp-desc {
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+
+  .insp-actions .btn,
+  .insp-mod .insp-actions .btn {
+    min-height: 44px;
+    padding-block: 4px;
+    font-size: 15px;
+  }
+
+  .piece-note {
+    font-size: 13px;
+  }
+
+  /* the catalog: the same sheet; its head and the tool in hand stay put while the list scrolls */
+  .catalog .cat-head .tool-plate {
+    width: 32px;
+    height: 32px;
+  }
+
+  .catalog .cat-head .tool-plate img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .catalog .cat-nav {
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .catalog .cat-tab {
+    min-height: 44px;
+    padding: 2px 3px;
+    font-size: 12px;
+  }
+
+  .catalog .cat-filter {
+    min-height: 44px;
+    padding: 2px 4px;
+    font-size: 11px;
+  }
+
+  .catalog .cat-item {
+    min-height: 44px;
+  }
+
+  .catalog .cat-pic,
+  .catalog .cat-pic img {
+    width: 48px;
+    height: 33px;
+  }
+
+  /* with an item in hand: what to do, then Rotate, Done and the catalog's × side by side, 44 px each */
+  .catalog .cat-tool {
+    gap: 6px;
+    padding: 4px 4px 4px 8px;
+  }
+
+  .catalog.has-tool .cat-tool {
+    padding-right: 4px;
+  }
+
+  .catalog .cat-tool-btns {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .catalog .cat-tool-btns .btn {
+    min-height: 44px;
+    padding: 2px 8px;
+    font-size: 14px;
+  }
+
+  .catalog.has-tool .cat-tool-x {
+    position: relative;
+    top: auto;
+    right: auto;
+    order: 3;
+    flex: none;
+    width: 36px;
+    height: 36px;
+  }
+
+  .catalog .cat-help {
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  /* the smog panel: a sheet on the left, under the band and above the build bar (a press anywhere else closes it) */
+  .smog-panel,
+  .hud:has(.catalog:not([hidden])) .smog-panel {
+    top: calc(var(--top-l, 54px) + 8px);
+    left: var(--cp-l);
+    z-index: 3;
+    width: min(340px, 50vw);
+    max-height: calc(100% - var(--top-l, 54px) - 8px - var(--dock, 80px) - 6px);
+    border-width: 2px;
+    border-radius: 14px;
+    transform: none;
+  }
+
+  .smog-panel .insp-head {
+    padding-block: 4px;
+  }
+
+  .smog-panel .insp-head .tag {
+    display: none;
+  }
+
+  .air {
+    padding: 0 10px 8px;
+  }
+
+  .air-row {
+    font-size: 13px;
+  }
+
+  /* ---------- the build bar: one slim row at the bottom ---------- */
+
+  .toolbar {
+    left: var(--cp-l);
+    right: var(--cp-r);
+    bottom: var(--cp-b);
+    gap: 6px;
+    padding: 4px 5px 6px;
+    border-width: 2px;
+    border-radius: 16px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    /* a card brought into sight (the goal's next step glowing, a scroll into view) stops left of the Tools column */
+    scroll-padding-right: 132px;
+  }
+
+  .toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* the groups' words are in their colours (the cards' tints) */
+  .group-label {
+    display: none;
+  }
+
+  .tool-group {
+    gap: 0;
+  }
+
+  .group-tools {
+    gap: 4px;
+  }
+
+  /* a card as wide as its price (58 px at least) */
+  .tool {
+    width: auto;
+    min-width: 58px;
+    gap: 2px;
+    padding: 3px 2px 4px;
+    border-width: 2px;
+    border-radius: 12px;
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.15),
+      0 3px 0 var(--ink);
+  }
+
+  .group-monument .tool {
+    width: auto;
+    min-width: 70px;
+  }
+
+  /* (no keyboard hints on a card this small) */
+  .tool kbd {
+    display: none;
+  }
+
+  .tool .tool-plate {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .tool .tool-plate img {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* the name is read on the strip of the building in hand (and by screen readers) */
+  .tool .tool-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .tool .tool-cost {
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+
+  .tool .cost {
+    padding: 0 3px 0 1px;
+    font-size: 11px;
+  }
+
+  .tool .cost img {
+    width: 10px;
+    height: 10px;
+  }
+
+  .tool:hover {
+    transform: none;
+  }
+
+  .tool.active {
+    transform: translateY(-2px);
+  }
+
+  .tool.next::after {
+    inset: -3px;
+    border-radius: 14px;
+  }
+
+  /* the Tools column (bulldozer, Objects & modules) stays in sight at the bar's right end; the cards scroll under it */
+  .group-tools-misc {
+    position: sticky;
+    right: -5px;
+    z-index: 2;
+    margin: -4px -5px -6px 0;
+    padding: 4px 5px 6px 6px;
+    background: var(--panel-hi);
+    border-left: 2px solid var(--ink);
+    box-shadow: -6px 0 8px -4px rgba(18, 11, 41, 0.8);
+  }
+
+  .group-tools-misc .group-tools {
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .tool.tool-mini {
+    flex: none;
+    flex-direction: column;
+    justify-content: center;
+    width: 52px;
+    gap: 2px;
+    padding: 3px 2px 4px;
+  }
+
+  .tool.tool-mini .tool-plate {
+    width: 34px;
+    height: 34px;
+  }
+
+  .tool.tool-mini .tool-plate img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .tool-mini .tool-text {
+    align-items: center;
+  }
+
+  .tool-mini .tool-cost {
+    justify-content: center;
+  }
+
+  .tool-badge {
+    top: -6px;
+    right: -4px;
+  }
+
+  /* ---------- dialogs: the head and the buttons in sight, the body scrolling between them ---------- */
+
+  .modal-backdrop {
+    padding: var(--cp-t) var(--cp-r) var(--cp-b) var(--cp-l);
+  }
+
+  .modal {
+    display: flex;
+    flex-direction: column;
+    width: min(620px, 100%);
+    max-height: 100%;
+    overflow: hidden;
+    padding: 0 14px 12px;
+    border-radius: 18px;
+    box-shadow: 0 5px 0 var(--ink);
+  }
+
+  .modal-wide {
+    width: min(860px, 100%);
+  }
+
+  .modal-head {
+    flex: none;
+    gap: 10px;
+    margin: 0 -14px 10px;
+    padding: 6px 8px 6px 14px;
+  }
+
+  .portrait {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    box-shadow: 0 2px 0 var(--ink);
+  }
+
+  .eyebrow {
+    margin-bottom: 3px;
+    font-size: 11px;
+  }
+
+  .modal h2 {
+    font-size: 22px;
+  }
+
+  .modal-head .modal-x {
+    position: relative;
+    align-self: center;
+  }
+
+  .modal-head .modal-x::after {
+    content: '';
+    position: absolute;
+    inset: -7px;
+  }
+
+  .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .modal-body p {
+    margin-bottom: 8px;
+  }
+
+  .story {
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  /* the buttons side by side, two or three to a row, 44 px high */
+  .modal-actions {
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .modal-actions .btn,
+  .slot .btn,
+  .trade-btns .btn,
+  .panel-actions .btn {
+    min-height: 44px;
+    padding: 4px 12px;
+    font-size: 16px;
+  }
+
+  .btn small {
+    font-size: 12px;
+  }
+
+  /* new game: the three ways to play side by side */
+  .modes {
+    gap: 10px;
+  }
+
+  .mode {
+    gap: 6px;
+    padding: 8px 8px 10px;
+  }
+
+  .mode-art {
+    width: 60px;
+    height: 60px;
+  }
+
+  .mode-art img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .mode-text b {
+    font-size: 19px;
+  }
+
+  .mode-text small {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .mode-badge {
+    top: -8px;
+    font-size: 12px;
+  }
+
+  /* forms: a row of 44 px for each control */
+  .settings-form,
+  .newgame-form {
+    gap: 6px;
+  }
+
+  .settings-form label.check {
+    min-height: 44px;
+    margin-top: 0;
+    font-size: 15px;
+  }
+
+  input[type='range'] {
+    height: 44px;
+    margin: 0;
+  }
+
+  select,
+  input[type='text'],
+  input[type='number'] {
+    min-height: 44px;
+    padding-block: 4px;
+    font-size: 18px;
+  }
+
+  .fine {
+    font-size: 13px;
+  }
+
+  .slots {
+    gap: 6px;
+  }
+
+  .slot {
+    padding: 4px 6px 4px 10px;
+  }
+
+  .slot b {
+    font-size: 16px;
+  }
+
+  .slot small,
+  .slot .empty,
+  .slot span {
+    font-size: 12px;
+  }
+
+  .langs {
+    gap: 8px;
+  }
+
+  .lang-btn {
+    min-height: 44px;
+    padding: 6px 12px;
+    font-size: 17px;
+  }
+
+  /* an ending, Extras: tighter cards */
+  .ending-grid,
+  .paths {
+    gap: 8px;
+  }
+
+  .ending-card,
+  .path-col {
+    padding: 8px 10px;
+  }
+
+  .ending-card b {
+    font-size: 17px;
+  }
+
+  .stats {
+    margin-top: 10px;
+    padding: 8px 10px;
+  }
+
+  .stats dd {
+    font-size: 15px;
+  }
+
+  .extras-h {
+    margin: 12px 0 4px;
+    font-size: 17px;
+  }
+
+  .howto {
+    font-size: 14px;
+  }
+
+  .ach-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  /* a resource on its line, its four buttons under it */
+  .trade-row {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 4px 12px;
+    padding: 6px 10px 8px;
+  }
+
+  .trade-btns {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .trade-btns .btn {
+    justify-content: center;
+    padding-inline: 4px;
+    font-size: 15px;
+  }
+
+  .trade-res {
+    font-size: 16px;
+  }
+
+  /* ---------- toasts: small; in a city above the build bar on the right (clear of the band, the goal, the sheets) ---------- */
+
+  body:has(#game:not([hidden])) .toasts,
+  body:has(.smog-panel:not([hidden])) .toasts {
+    top: auto;
+    right: var(--cp-r);
+    bottom: calc(var(--cp-b) + 82px);
+    left: auto;
+    align-items: flex-end;
+    transform: none;
+  }
+
+  body:has(.hud .inspector:not([hidden])) .toasts {
+    right: calc(var(--cp-r) + var(--cp-sheet) + 8px);
+  }
+
+  /* over a dialog: on its head band, left of its × (its buttons are at the bottom) */
+  .toasts.below,
+  body:has(#modal-root .modal-backdrop) .toasts {
+    top: calc(var(--cp-t) + 4px);
+    right: calc(var(--cp-r) + 56px);
+    bottom: auto;
+    left: auto;
+  }
+
+  .toast {
+    gap: 6px;
+    padding: 3px 12px 3px 3px;
+  }
+
+  .toast-ico {
+    width: 28px;
+    height: 28px;
+  }
+
+  .toast b {
+    font-size: 15px;
+  }
+
+  /* ---------- messages, the smog alarm, a new project's notice ---------- */
+
+  /* the last three messages, above the build bar on the left */
+  .feed {
+    left: var(--cp-l);
+    bottom: calc(var(--dock, 80px) + 8px);
+    gap: 4px;
+    max-width: min(400px, 55%);
+  }
+
+  .feed .msg:nth-last-child(n + 4) {
+    display: none;
+  }
+
+  /* (it fades where it is: sliding out it would reach into the safe area) */
+  .feed .msg-out {
+    transform: none;
+  }
+
+  .msg {
+    gap: 6px;
+    padding: 3px 10px 3px 4px;
+    font-size: 12px;
+    border-width: 2px;
+    box-shadow: 0 2px 0 var(--ink);
+  }
+
+  .msg::before {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* the alarm (the 95% countdown): under the band in the goal chip's row, which comes down under it (the goal chip,
+     the strip of the building in hand: --below-alarm, measured by the HUD), left of a side panel */
+  .smog-alert {
+    top: calc(var(--top-l, 54px) + 8px);
+    left: calc(var(--cp-l) + 52px);
+    max-width: calc(100% - var(--cp-l) - var(--cp-r) - 60px);
+    padding: 5px 12px;
+    font-size: 13px;
+    line-height: 1.2;
+    text-align: left;
+    border-width: 2px;
+    border-radius: 14px;
+    transform: none;
+    animation: none;
+  }
+
+  .hud:has([data-region]) .smog-alert {
+    left: calc(var(--cp-l) + 102px);
+    max-width: calc(100% - var(--cp-l) - var(--cp-r) - 110px);
+  }
+
+  .hud:has(.inspector:not([hidden])) .smog-alert {
+    max-width: calc(100% - var(--cp-l) - var(--cp-r) - var(--cp-sheet) - 68px);
+  }
+
+  .hud:has([data-region]):has(.inspector:not([hidden])) .smog-alert {
+    max-width: calc(100% - var(--cp-l) - var(--cp-r) - var(--cp-sheet) - 118px);
+  }
+
+  .proj-note {
+    gap: 6px;
+    padding: 3px;
+    border-width: 2px;
+  }
+
+  .proj-note-ico {
+    width: 30px;
+    height: 30px;
+  }
+
+  .proj-note-ico img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .proj-note-text b {
+    font-size: 15px;
+  }
+
+  .btn.proj-note-open {
+    min-height: 44px;
+    padding: 4px 12px;
+    font-size: 15px;
+  }
+
+  /* ---------- the tutorial's bubble ---------- */
+
+  .coach {
+    gap: 8px;
+    padding: 6px 8px 6px 8px;
+    border-width: 2px;
+    border-radius: 16px;
+    box-shadow: 0 4px 0 var(--ink);
+  }
+
+  .coach-face {
+    width: 32px;
+    height: 32px;
+    border-width: 2px;
+    border-radius: 10px;
+  }
+
+  .coach-step {
+    font-size: 11px;
+  }
+
+  .coach h3 {
+    margin-bottom: 1px;
+    font-size: 16px;
+  }
+
+  .coach p {
+    margin-bottom: 4px;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  .coach p.coach-action {
+    margin-bottom: 0;
+    padding: 3px 8px;
+    border-radius: 10px;
+  }
+
+  .coach-action .dot {
+    margin-top: 3px;
+  }
+
+  /* the words on the left, the buttons beside them (src/ui/tutorial.ts makes the bubble wider here) */
+  .coach-body {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+  }
+
+  .coach-body > * {
+    grid-column: 1;
+  }
+
+  .coach-buttons {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: center;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .coach-buttons .btn {
+    min-height: 44px;
+    padding: 4px 14px;
+    font-size: 15px;
+  }
+
+  .coach-skip {
+    min-height: 44px;
+    padding: 4px 8px;
+  }
+
+  .coach-ring {
+    border-width: 3px;
+    border-radius: 14px;
+  }
+
+  /* ---------- the main menu ---------- */
+
+  .corner-tl {
+    top: var(--cp-t);
+    left: var(--cp-l);
+  }
+
+  /* the version and the build stamp: in Credits (the logo's crown would sit on the stamp) */
+  .corner-tr,
+  .corner-tl p {
+    display: none;
+  }
+
+  .corner-right {
+    top: var(--cp-t);
+    right: var(--cp-r);
+  }
+
+  .corner-right .lang-pill {
+    position: relative;
+    margin-right: 0;
+  }
+
+  .lang-pill::after {
+    content: '';
+    position: absolute;
+    inset: -8px -4px;
+  }
+
+  .menu-left {
+    top: calc(var(--cp-t) + 44px);
+    left: calc(var(--cp-l) + 16px);
+    width: min(470px, calc(100% - var(--cp-l) - var(--cp-r) - 200px));
+    gap: 10px;
+  }
+
+  .logo {
+    align-self: flex-start;
+    margin: 0;
+    zoom: 0.62;
+  }
+
+  .pillars {
+    display: none;
+  }
+
+  /* the entries in two columns, 44 px high */
+  .menu-list {
+    display: grid;
+    grid-template-rows: repeat(4, auto);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: column;
+    gap: 6px 18px;
+  }
+
+  .menu-list button,
+  .menu-list button.selected:not(:disabled) {
+    width: 100%;
+    min-height: 44px;
+    gap: 8px;
+    padding: 3px 10px 3px 5px;
+    font-size: 16px;
+    letter-spacing: 0.02em;
+  }
+
+  .menu-list button.selected:not(:disabled) {
+    transform: rotate(-1deg) scale(1.02);
+  }
+
+  .menu-list .chip {
+    width: 30px;
+    height: 30px;
+  }
+
+  /* the path cards: their labels only, on the right above the footer (each opens the paths' story) */
+  .path-cards {
+    display: flex;
+    top: auto;
+    right: var(--cp-r);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 50px);
+    width: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    transform: none;
+  }
+
+  .path-card {
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .path-card canvas {
+    display: none;
+  }
+
+  .path-card .card-label {
+    position: static;
+    min-height: 44px;
+    padding: 3px 12px 2px 5px;
+    font-size: 13px;
+    box-shadow: 0 3px 0 var(--ink);
+  }
+
+  .menu-footer {
+    gap: 12px;
+    padding: 6px var(--cp-r) calc(6px + env(safe-area-inset-bottom, 0px)) var(--cp-l);
+    font-size: 12px;
+  }
+
+  .menu-footer .question {
+    display: none;
+  }
+
+  /* ---------- the region map ---------- */
+
+  .region-top {
+    top: var(--cp-t);
+    left: var(--cp-l);
+    right: var(--cp-r);
+    gap: 8px;
+  }
+
+  .region-back {
+    min-height: 44px;
+    padding: 4px 12px;
+    font-size: 15px;
+  }
+
+  .region-title {
+    padding: 2px 12px 4px;
+    border-width: 2px;
+  }
+
+  .region-title .eyebrow {
+    margin-bottom: 1px;
+  }
+
+  .region-title h1 {
+    font-size: 18px;
+  }
+
+  .pill {
+    padding: 2px 10px;
+    font-size: 14px;
+    border-width: 2px;
+  }
+
+  /* the map left of the city's panel (a little narrower than a city's sheets: the cities need the room) */
+  .region-map {
+    top: calc(var(--cp-t) + 52px);
+    right: calc(min(330px, 46vw) + var(--cp-r));
+    bottom: var(--cp-b);
+    left: var(--cp-l);
+  }
+
+  .region-panel {
+    top: calc(var(--cp-t) + 56px);
+    right: var(--cp-r);
+    bottom: var(--cp-b);
+    width: min(330px, 46vw);
+    padding: 0 12px 12px;
+    border-width: 2px;
+    border-radius: 16px;
+  }
+
+  .panel-head {
+    gap: 8px;
+    margin: 0 -12px 8px;
+    padding: 6px 12px;
+  }
+
+  .panel-head h2 {
+    font-size: 22px;
+  }
+
+  /* Travel / Continue and Restart stay in sight at the panel's bottom while its text scrolls */
+  .panel-actions {
+    position: sticky;
+    bottom: -12px;
+    margin: 8px -12px -12px;
+    padding: 8px 12px 12px;
+    background: var(--cream);
+    border-top: 2px solid rgba(26, 16, 51, 0.15);
+  }
+
+  .panel-desc {
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .region-panel h3 {
+    font-size: 16px;
+  }
+
+  .traits li {
+    font-size: 12px;
+  }
+
+  .goals li {
+    padding: 4px 8px 4px 4px;
+    font-size: 13px;
+  }
+
+  .city-node {
+    gap: 2px;
+  }
+
+  .node-badge {
+    width: 46px;
+    height: 46px;
+    border-width: 3px;
+    box-shadow:
+      inset 0 -4px 0 rgba(26, 16, 51, 0.25),
+      0 3px 0 var(--ink);
+  }
+
+  .node-badge img {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* (the selected city's rings fit the smaller badge) */
+  .city-node.selected .node-badge {
+    box-shadow:
+      0 0 0 4px var(--cream),
+      0 0 0 6px var(--ink),
+      0 5px 0 4px var(--ink);
+  }
+
+  .node-lock {
+    inset: auto -14px -2px auto;
+    font-size: 11px;
+  }
+
+  .node-lock img {
+    width: 12px;
+    height: 12px;
+  }
+
+  .node-badge.small {
+    width: 44px;
+    height: 44px;
+  }
+
+  .node-badge.small img {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* the name over its badge's rings (they come close to it here) */
+  .node-name {
+    position: relative;
+    margin-top: 3px;
+    padding: 0 7px;
+    font-size: 12px;
+    border-width: 2px;
+    box-shadow: 0 2px 0 var(--ink);
+  }
+
+  .node-stars {
+    font-size: 11px;
+  }
+}

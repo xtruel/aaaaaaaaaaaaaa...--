@@ -60,6 +60,7 @@ import {
   statusLine,
 } from './catalog';
 import type { CatalogCategory, CatalogFilter, ModuleState, PieceInfo, StatusLine } from './catalog';
+import { compact } from './compact';
 import { esc } from './escape';
 import { fitToolNames } from './fit';
 import { isModalOpen } from './modal';
@@ -286,6 +287,7 @@ export class Hud {
     this.toolButtons.clear();
     this.inspectorKey = '';
     this.catalogKey = '';
+    this.buildInfoKey = '';
     this.starsKey = '';
     this.smogKey = '';
     this.last = {};
@@ -379,7 +381,9 @@ export class Hud {
           <em data-obj-hint></em>
           <ul class="obj-stars" data-stars hidden></ul>
         </div>
+        <button type="button" class="obj-toggle" data-obj-toggle aria-expanded="false"></button>
       </div>
+      <div class="build-info" data-build-info hidden></div>
       <div class="feed" data-feed aria-live="polite"></div>
       <div class="smog-alert" data-smog-alert hidden></div>
       <aside class="smog-panel" id="smog-panel" data-smog-panel aria-label="${esc(t('hud.smog'))}" hidden>
@@ -407,7 +411,7 @@ export class Hud {
       const key = node.closest<HTMLElement>('[data-res]')!.dataset.res!;
       this.el[`${key}:${node.hasAttribute('data-v') ? 'v' : 'cap'}`] = node;
     }
-    for (const name of ['smog-bar', 'smog', 'smog-meter', 'smog-panel', 'smog-level', 'smog-body', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'project-note', 'tooltip', 'toolbar']) {
+    for (const name of ['smog-bar', 'smog', 'smog-meter', 'smog-panel', 'smog-level', 'smog-body', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'obj-toggle', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'project-note', 'tooltip', 'build-info', 'toolbar']) {
       this.el[name] = this.root.querySelector(`[data-${name}]`)!;
     }
     this.el.wait = this.root.querySelector('[data-wait]')!; // "+N waiting" next to the scrap
@@ -453,6 +457,12 @@ export class Hud {
       this.closeSmog();
     });
     this.showSmog();
+    // the compact layout's goal chip: a tap opens it (all of the goal), another closes it (src/compact.css)
+    this.el['obj-toggle'].addEventListener('click', () => {
+      audio.play('click');
+      const open = this.el.objective.classList.toggle('open');
+      this.el['obj-toggle'].setAttribute('aria-expanded', String(open));
+    });
 
     const toolbar = this.el.toolbar;
     const groups = new Map<string, HTMLElement>();
@@ -540,7 +550,8 @@ export class Hud {
     });
   }
 
-  private showTooltip(type: BuildingType, anchor: HTMLElement): void {
+  // What a building gives and needs, a line each (its tooltip, the compact layout's strip of the building in hand).
+  private tipLines(type: BuildingType): string[] {
     const def = BUILDINGS[type];
     const lines: string[] = [];
     if (def.energy) lines.push(t('tip.energy', { n: `${def.energy > 0 ? '+' : ''}${def.energy}` }));
@@ -550,6 +561,12 @@ export class Hud {
     if (def.bots) lines.push(t('tip.bots', { n: def.bots }));
     if (def.happiness) lines.push(t('tip.happiness', { n: def.happiness }));
     if (def.minPop) lines.push(t('tip.needs', { n: def.minPop }));
+    return lines;
+  }
+
+  private showTooltip(type: BuildingType, anchor: HTMLElement): void {
+    const def = BUILDINGS[type];
+    const lines = this.tipLines(type);
     const tip = this.el.tooltip;
     tip.innerHTML = `
       <p class="tip-title">${bName(type)} <span class="tag" style="--path:${pathColor(type)}">${pathLabel(def.path)}</span></p>
@@ -567,6 +584,61 @@ export class Hud {
 
   private hideTooltip(): void {
     this.el.tooltip.hidden = true;
+  }
+
+  // ---------- the compact layout: the strip of the tool in hand ----------
+
+  // On a phone (the compact layout, src/compact.css) the build bar shows pictures and prices only: the building in hand
+  // (or the bulldozer) is named on a strip under the top band, with its path, its price, what it does and gives, how
+  // to place it, and a × that puts it away. In any other layout the strip stays hidden: the cards and their tooltips
+  // say it all.
+  private buildInfoKey = '';
+
+  private updateBuildInfo(s: GameState, view: HudView): void {
+    const el = this.el['build-info'];
+    const tool: BuildingType | 'doze' | null = compact() ? (view.build ?? (view.bulldoze ? 'doze' : null)) : null;
+    // (drawn again when the tool or the input changes: the help names the input's controls)
+    const key = tool ? `${tool}|${inputKind()}` : '';
+    if (key !== this.buildInfoKey) {
+      this.buildInfoKey = key;
+      el.hidden = !tool;
+      el.innerHTML = tool ? this.buildInfoHtml(s, tool) : '';
+      el.querySelector('[data-build-close]')?.addEventListener('click', () => {
+        audio.play('click');
+        if (tool === 'doze') this.handlers.onBulldoze();
+        else this.handlers.onBuild(null);
+      });
+    }
+    // the price follows the city, written in place
+    if (tool && tool !== 'doze') {
+      const cost = el.querySelector<HTMLElement>('[data-build-cost]');
+      const html = costChips(buildCost(s, tool));
+      if (cost && cost.innerHTML !== html) cost.innerHTML = html;
+    }
+  }
+
+  private buildInfoHtml(s: GameState, tool: BuildingType | 'doze'): string {
+    const close = `<button type="button" class="modal-x" data-build-close aria-label="${t('common.close')}">×</button>`;
+    if (tool === 'doze') {
+      return `
+        <span class="tool-plate"><img src="${iconUrl('bulldoze', 3)}" alt="" /></span>
+        <div class="bi-text">
+          <p class="bi-title"><b>${esc(t('b.bulldoze'))}</b></p>
+          <p class="bi-desc">${esc(t('tip.rubble', { n: BULLDOZE_RUBBLE_COST }))}</p>
+        </div>
+        ${close}`;
+    }
+    const def = BUILDINGS[tool];
+    const help = inputKind() === 'pad' ? t('cat.help.pad') : inputText('cat.help.place');
+    return `
+      <span class="tool-plate"><img src="${toolThumb(tool)}" alt="" /></span>
+      <div class="bi-text">
+        <p class="bi-title"><b>${bName(tool)}</b><span class="tag" style="--path:${pathColor(tool)}">${pathLabel(def.path)}</span><span class="tool-cost" data-build-cost>${costChips(buildCost(s, tool))}</span></p>
+        <p class="bi-desc">${esc(buildingDesc({ type: tool }))}</p>
+        <p class="bi-stats">${this.tipLines(tool).map(esc).join(' · ')}</p>
+        <p class="bi-help">${help}</p>
+      </div>
+      ${close}`;
   }
 
   private msgTimers = new WeakMap<HTMLElement, number[]>();
@@ -702,6 +774,9 @@ export class Hud {
       set('obj-text', t('hud.starGoals'));
       set('obj-hint', t('hud.starGoals.hint'));
     }
+    // (the goal chip's button is read as the goal's step: "Goal 1/9", opened or not)
+    const step = this.el['obj-step'].textContent ?? '';
+    if (this.el['obj-toggle'].getAttribute('aria-label') !== step) this.el['obj-toggle'].setAttribute('aria-label', step);
     if (city) {
       const key = s.stars.join();
       if (key !== this.starsKey) {
@@ -739,6 +814,7 @@ export class Hud {
     catalog.classList.toggle('active', view.catalog);
     catalog.setAttribute('aria-expanded', String(view.catalog));
 
+    this.updateBuildInfo(s, view);
     this.updateCatalog(s, view);
     this.updateInspector(s, view);
     this.updateNotice(view);
@@ -811,12 +887,19 @@ export class Hud {
     const frame = hud.width > 0 ? hud : new DOMRect(0, 0, window.innerWidth, window.innerHeight);
     const x0 = frame.left;
     const vw = frame.right;
+    // the room from side to side: those sides, or on a phone (the compact layout) the top band's edges, clear of the
+    // safe area
+    const band = compact() ? this.root.querySelector('.hud-top')?.getBoundingClientRect() : undefined;
+    const lo = band ? band.left : x0 + 8;
+    const hi = band ? band.right : vw - 8;
     const w = el.offsetWidth;
     const h = el.offsetHeight;
     // what is on screen: drawn boxes (not offsetParent, which is null for the tutorial's bubble: it is position: fixed)
     const boxes = (sel: string) =>
       [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => !e.hidden && e.getClientRects().length > 0).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
     const hard = [...boxes('.coach'), ...boxes('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective], [data-smog-alert], .hud-top > *, [data-toolbar]')];
+    // (the compact layout puts the hint and the cargo blimp under the top band, and the strip of the tool in hand)
+    if (compact()) hard.push(...boxes('[data-hint], [data-region], [data-build-info]'));
     // an achievement's toast: never a place to choose, but it does not push a notice that stands: it comes down under
     // the notice (--note-bottom), passes over its edge only while it slides in, and lets presses through
     const toasts = boxes('#toasts .toast');
@@ -840,17 +923,17 @@ export class Hud {
         [Math.round((below + low) / 2), false],
       ] as const) {
         const taken = [...hard, ...toasts, ...presses].filter((r) => r.bottom > y && r.top < y + h).map((r) => [r.left, r.right] as const).sort((a, b) => a[0] - b[0]);
-        let from = x0 + 8;
-        for (const [l, r] of [...taken, [vw - 8, vw - 8] as const]) {
+        let from = lo;
+        for (const [l, r] of [...taken, [hi, hi] as const]) {
           if (l - from >= w) spots.push({ x: from + (l - from - w) / 2, y, top });
           from = Math.max(from, r + 8);
         }
-        for (const x of [(x0 + vw - w) / 2, x0 + 12, vw - w - 12]) spots.push({ x, y, top });
+        for (const x of [(lo + hi - w) / 2, lo + 4, hi - w - 4]) spots.push({ x, y, top });
       }
       let best = spots[0];
       let bestCost = Infinity;
       spots.forEach((p, i) => {
-        const x = Math.max(x0 + 8, Math.min(vw - w - 8, p.x));
+        const x = Math.max(lo, Math.min(hi - w, p.x));
         const cost = presses.reduce((c, r) => c + overlap(r, x, p.y) * 1e6, 0) + coveredAll(x, p.y) * 100 + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
         if (cost < bestCost) {
           bestCost = cost;
