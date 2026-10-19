@@ -1,5 +1,7 @@
 # Scrapbot City sull'App Store — cosa fare
 
+> **Per la sessione di Claude che continua** (build con Codemagic, TestFlight, scheda e revisione via API): [APPSTORE-AUTOMATION.md](APPSTORE-AUTOMATION.md).
+
 Stato al 19 ottobre 2026, ramo `appstore`. Il gioco è lo stesso file unico della versione web (`npm run build`) dentro
 una shell iOS Capacitor 8 (`capacitor.config.ts`, `ios/`, Swift Package Manager). **Qui non c'è un Mac: niente è stato
 compilato, avviato o caricato per iOS.** Cosa è stato provato e cosa no: sezione 15.
