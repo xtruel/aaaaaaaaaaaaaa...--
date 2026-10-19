@@ -349,7 +349,7 @@ const REGION = () => {
   const out = [];
   for (const el of r.querySelectorAll('[data-back], .region-title, .region-stats .pill, [data-panel]')) out.push(...P.inSafe(el));
   out.push(...P.hit44(r.querySelector('[data-back]')));
-  for (const n of r.querySelectorAll('[data-city]')) out.push(...P.inSafe(n.querySelector('.node-badge'), n.dataset.city), ...P.covered(n.querySelector('.node-badge'), n.dataset.city));
+  for (const n of r.querySelectorAll('[data-city]')) out.push(...P.inSafe(n.querySelector('.node-badge'), n.dataset.city), ...P.covered(n.querySelector('.node-badge'), n.dataset.city), ...P.hit44(n, n.dataset.city));
   const panel = r.querySelector('[data-panel]');
   const play = panel.querySelector('[data-play]');
   if (play) {
