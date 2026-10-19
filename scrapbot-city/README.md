@@ -1,4 +1,4 @@
-# Scrapbot City — build 0.7.0-rc.1
+# Scrapbot City — 1.0.0
 
 City builder in pixel art: piccoli robot raccolgono spazzatura, tu decidi cosa diventa.
 **Recycle × Build × Expand × Survive.** Un pianeta pulito o un profitto più grande?
@@ -26,10 +26,11 @@ npm run steam:check  # steamworks.js contro l'Electron installato: controlli sta
 npm run ios:sync     # app per iPad e iPhone: build + cap sync ios, poi Xcode o Codemagic (docs/APPSTORE.md)
 ```
 
-Per l'App Store (iPad, iPhone, Mac con chip Apple) segui **[docs/APPSTORE.md](docs/APPSTORE.md)**.
-Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, Steam Cloud, Steam Deck, upload,
-pagina del negozio, prezzo. Per i test con giocatori veri c'è **[docs/PLAYTEST.md](docs/PLAYTEST.md)**.
-La **0.7.0-rc.1** è la 0.7.0-beta.1 con il pacchetto Steam unito (steamworks.js, icone, script SteamPipe, materiali
+La **1.0.0** è la versione per l'**App Store**: un'unica app per iPhone (in orizzontale), iPad e Mac con chip Apple,
+compilata e mandata su TestFlight da Codemagic. Passi, stato e cosa non è ancora verificato: **[docs/APPSTORE.md](docs/APPSTORE.md)**.
+Steam è sospeso: il pacchetto e la guida restano nel repository ([docs/STEAM.md](docs/STEAM.md)), fermi. Per i test con
+giocatori veri c'è **[docs/PLAYTEST.md](docs/PLAYTEST.md)**.
+La **0.7.0-rc.1** era la 0.7.0-beta.1 con il pacchetto Steam unito (steamworks.js, icone, script SteamPipe, materiali
 del negozio) e l'ultimo problema basso della beta chiuso: cosa cambia è nel [CHANGELOG](CHANGELOG.md). Una release
 candidate non è un via libera commerciale: Steam, Windows, Steam Deck e controller veri restano da provare.
 Verifica della **0.7.0-rc.1** (hash delle build, cosa è e non è verificato, la lista di controllo del titolare per

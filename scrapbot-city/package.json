@@ -1,7 +1,7 @@
 {
   "name": "scrapbot-city",
   "private": true,
-  "version": "0.7.0-rc.1",
+  "version": "1.0.0",
   "description": "Scrapbot City: a pixel-art city builder about junk, robots and big choices.",
   "author": "Qwerty3D Games",
   "type": "module",

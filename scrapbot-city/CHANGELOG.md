@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0 — App Store: iPhone, iPad e Mac con chip Apple
+
+Il gioco della 0.7.0-rc.1 (stessi 24 oggetti del catalogo, stessi numeri, stessi salvataggi) diventa un'app per
+l'App Store. Steam è sospeso: il suo pacchetto resta nel repository, fermo.
+
+### L'app iOS (`ios/`, Capacitor 8, Swift Package Manager)
+- **Un'unica app** per iPhone (solo in orizzontale), iPad (ogni orientamento, finestre ridimensionabili di iPadOS 26,
+  con una dimensione minima di 744×660) e i Mac con chip Apple («Designed for iPad»). Versione 1.0.0 (1).
+- **Salvataggi al sicuro**: iOS può cancellare i dati del web view; ogni chiave dei salvataggi è copiata anche in un
+  file (`Library/saves`) e torna all'avvio; il gioco parte quando i salvataggi sono tornati. Niente viene cancellato:
+  una copia più vecchia o rovinata è messa da parte.
+- **Quando l'app va in background** fa quello che fa una scheda nascosta: salva (tranne durante il conto alla rovescia
+  dello smog), mette in pausa, spegne il suono.
+- **Niente pulsante «Esci»** (le app iOS non si chiudono da sole) e niente «Schermo intero»; comandi touch fin dalla
+  prima schermata; niente zoom della pagina, menu del tocco prolungato o rimbalzo; barra di stato nascosta; interfaccia
+  dentro l'area sicura (notch, Dynamic Island, indicatore Home), la mappa sotto tutto lo schermo.
+- Icona e schermata di avvio fatte dalle immagini del gioco; le 8 lingue dichiarate (`.lproj`), così l'App Store le
+  elenca; dichiarazione sulla privacy di Apple: nessun tracciamento, nessun dato raccolto.
+
+### iPhone: l'interfaccia compatta (`src/compact.css`)
+- Sugli schermi bassi (fino a 500 px di altezza, cioè gli iPhone in orizzontale) una banda in alto con risorse, smog,
+  orologio e velocità; l'obiettivo in un'etichetta che si apre con un tocco; la barra degli edifici sottile, con
+  immagine e prezzo, che scorre di lato; i pannelli come fogli a destra; finestre di dialogo che stanno nello schermo.
+  Ogni pulsante da premere col dito è almeno 44×44. Sopra i 500 px di altezza (iPad, Mac, computer) niente cambia.
+
+### Distribuzione
+- `codemagic.yaml` (nella radice del repository): compila con Xcode 26, firma per l'App Store e carica su TestFlight.
+- Guida passo passo, informativa sulla privacy e testi per l'App Store in inglese e italiano: `docs/APPSTORE.md`,
+  `docs/privacy-policy.*`, `appstore/metadata/`.
+
+### Cosa non è verificato
+Qui non c'è un Mac: l'app non è mai stata compilata per iOS né provata su un iPhone, un iPad o un Mac. Tutto è stato
+provato in Chromium con touch e dimensioni di iPhone e iPad simulate. La prima prova vera è la build di Codemagic su
+TestFlight.
+
 ## 0.7.0-rc.1 — release candidate: il pacchetto Steam unito al gioco, l'ultimo problema basso della beta chiuso
 
 La 0.7.0-beta.1 verificata (`c199a4f`, [docs/BETA-REPORT.md](docs/BETA-REPORT.md)) unita al pacchetto Steam preparato
