@@ -1,0 +1,2 @@
+/* The name under the app icon (the game chooses its own language at runtime) */
+"CFBundleDisplayName" = "Scrapbot City";

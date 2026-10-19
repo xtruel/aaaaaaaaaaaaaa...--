@@ -183,7 +183,8 @@ Da incollare (in inglese) in App Review Information, con il tuo contatto:
   icona con la maschera di iOS; niente menu del tocco prolungato e niente rimbalzo; l'audio quando l'app torna
   dal background; trackpad e mouse su iPad (`UIApplicationSupportsIndirectInputEvents`), tastiera, controller;
   prestazioni sugli iPad e iPhone più vecchi; «Designed for iPad» sul Mac; l'elenco delle lingue sulla pagina del
-  negozio (l'app dichiara `CFBundleLocalizations` ma non ha cartelle `.lproj`); il layout compatto per iPhone (altro
+  negozio (l'app ha una cartella `.lproj` per ognuna delle 8 lingue, con il solo nome sotto l'icona, e le dichiara in
+  `CFBundleLocalizations`; il portoghese è `pt-PT`, come i testi del gioco); il layout compatto per iPhone (altro
   ramo).
 - I passi di App Store Connect e di Codemagic seguono le pagine di Apple e di Codemagic lette il 19/10/2026: possono
   cambiare.
