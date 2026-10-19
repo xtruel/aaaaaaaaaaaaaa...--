@@ -106,10 +106,12 @@ export async function stableBox(page, sel, { timeout = 8000 } = {}) {
 }
 
 // A phone's safe area as iOS reports it (env(safe-area-inset-*)), emulated by Chromium for this page (CDP
-// Emulation.setSafeAreaInsetsOverride, Chromium 136+): { top, left, right, bottom } in CSS px. Kept across reloads.
+// Emulation.setSafeAreaInsetsOverride, Chromium 136+): { top, left, right, bottom } in CSS px. A reload loses it:
+// reload() below sets it again.
 export async function safeArea(page, insets) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, left: 0, right: 0, bottom: 0, ...insets } });
+  page.__e2eInsets = insets;
   return cdp;
 }
 
@@ -157,6 +159,7 @@ export async function waitMenu(page, { hook = true, timeout = 30000 } = {}) {
 // The page reloaded (F5): the same storage, the main menu again.
 export async function reload(page, io, { hook = true } = {}) {
   await page.reload();
+  if (page.__e2eInsets) await safeArea(page, page.__e2eInsets);
   await waitMenu(page, { hook });
   await io.attach(page);
 }
