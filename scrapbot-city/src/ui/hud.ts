@@ -60,6 +60,7 @@ import {
   statusLine,
 } from './catalog';
 import type { CatalogCategory, CatalogFilter, ModuleState, PieceInfo, StatusLine } from './catalog';
+import { compact } from './compact';
 import { esc } from './escape';
 import { fitToolNames } from './fit';
 import { isModalOpen } from './modal';
@@ -286,6 +287,7 @@ export class Hud {
     this.toolButtons.clear();
     this.inspectorKey = '';
     this.catalogKey = '';
+    this.buildInfoKey = '';
     this.starsKey = '';
     this.smogKey = '';
     this.last = {};
@@ -375,7 +377,9 @@ export class Hud {
           <em data-obj-hint></em>
           <ul class="obj-stars" data-stars hidden></ul>
         </div>
+        <button type="button" class="obj-toggle" data-obj-toggle aria-expanded="false"></button>
       </div>
+      <div class="build-info" data-build-info hidden></div>
       <div class="feed" data-feed aria-live="polite"></div>
       <div class="smog-alert" data-smog-alert hidden></div>
       <aside class="smog-panel" id="smog-panel" data-smog-panel aria-label="${esc(t('hud.smog'))}" hidden>
@@ -403,7 +407,7 @@ export class Hud {
       const key = node.closest<HTMLElement>('[data-res]')!.dataset.res!;
       this.el[`${key}:${node.hasAttribute('data-v') ? 'v' : 'cap'}`] = node;
     }
-    for (const name of ['smog-bar', 'smog', 'smog-meter', 'smog-panel', 'smog-level', 'smog-body', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'project-note', 'tooltip', 'toolbar']) {
+    for (const name of ['smog-bar', 'smog', 'smog-meter', 'smog-panel', 'smog-level', 'smog-body', 'knob', 'day', 'time', 'objective', 'obj-step', 'obj-text', 'obj-hint', 'obj-toggle', 'stars', 'hint-badge', 'feed', 'smog-alert', 'inspector', 'catalog-panel', 'project-note', 'tooltip', 'build-info', 'toolbar']) {
       this.el[name] = this.root.querySelector(`[data-${name}]`)!;
     }
     this.el.wait = this.root.querySelector('[data-wait]')!; // "+N waiting" next to the scrap
@@ -449,6 +453,12 @@ export class Hud {
       this.closeSmog();
     });
     this.showSmog();
+    // the compact layout's goal chip: a tap opens it (all of the goal), another closes it (src/compact.css)
+    this.el['obj-toggle'].addEventListener('click', () => {
+      audio.play('click');
+      const open = this.el.objective.classList.toggle('open');
+      this.el['obj-toggle'].setAttribute('aria-expanded', String(open));
+    });
 
     const toolbar = this.el.toolbar;
     const groups = new Map<string, HTMLElement>();
@@ -536,7 +546,8 @@ export class Hud {
     });
   }
 
-  private showTooltip(type: BuildingType, anchor: HTMLElement): void {
+  // What a building gives and needs, a line each (its tooltip, the compact layout's strip of the building in hand).
+  private tipLines(type: BuildingType): string[] {
     const def = BUILDINGS[type];
     const lines: string[] = [];
     if (def.energy) lines.push(t('tip.energy', { n: `${def.energy > 0 ? '+' : ''}${def.energy}` }));
@@ -546,6 +557,12 @@ export class Hud {
     if (def.bots) lines.push(t('tip.bots', { n: def.bots }));
     if (def.happiness) lines.push(t('tip.happiness', { n: def.happiness }));
     if (def.minPop) lines.push(t('tip.needs', { n: def.minPop }));
+    return lines;
+  }
+
+  private showTooltip(type: BuildingType, anchor: HTMLElement): void {
+    const def = BUILDINGS[type];
+    const lines = this.tipLines(type);
     const tip = this.el.tooltip;
     tip.innerHTML = `
       <p class="tip-title">${bName(type)} <span class="tag" style="--path:${pathColor(type)}">${pathLabel(def.path)}</span></p>
@@ -563,6 +580,61 @@ export class Hud {
 
   private hideTooltip(): void {
     this.el.tooltip.hidden = true;
+  }
+
+  // ---------- the compact layout: the strip of the tool in hand ----------
+
+  // On a phone (the compact layout, src/compact.css) the build bar shows pictures and prices only: the building in hand
+  // (or the bulldozer) is named on a strip under the top band, with its path, its price, what it does and gives, how
+  // to place it, and a × that puts it away. In any other layout the strip stays hidden: the cards and their tooltips
+  // say it all.
+  private buildInfoKey = '';
+
+  private updateBuildInfo(s: GameState, view: HudView): void {
+    const el = this.el['build-info'];
+    const tool: BuildingType | 'doze' | null = compact() ? (view.build ?? (view.bulldoze ? 'doze' : null)) : null;
+    // (drawn again when the tool or the input changes: the help names the input's controls)
+    const key = tool ? `${tool}|${inputKind()}` : '';
+    if (key !== this.buildInfoKey) {
+      this.buildInfoKey = key;
+      el.hidden = !tool;
+      el.innerHTML = tool ? this.buildInfoHtml(s, tool) : '';
+      el.querySelector('[data-build-close]')?.addEventListener('click', () => {
+        audio.play('click');
+        if (tool === 'doze') this.handlers.onBulldoze();
+        else this.handlers.onBuild(null);
+      });
+    }
+    // the price follows the city, written in place
+    if (tool && tool !== 'doze') {
+      const cost = el.querySelector<HTMLElement>('[data-build-cost]');
+      const html = costChips(buildCost(s, tool));
+      if (cost && cost.innerHTML !== html) cost.innerHTML = html;
+    }
+  }
+
+  private buildInfoHtml(s: GameState, tool: BuildingType | 'doze'): string {
+    const close = `<button type="button" class="modal-x" data-build-close aria-label="${t('common.close')}">×</button>`;
+    if (tool === 'doze') {
+      return `
+        <span class="tool-plate"><img src="${iconUrl('bulldoze', 3)}" alt="" /></span>
+        <div class="bi-text">
+          <p class="bi-title"><b>${esc(t('b.bulldoze'))}</b></p>
+          <p class="bi-desc">${esc(t('tip.rubble', { n: BULLDOZE_RUBBLE_COST }))}</p>
+        </div>
+        ${close}`;
+    }
+    const def = BUILDINGS[tool];
+    const help = inputKind() === 'pad' ? t('cat.help.pad') : inputText('cat.help.place');
+    return `
+      <span class="tool-plate"><img src="${toolThumb(tool)}" alt="" /></span>
+      <div class="bi-text">
+        <p class="bi-title"><b>${bName(tool)}</b><span class="tag" style="--path:${pathColor(tool)}">${pathLabel(def.path)}</span><span class="tool-cost" data-build-cost>${costChips(buildCost(s, tool))}</span></p>
+        <p class="bi-desc">${esc(buildingDesc({ type: tool }))}</p>
+        <p class="bi-stats">${this.tipLines(tool).map(esc).join(' · ')}</p>
+        <p class="bi-help">${help}</p>
+      </div>
+      ${close}`;
   }
 
   private msgTimers = new WeakMap<HTMLElement, number[]>();
@@ -698,6 +770,9 @@ export class Hud {
       set('obj-text', t('hud.starGoals'));
       set('obj-hint', t('hud.starGoals.hint'));
     }
+    // (the goal chip's button is read as the goal's step: "Goal 1/9", opened or not)
+    const step = this.el['obj-step'].textContent ?? '';
+    if (this.el['obj-toggle'].getAttribute('aria-label') !== step) this.el['obj-toggle'].setAttribute('aria-label', step);
     if (city) {
       const key = s.stars.join();
       if (key !== this.starsKey) {
@@ -735,6 +810,7 @@ export class Hud {
     catalog.classList.toggle('active', view.catalog);
     catalog.setAttribute('aria-expanded', String(view.catalog));
 
+    this.updateBuildInfo(s, view);
     this.updateCatalog(s, view);
     this.updateInspector(s, view);
     this.updateNotice(view);
