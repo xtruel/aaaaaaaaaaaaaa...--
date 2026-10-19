@@ -5,7 +5,7 @@ import { detectLang, isLang } from './i18n';
 import type { Lang } from './i18n';
 import type { GameState, OutcomeKind } from './game/state';
 
-const PREFIX = 'scrapbot:';
+export const PREFIX = 'scrapbot:';
 
 interface FileStore {
   get(key: string): string | null;
@@ -17,6 +17,19 @@ interface FileStore {
 
 const desktop = (window as unknown as { scrapbotDesktop?: { storage?: FileStore; openSaves?: () => void } }).scrapbotDesktop;
 const files = desktop?.storage ?? null;
+
+// The iOS app keeps a copy of every key in files (src/platform/native.ts, src/platform/mirror.ts): it is told of each
+// write and removal the browser storage took. Nothing sets one on the web or on the desktop.
+export interface KeyMirror {
+  write(key: string, value: string): void;
+  remove(key: string): void;
+}
+
+let mirror: KeyMirror | null = null;
+
+export function setKeyMirror(m: KeyMirror | null): void {
+  mirror = m;
+}
 
 export function readKey(key: string): string | null {
   try {
@@ -40,6 +53,7 @@ export function writeKey(key: string, value: string): boolean {
   try {
     if (files) return files.set(key, value);
     window.localStorage.setItem(PREFIX + key, value);
+    mirror?.write(key, value);
     return true;
   } catch {
     return false;
@@ -49,7 +63,10 @@ export function writeKey(key: string, value: string): boolean {
 export function removeKey(key: string): void {
   try {
     if (files) files.remove(key);
-    else window.localStorage.removeItem(PREFIX + key);
+    else {
+      window.localStorage.removeItem(PREFIX + key);
+      mirror?.remove(key);
+    }
   } catch {
     // storage blocked: nothing to remove
   }
