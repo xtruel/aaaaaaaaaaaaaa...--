@@ -43,6 +43,10 @@ await T.run(async () => {
     const n0 = await S(page, (type) => window.scrapbot.session().s.buildings.filter((b) => b.type === type).length, type);
     await io.press(`[data-tool="${type}"]`);
     await until(page, (type) => window.scrapbot.session().build === type, type, { what: `the ${type} tool in hand` });
+    // (on a phone the strip naming it comes with the next redraw of the interface, under the band: the spot is chosen
+    // with it on screen; in the tutorial the bubble says it instead)
+    await until(page, () => !document.querySelector('[data-build-info]').hidden || !!document.querySelector('.coach'), null, { what: `the strip of the ${type}` });
+    await settle(page);
     const spot = await S(page, (type) => {
       const s = window.scrapbot.session().s;
       const A = window.scrapbot.actions;
@@ -59,7 +63,10 @@ await T.run(async () => {
     if (!spot) throw new Error(`no room for a ${type}`);
     const p = await G.bringClear(page, io, spot);
     await io.at(p.x, p.y);
-    return until(page, ([type, n0]) => window.scrapbot.session().s.buildings.filter((b) => b.type === type).length > n0, [type, n0], { soft: true, timeout: 5000, what: `a ${type} built` });
+    const built = await until(page, ([type, n0]) => window.scrapbot.session().s.buildings.filter((b) => b.type === type).length > n0, [type, n0], { soft: true, timeout: 5000, what: `a ${type} built` });
+    // (not built: what the game said, and what was under the finger)
+    if (!built) T.note(`${type} not built by the tap at ${p.x},${p.y} on tile ${JSON.stringify(spot)}: under it ${await S(page, ([x, y]) => document.elementFromPoint(x, y)?.className, [p.x, p.y])}; feed: ${(await G.feed(page)).slice(-3).join(' | ')}`);
+    return built;
   }
   const step = (n) => until(page, (n) => new RegExp(`\\b${n}/7`).test(document.querySelector('.coach-step')?.textContent ?? ''), n, { timeout: 15000, what: `the tutorial's step ${n}`, soft: true });
 

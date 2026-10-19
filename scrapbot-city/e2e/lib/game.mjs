@@ -484,6 +484,8 @@ export const clearSpotNear = (page, p, { inset = 70, margin = 24 } = {}) =>
 // clear spot of the map (clearSpotNear). Returns its screen point.
 export async function bringClear(page, io, t, onPan = null) {
   for (let k = 0; k < 8; k++) {
+    // (the interface caught up with the city first: a strip or a card that is about to show is measured too)
+    await settle(page);
     const p = await tileScreen(page, t);
     const inside = await S(page, ([x, y]) => x >= 69.5 && x <= innerWidth - 69.5 && y >= 39.5 && y <= innerHeight - 29.5, [p.x, p.y]);
     if (inside && (await S(page, MAP_CLEAR, [p.x, p.y, 24]))) return { x: Math.round(p.x), y: Math.round(p.y) };
