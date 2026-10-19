@@ -17,6 +17,15 @@ segnati come suoi. La guida per il titolare è [APPSTORE.md](APPSTORE.md).
 - Scelte del titolare: **app a pagamento** (prezzo non ancora indicato: chiedilo prima di impostarlo); ID del bundle
   previsto `com.qwerty3d.scrapbotcity` (verificalo, sotto).
 - Testi del negozio: `appstore/metadata/en-US` e `appstore/metadata/it`; screenshot: `appstore/screenshots/`.
+- Già fatto con le API (19 ottobre): ID del bundle `com.qwerty3d.scrapbotcity` registrato (risorsa `F4TW2966UR`,
+  piattaforma UNIVERSAL); certificato iOS Distribution `2FS2G44A9H` (scade il 19 ottobre 2027), la cui chiave privata
+  è solo in Codemagic (`CERTIFICATE_PRIVATE_KEY`); app di Codemagic `6ad5d4797c0fa2cb894170c9`; gruppo
+  `appstore_credentials` `6ad5d4987550aed810900e47` con 4 variabili segrete (manca `APP_STORE_APPLE_ID`). L'account
+  ha già 3 certificati Apple Distribution di altre app: non toccarli.
+- Manca il record dell'app in App Store Connect: Apple non permette di crearlo via API (`POST /v1/apps` → 403), lo
+  crea il titolare.
+- Script nel repository (chiave dalle variabili d'ambiente, vedi sotto): `scripts/asc-listing.mjs` (scheda, §4) e
+  `scripts/asc-testflight.mjs` (§3), entrambi rieseguibili; `scripts/asc-api.mjs` è il client.
 
 ## Le chiavi (variabili d'ambiente della sessione, mai nel repository né nella chat)
 
@@ -24,7 +33,7 @@ segnati come suoi. La guida per il titolare è [APPSTORE.md](APPSTORE.md).
 |---|---|
 | `CODEMAGIC_API_TOKEN` | token dell'API di Codemagic (Settings → Integrations → Codemagic API) |
 | `ASC_ISSUER_ID`, `ASC_KEY_ID` | chiave dell'API di App Store Connect (ruolo App Manager o Admin) |
-| `ASC_PRIVATE_KEY` oppure `ASC_PRIVATE_KEY_B64` | il file `.p8` della chiave, in chiaro o in base64 |
+| `ASC_PRIVATE_KEY`, `ASC_PRIVATE_KEY_B64` o `ASC_PRIVATE_KEY_PATH` | il file `.p8` della chiave: in chiaro, in base64 o il percorso |
 
 Se mancano, dillo al titolare in poche righe (impostazioni dell'ambiente → variabili, poi una nuova sessione) e
 fermati sulla parte che le richiede.
@@ -70,6 +79,8 @@ Base URL `https://api.codemagic.io`, header `x-auth-token: $CODEMAGIC_API_TOKEN`
 
 - La build caricata compare in `GET /v1/builds?filter[app]={appId}`; aspetta `processingState` = `VALID`. La
   conformità all'esportazione è già dichiarata (`ITSAppUsesNonExemptEncryption` = NO in `Info.plist`).
+- `node scripts/asc-testflight.mjs --wait` fa i passi che seguono. Codemagic non chiede la revisione beta di Apple
+  (`submit_to_testflight: false`): serve solo per i tester esterni.
 - Gruppo interno: `GET /v1/betaGroups?filter[app]={appId}`, oppure creane uno interno; aggiungi la build. Il titolare
   la installa con l'app TestFlight su iPhone/iPad (e sul Mac con chip Apple, abilitando nel gruppo «Test iPhone and
   iPad Apps on Apple Silicon Macs») e prova il gioco: **10 minuti su un dispositivo vero prima dell'invio alla
@@ -77,15 +88,21 @@ Base URL `https://api.codemagic.io`, header `x-auth-token: $CODEMAGIC_API_TOKEN`
 
 ## 4. La scheda dell'App Store (via API)
 
-Leggi la documentazione attuale di App Store Connect API per i nomi esatti; le risorse sono:
+`node scripts/asc-listing.mjs --dry` mostra cosa cambierebbe; senza `--dry` scrive categorie, testi en-US e it con
+i due URL, età consigliata, numero di versione, copyright, rilascio manuale e screenshot. Restano fuori: prezzo,
+contatto per la revisione, privacy dell'app, dichiarazione sui contenuti di terzi (`contentRightsDeclaration`, da
+chiedere al titolare). Le risorse, per correggere lo script o fare a mano (nomi verificati sulla specifica OpenAPI
+4.5.1 di Apple):
 - `appInfos` → `appInfoLocalizations` per `en-US` e `it`: `name`, `subtitle`, `privacyPolicyUrl`
   (`…RtuycNCpGDGdHCDPXLK5jz#privacy`); categoria principale Giochi, sottocategorie Simulazione e Strategia.
 - `appStoreVersions` (piattaforma `IOS`, `versionString` `1.0.0`) → `appStoreVersionLocalizations`: `description`,
   `keywords`, `promotionalText`, `supportUrl` (`…#support`) dai file in `appstore/metadata/<lingua>/`; copyright da
   `appstore/metadata/copyright.txt`.
-- Screenshot: `appScreenshotSets` per i tipi di schermo iPhone 6,9" e iPad 13" (controlla gli enum di
-  `screenshotDisplayType` per 2868×1320 e 2752×2064), poi per ogni file `appScreenshots` (prenotazione, upload delle
-  parti, conferma con il checksum MD5). File in `appstore/screenshots/<lingua>/{iphone-6.9,ipad-13}/`.
+- Screenshot: `appScreenshotSets` con `screenshotDisplayType` `APP_IPHONE_67` (lo spazio dell'iPhone 6,9": 2868×1320)
+  e `APP_IPAD_PRO_3GEN_129` (iPad 13": 2752×2064), poi per ogni file `appScreenshots` (prenotazione, upload delle
+  parti, conferma con il checksum MD5). File in `appstore/screenshots/<lingua>/{iphone-6.9,ipad-13}/NN-nome.png`.
+  Gli scatti grezzi del 19 ottobre (circa 30 per dispositivo e lingua, da scegliere) erano solo nella cartella
+  temporanea della sessione: se non ci sono più, vanno rifatti dalla build di rilascio (vedi `e2e/tests/ios-shell.mjs`).
 - `ageRatingDeclarations`: tutto «nessuno / no» (vedi APPSTORE.md, sezione 10): 4+.
 - Prezzo: `appPriceSchedules` con il prezzo che **dice il titolare**. Per un'app a pagamento l'accordo «Paid Apps»
   (dati fiscali e bancari) deve essere attivo in App Store Connect → Business: solo il titolare può firmarlo.
