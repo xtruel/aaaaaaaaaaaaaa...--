@@ -290,6 +290,13 @@ await T.run(async () => {
   const hudOut = await S(page, outside, [['.hud-top > *', '[data-toolbar]', '[data-objective]'], PHONE_INSETS, true]);
   const bar = await S(page, () => document.querySelector('[data-toolbar]').getBoundingClientRect().bottom);
   T.ok(`${size}: the HUD clear of the side insets and the build bar above the home indicator`, hudOut.length === 0 && bar <= g.h - PHONE_INSETS.bottom + 0.5, `${hudOut.slice(0, 4).join('; ')} bar bottom ${bar}`);
+  // the compact layout (src/compact.css) inside the iOS app's safe area: the safe area counted once, not twice
+  const edges = await S(page, () => {
+    const t = document.querySelector('.hud-top').getBoundingClientRect();
+    const b = document.querySelector('[data-toolbar]').getBoundingClientRect();
+    return { topLeft: t.left, topRight: innerWidth - t.right, barLeft: b.left };
+  });
+  T.ok(`${size}: the top band and the build bar start just inside the safe area, not twice its width in`, edges.topLeft <= PHONE_INSETS.left + 16 && edges.topRight <= PHONE_INSETS.right + 16 && edges.barLeft <= PHONE_INSETS.left + 16, JSON.stringify(edges));
   await T.shot(page, `${size}-city`);
   await g.io.pauseMenu();
   const dialogOut = await S(page, outside, [['#modal-root .modal'], PHONE_INSETS, true]);

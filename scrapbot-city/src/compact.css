@@ -21,6 +21,11 @@
     --cp-r: max(8px, env(safe-area-inset-right, 0px));
     --cp-t: max(6px, env(safe-area-inset-top, 0px));
     --cp-b: max(6px, env(safe-area-inset-bottom, 0px));
+    /* the same edges for what is fixed to the screen itself, outside the HUD (the achievement toasts): in the iOS app
+       the containers are already inside the safe area and --cp-l/r/t drop it (end of this file), these never do */
+    --cp-vr: max(8px, env(safe-area-inset-right, 0px));
+    --cp-vt: max(6px, env(safe-area-inset-top, 0px));
+    --cp-vb: max(6px, env(safe-area-inset-bottom, 0px));
     /* the top band: 44 px of buttons in a 2 px border */
     --cp-band: 48px;
     /* the side panels' width (sheets on the right) */
@@ -1151,22 +1156,22 @@
   body:has(#game:not([hidden])) .toasts,
   body:has(.smog-panel:not([hidden])) .toasts {
     top: auto;
-    right: var(--cp-r);
-    bottom: calc(var(--cp-b) + 82px);
+    right: var(--cp-vr);
+    bottom: calc(var(--cp-vb) + 82px);
     left: auto;
     align-items: flex-end;
     transform: none;
   }
 
   body:has(.hud .inspector:not([hidden])) .toasts {
-    right: calc(var(--cp-r) + var(--cp-sheet) + 8px);
+    right: calc(var(--cp-vr) + var(--cp-sheet) + 8px);
   }
 
   /* over a dialog: on its head band, left of its × (its buttons are at the bottom) */
   .toasts.below,
   body:has(#modal-root .modal-backdrop) .toasts {
-    top: calc(var(--cp-t) + 4px);
-    right: calc(var(--cp-r) + 56px);
+    top: calc(var(--cp-vt) + 4px);
+    right: calc(var(--cp-vr) + 56px);
     bottom: auto;
     left: auto;
   }
@@ -1616,5 +1621,26 @@
 
   .node-stars {
     font-size: 11px;
+  }
+
+  /* ---------- the iOS app ----------
+     There (src/style.css, html.ios-app) the HUD and the main menu are already inside the safe area on the sides and the
+     top, and the region map and the dialogs on every side: inside them the compact layout adds only its own small
+     margins, not the safe area a second time. The HUD's bottom is not inset, so --cp-b keeps the home indicator clear
+     for the build bar and the side panels; the region map and the dialogs, inset at the bottom too, take the margin only.
+     The achievement toasts, fixed to the screen, keep the full edges (--cp-vr/vt/vb). */
+  html.ios-app {
+    --cp-l: 8px;
+    --cp-r: 8px;
+    --cp-t: 6px;
+  }
+
+  html.ios-app .modal-backdrop {
+    padding-bottom: 6px;
+  }
+
+  html.ios-app .region-map,
+  html.ios-app .region-panel {
+    bottom: 6px;
   }
 }
