@@ -878,12 +878,18 @@ export class Hud {
   private placeNotice(avoid: { x: number; y: number }[]): void {
     const el = this.el['project-note'];
     const vw = window.innerWidth;
+    // the screen's room from side to side: on a phone (the compact layout) the top band's edges, clear of the safe area
+    const band = compact() ? this.root.querySelector('.hud-top')?.getBoundingClientRect() : undefined;
+    const lo = band ? band.left : 8;
+    const hi = band ? band.right : vw - 8;
     const w = el.offsetWidth;
     const h = el.offsetHeight;
     // what is on screen: drawn boxes (not offsetParent, which is null for the tutorial's bubble: it is position: fixed)
     const boxes = (sel: string) =>
       [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => !e.hidden && e.getClientRects().length > 0).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
     const hard = [...boxes('.coach'), ...boxes('[data-inspector], [data-catalog-panel], [data-smog-panel], [data-objective], [data-smog-alert], .hud-top > *, [data-toolbar]')];
+    // (the compact layout puts the hint and the cargo blimp under the top band, and the strip of the tool in hand)
+    if (compact()) hard.push(...boxes('[data-hint], [data-region], [data-build-info]'));
     // an achievement's toast: never a place to choose, but it does not push a notice that stands: it comes down under
     // the notice (--note-bottom), passes over its edge only while it slides in, and lets presses through
     const toasts = boxes('#toasts .toast');
@@ -907,17 +913,17 @@ export class Hud {
         [Math.round((below + low) / 2), false],
       ] as const) {
         const taken = [...hard, ...toasts, ...presses].filter((r) => r.bottom > y && r.top < y + h).map((r) => [r.left, r.right] as const).sort((a, b) => a[0] - b[0]);
-        let from = 8;
-        for (const [l, r] of [...taken, [vw - 8, vw - 8] as const]) {
+        let from = lo;
+        for (const [l, r] of [...taken, [hi, hi] as const]) {
           if (l - from >= w) spots.push({ x: from + (l - from - w) / 2, y, top });
           from = Math.max(from, r + 8);
         }
-        for (const x of [(vw - w) / 2, 12, vw - w - 12]) spots.push({ x, y, top });
+        for (const x of [(lo + hi - w) / 2, lo + 4, hi - w - 4]) spots.push({ x, y, top });
       }
       let best = spots[0];
       let bestCost = Infinity;
       spots.forEach((p, i) => {
-        const x = Math.max(8, Math.min(vw - w - 8, p.x));
+        const x = Math.max(lo, Math.min(hi - w, p.x));
         const cost = presses.reduce((c, r) => c + overlap(r, x, p.y) * 1e6, 0) + coveredAll(x, p.y) * 100 + soft.reduce((c, r) => c + overlap(r, x, p.y), 0) + i;
         if (cost < bestCost) {
           bestCost = cost;

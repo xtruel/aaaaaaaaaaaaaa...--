@@ -8,6 +8,7 @@ import { t } from '../i18n';
 import { inputKind, inputText } from '../input';
 import type { InputKind } from '../input';
 import { portraitUrl } from '../render/icons';
+import { compact } from './compact';
 
 export interface Box {
   left: number;
@@ -182,7 +183,13 @@ export class Tutorial {
     const b = this.bubble;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const bw = Math.min(360, vw - 24);
+    // the screen's room from side to side: on a phone (the compact layout, src/compact.css) the top band's edges, clear
+    // of the safe area, and a wider, shorter bubble (its buttons beside the words) that leaves more of the map in sight
+    const small = compact();
+    const band = small ? this.root.querySelector('.hud-top')?.getBoundingClientRect() : undefined;
+    const lo = band ? band.left : 12;
+    const hi = band ? band.right : vw - 12;
+    const bw = Math.min(small ? 520 : 360, hi - lo);
     b.style.width = `${bw}px`;
     b.style.bottom = '';
     const bh = b.offsetHeight;
@@ -191,13 +198,20 @@ export class Tutorial {
       if (el && (el as HTMLElement).offsetParent !== null) avoid.push({ box: el.getBoundingClientRect(), weight });
     };
     add(this.root.querySelector('[data-objective]'), 1);
-    add(this.root.querySelector('[data-toolbar]'), 0.6);
+    // (a phone's build bar is one slim row the player keeps pressing: the bubble keeps off it)
+    add(this.root.querySelector('[data-toolbar]'), small ? 2 : 0.6);
     add(this.root.querySelector('.hud-top'), 0.3);
     add(this.root.querySelector('[data-feed]'), 0.5);
+    // (on a phone: the strip of the building in hand, and the hint and the cargo blimp under the band)
+    if (small) {
+      add(this.root.querySelector('[data-build-info]'), 1);
+      add(this.root.querySelector('[data-hint]'), 0.5);
+      add(this.root.querySelector('[data-region]'), 0.5);
+    }
     if (ctx.hq) avoid.push({ box: ctx.hq, weight: step.action ? 3 : 1 });
 
     const at = (left: number, top: number): Box => {
-      const l = Math.max(12, Math.min(vw - bw - 12, left));
+      const l = Math.max(lo, Math.min(hi - bw, left));
       const t = Math.max(8, Math.min(vh - bh - 8, top));
       return { left: l, top: t, right: l + bw, bottom: t + bh };
     };
@@ -215,7 +229,7 @@ export class Tutorial {
     });
     this.rings.forEach((ring, i) => (ring.hidden = i >= targets.length));
     const toolbarTop = this.root.querySelector('[data-toolbar]')?.getBoundingClientRect().top ?? vh;
-    spots.push(at(12, toolbarTop - bh - 14), at(vw - bw - 12, toolbarTop - bh - 14), at((vw - bw) / 2, Math.max(80, vh * 0.2)));
+    spots.push(at(lo, toolbarTop - bh - 14), at(hi - bw, toolbarTop - bh - 14), at((lo + hi - bw) / 2, Math.max(80, vh * 0.2)));
     const cost = (c: Box) => avoid.reduce((sum, a) => sum + overlap(c, a.box) * a.weight, 0);
     let best = 0;
     for (let i = 1; i < spots.length; i++) if (cost(spots[i]) < cost(spots[best])) best = i;
