@@ -23,8 +23,10 @@ npm run e2e:list     # i test end-to-end, il loro input (simulato) e cosa copron
 npm run desktop      # app desktop (Electron)
 npm run dist:steam   # build Windows + Linux per Steam: release/ e steam/content/ (guida: docs/STEAM.md)
 npm run steam:check  # steamworks.js contro l'Electron installato: controlli statici e caricamento (docs/STEAM.md, sezione 5)
+npm run ios:sync     # app per iPad e iPhone: build + cap sync ios, poi Xcode o Codemagic (docs/APPSTORE.md)
 ```
 
+Per l'App Store (iPad, iPhone, Mac con chip Apple) segui **[docs/APPSTORE.md](docs/APPSTORE.md)**.
 Per pubblicare su Steam segui **[docs/STEAM.md](docs/STEAM.md)**: account, achievement, Steam Cloud, Steam Deck, upload,
 pagina del negozio, prezzo. Per i test con giocatori veri c'è **[docs/PLAYTEST.md](docs/PLAYTEST.md)**.
 La **0.7.0-rc.1** è la 0.7.0-beta.1 con il pacchetto Steam unito (steamworks.js, icone, script SteamPipe, materiali
