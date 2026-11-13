@@ -1,0 +1,87 @@
+diff --git a/lib/components/normal-components/Battery.ts b/lib/components/normal-components/Battery.ts
+index 25a8f98..8e25ec9 100644
+--- a/lib/components/normal-components/Battery.ts
++++ b/lib/components/normal-components/Battery.ts
+@@ -1,5 +1,4 @@
+ import { batteryProps, resolveManufacturerPartNumber } from "@tscircuit/props"
+-import type { SourceSimpleBatteryInput } from "circuit-json"
+ 
+ import type { BaseSymbolName, Ftype, PassivePorts } from "lib/utils/constants"
+ import { NormalComponent } from "../base-components/NormalComponent/NormalComponent"
+@@ -34,11 +33,12 @@ export class Battery extends NormalComponent<
+       name: this.name,
+       ftype: "simple_power_source" as Ftype,
+       capacity: props.capacity,
++      voltage: props.voltage,
+       supplier_part_numbers: props.supplierPartNumbers,
+       manufacturer_part_number: resolveManufacturerPartNumber(props),
+       are_pins_interchangeable: false,
+       display_name: props.displayName,
+-    } as SourceSimpleBatteryInput)
++    } as any)
+     this.source_component_id = source_component.source_component_id
+   }
+ }
+diff --git a/lib/components/normal-components/PinHeader.ts b/lib/components/normal-components/PinHeader.ts
+index f6b57de..cbff8df 100644
+--- a/lib/components/normal-components/PinHeader.ts
++++ b/lib/components/normal-components/PinHeader.ts
+@@ -40,21 +40,11 @@ export class PinHeader extends NormalComponent<typeof pinHeaderProps> {
+     const gender = this._parsedProps.gender
+ 
+     if (pinCount > 0) {
+-      let footprintString: string
+-
+-      if (pitch) {
+-        if (!holeDiameter && !platedDiameter) {
+-          footprintString = `pinrow${pinCount}_p${pitch}`
+-        } else {
+-          footprintString = `pinrow${pinCount}_p${pitch}_id${holeDiameter}_od${platedDiameter}`
+-        }
+-      } else {
+-        if (!holeDiameter && !platedDiameter) {
+-          footprintString = `pinrow${pinCount}`
+-        } else {
+-          return null
+-        }
+-      }
++      let footprintString = `pinrow${pinCount}`
++
++      if (pitch) footprintString += `_p${pitch}`
++      if (holeDiameter) footprintString += `_id${holeDiameter}`
++      if (platedDiameter) footprintString += `_od${platedDiameter}`
+ 
+       // Add _nopinlabels by default, only show pin labels if showSilkscreenPinLabels is explicitly true
+       // Default behavior (undefined/false) hides pin labels
+@@ -70,6 +60,10 @@ export class PinHeader extends NormalComponent<typeof pinHeaderProps> {
+         footprintString += `_rows${rows}`
+       }
+ 
++      if (this._parsedProps.rightAngle) {
++        footprintString += "_rightangle"
++      }
++
+       return footprintString
+     }
+     return null
+diff --git a/lib/components/primitive-components/CopperText.ts b/lib/components/primitive-components/CopperText.ts
+index 27e7030..cdbfb82 100644
+--- a/lib/components/primitive-components/CopperText.ts
++++ b/lib/components/primitive-components/CopperText.ts
+@@ -20,6 +20,7 @@ export class CopperText extends PrimitiveComponent<typeof copperTextProps> {
+     const container = this.getPrimitiveContainer()!
+     const position = this._getGlobalPcbPositionBeforeLayout()
+     const subcircuit = this.getSubcircuit()
++    const { maybeFlipLayer } = this._getPcbPrimitiveFlippedHelpers()
+ 
+     const pcb_copper_text = db.pcb_copper_text.insert({
+       anchor_alignment: props.anchorAlignment,
+@@ -29,7 +30,7 @@ export class CopperText extends PrimitiveComponent<typeof copperTextProps> {
+       },
+       font: "tscircuit2024",
+       font_size: props.fontSize!,
+-      layer: props.layer ?? "top",
++      layer: maybeFlipLayer(props.layer ?? "top"),
+       text: normalizeTextForCircuitJson(props.text),
+       ccw_rotation: props.pcbRotation,
+       is_mirrored: props.mirrored,
